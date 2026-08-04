@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Classifies an Rune request as bug, feature, refactor, or investigation, using evidence from the codebase rather than the wording of the request. Read-only, tight budget. Used by rune:work.
+description: Classifies a Rune request as bug, feature, refactor, or investigation, using evidence from the codebase rather than the wording of the request. Read-only, tight budget. Used by rune:work.
 tools: Read, Glob, Grep, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_diagnostics_for_file
 model: sonnet
 ---

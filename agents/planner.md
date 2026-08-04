@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Decomposes an Rune milestone into encapsulated, independently verifiable task files against real code. The one step where model strength matters most. Used by rune:work.
+description: Decomposes a Rune milestone into encapsulated, independently verifiable task files against real code. The one step where model strength matters most. Used by rune:work.
 tools: Read, Glob, Grep, Write, Edit, Bash, PowerShell, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__find_declaration, mcp__serena__list_memories, mcp__serena__read_memory
 model: opus
 ---

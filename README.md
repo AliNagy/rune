@@ -36,6 +36,18 @@ claude --plugin-dir /path/to/rune
 Skills, subagents, and model tiering all install together — there is nothing to copy by
 hand.
 
+### OpenCode
+
+Rune is authored for Claude Code, but a generator emits an OpenCode variant:
+
+```bash
+node scripts/sync-opencode.mjs
+```
+
+Skills become `/rune-init`, `/rune-vision`, and so on. See [docs/opencode.md](docs/opencode.md)
+for options and — importantly — the known gaps, chiefly that OpenCode has no worktree
+isolation for subagents, which weakens the stateless-restart guarantee.
+
 ## Use
 
 | You want to | Run |
