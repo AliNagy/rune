@@ -1,0 +1,21 @@
+{
+  "name": "rune",
+  "description": "A context-budgeted development workflow. Maps a project's road to v1, then executes it as encapsulated tasks in isolated worktrees, keeping every unit of work under ~150k context by holding all state on disk.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ali Nagy",
+    "email": "alinagy50@gmail.com",
+    "url": "https://github.com/AliNagy"
+  },
+  "homepage": "https://github.com/AliNagy/rune",
+  "repository": "https://github.com/AliNagy/rune",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "context-management",
+    "planning",
+    "subagents",
+    "serena",
+    "tdd"
+  ]
+}

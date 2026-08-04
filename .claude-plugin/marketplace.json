@@ -1,0 +1,15 @@
+{
+  "name": "rune",
+  "description": "Context-budgeted development workflows for coding agents.",
+  "owner": {
+    "name": "Ali Nagy",
+    "email": "alinagy50@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "rune",
+      "source": "./",
+      "description": "A context-budgeted development workflow. Maps a project's road to v1, then executes it as encapsulated tasks in isolated worktrees, keeping every unit of work under ~150k context by holding all state on disk."
+    }
+  ]
+}
