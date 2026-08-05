@@ -187,6 +187,11 @@ rationale: —
 converts "make suggestions, never assumptions" from a personality instruction into a
 checkable property. Recommendations are encouraged; silently adopting one is not.
 
+Executors use the same record to ask questions mid-task. They add `raised_by: T-nnn`, stop
+with `status: question`, and the task sits `awaiting` until the decision is made. Reusing
+this format rather than inventing a question artifact means one gate, one place to look,
+and one thing for the user to resolve.
+
 ## Handoff note
 
 Written when an executor stops early. Read by a stranger, always.
@@ -194,7 +199,7 @@ Written when an executor stops early. Read by a stranger, always.
 ```markdown
 # T-014 handoff
 stopped_at: step 2 of 3
-reason: drift | budget | blocked
+reason: drift | budget | blocked | question
 what_exists: TokenStore.rotate implemented and unit-tested; not yet wired into handle()
 what_surprised_me: handle() is called from two places, not one — see src/ws/upgrade.ts
 worktree: kept | discarded

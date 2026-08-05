@@ -151,6 +151,18 @@ desync from reality the way a hand-maintained progress file can.
 symbols. For a milestone three steps out those files don't exist yet, so anything written
 now is fiction that drifts on contact. Plan the whole road, pave one section at a time.
 
+**Tasks run in parallel when their file lists don't overlap.** Up to three at once, each
+in its own worktree, merged one at a time with the checks re-run after each — because
+disjoint file lists rule out textual conflicts but not semantic ones.
+
+**Executors can ask you something.** A worker that hits a choice you'd want a say in
+writes an open decision with its recommendation and stops, rather than guessing. It only
+asks when the answer changes behaviour you'd notice and neither the task nor the
+surrounding code settles it.
+
+**You hear from it at every checkpoint.** After each task, each batch, each milestone, and
+every blocker — TL;DR first, plain words, no commentary in between.
+
 ## Layout
 
 ```
@@ -162,6 +174,7 @@ skills/
   init  vision  work  continue          you invoke these, as /rune:<name>
 
   ai-taskfmt      the file schemas — the spine
+  ai-report       when to speak to the user, and how
   ai-serena       context-frugal code access
   ai-oracle       establishing and running pass/fail checks
   ai-survey       codebase reconnaissance

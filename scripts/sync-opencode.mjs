@@ -32,7 +32,7 @@ const AGENTS = {
 }
 
 const AI_SKILLS = [
-  'taskfmt', 'serena', 'oracle', 'survey', 'decompose',
+  'taskfmt', 'serena', 'oracle', 'survey', 'decompose', 'report',
   'bug', 'feature', 'refactor', 'investigate', 'drift', 'verify', 'ledger',
 ]
 

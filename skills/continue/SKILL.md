@@ -72,25 +72,29 @@ Summarise what was settled in two or three lines so they can correct you, then c
 
 ## 4. Report
 
-Say what was repaired, not just what exists. Silent repair looks like nothing happened,
-and the user needs to know work was discarded.
+Follow `ai-report`. Say what was **repaired**, not just what exists — silent repair looks
+like nothing happened, and the user needs to know work was thrown away.
 
 ```
-Resumed · M-03 Session lifecycle
+TL;DR
+- Back on M-03, session lifecycle. 2 of 4 tasks done.
+- Cleaned up after the last session: T-016 died mid-edit, its work was discarded.
+- Need you: the plan assumed one entry point into session handling, there are two.
 
-  reconciled
-    T-016  was in_progress, no handoff — worktree had 40 lines, discarded → pending
-    T-018  blocked by DRF-003 (recorded, was missing from ledger)
+Repaired
+- T-016 was marked in progress with nobody working on it. 40 lines of unexplained
+  changes, no notes — discarded, back in the queue.
+- T-018 was missing that it depends on the same problem. Recorded.
 
-  state
-    T-014  done      T-015  done
-    T-016  pending   T-017  blocked by DRF-003
+Where things stand
+  done       T-014 rotate tokens · T-015 refresh endpoint
+  queued     T-016 restart persistence
+  waiting    T-017, T-018
 
-  decisions   9 decided · 0 open
-  oracle      npm test — passing
+Tests pass. No decisions outstanding.
 
-DRF-003 says handle() has two call sites; T-016 assumed one.
-Re-decompose the remainder of M-03, or retry T-016 as specified?
+The problem: handle() is called from two places, not one. T-016 assumed one.
+Re-split the rest of M-03, or retry T-016 as written?
 ```
 
 ## Rules

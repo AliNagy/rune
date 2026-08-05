@@ -93,6 +93,54 @@ If a task drifts or exhausts budget repeatedly, that is a decomposition problem.
 in the drift record. A task that keeps bouncing was cut too large, and that is
 information about the planner.
 
+## Stopping to ask the user something
+
+You cannot talk to the user. The dispatcher can. So when you hit a choice you have no
+authority to make, end your run and hand the question up.
+
+**The tripwire: ask only when the answer changes behaviour the user would notice, and the
+task spec does not settle it.**
+
+- A technical choice inside your change surface — helper name, loop or map, where a
+  private function lives → **decide it yourself**, note it, continue.
+- A choice the user would notice and might disagree with — what happens to expired data,
+  whether an error is silent or loud, what a default value is → **ask**.
+- The task spec already answers it → **do not ask**. Re-read it.
+- The code already answers it — an existing convention, a pattern used everywhere else →
+  **do not ask**. Follow the convention and say you did.
+
+An agent that asks about things it could have determined is worse than one that guesses,
+because it spends the user's attention, which is the scarcest thing in the system.
+
+When you do ask, write an open decision record rather than inventing a new artifact —
+`.agent/decisions.md` already exists and the same gate already blocks on it:
+
+```markdown
+## DEC-012 · Expired session rows
+status: open
+raised_by: T-017
+options:
+  - Delete the row - simpler, no cleanup job
+  - Keep it flagged - supports "you were logged out at 4pm", needs a sweep
+recommendation: keep flagged
+decided: -
+rationale: -
+```
+
+Then write your handoff, **keep** the worktree — the work so far is usually fine, it is
+just blocked — and return:
+
+```
+status: question
+task: T-017
+worktree: kept
+decision: DEC-012
+summary: expired sessions - delete or flag? blocked until decided
+```
+
+Give a recommendation every time. "I don't know, you decide" wastes the round trip; the
+user wants your read, they just want the final call.
+
 ## What not to do
 
 **Do not widen scope to be helpful.** Fixing an unrelated bug you noticed inside another

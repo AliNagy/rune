@@ -103,21 +103,29 @@ Add `.agent/worktrees/` to `.gitignore` if worktrees will live inside the repo.
 
 ## Report
 
-Short. The detail is on disk.
+Follow `ai-report`. TL;DR first, plain words, detail stays on disk.
 
 ```
-Initialized · TypeScript/Fastify/Postgres · 7 modules
+TL;DR
+- Ready. TypeScript/Fastify/Postgres, 7 modules mapped.
+- `npm test` passes in 34s — that is what every task will be checked against.
+- Found 3 unfinished things worth knowing about before you plan.
 
-  oracle      npm test — passing (34s)
-  build       ok       typecheck ok       lint 14 pre-existing errors
-  serena      active
-  git         clean, worktrees available
+Checks     tests pass (34s) · build ok · typecheck ok · lint has 14 pre-existing errors
+Setup      Serena active · git clean · worktrees available
 
-  completeness  3 stubs · 1 orphan module (billing) · 1 contradiction (dual user model)
-  confidence    map high · conventions medium (4 files sampled)
+Unfinished
+- src/auth/refresh.ts — rotate() returns null and nothing calls it
+- src/billing/ — nothing anywhere imports it
+- two user models: src/models/User.ts and src/db/user.ts
 
-Next: /rune:vision to map the road, or /rune:work if you already have one.
+Confidence  module map high · conventions medium (sampled 4 files)
+
+Next: /rune:vision to map the road, or /rune:work if you already know what you want.
 ```
+
+Say "tests pass", never "the oracle is green". The internal vocabulary is for the skills,
+not the user.
 
 ## Rules
 

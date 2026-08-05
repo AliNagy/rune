@@ -37,8 +37,9 @@ oracle: npm test            # or: none (degraded)
 pending ──claim──> in_progress ──report──> verifying ──pass──> done
                         │                      │
                         │                      └──fail──> pending (attempt++)
-                        ├──drift──> drifted
-                        └──budget──> pending (handoff written)
+                        ├──drift────> drifted
+                        ├──budget───> pending (handoff written)
+                        └──question─> awaiting (open decision recorded)
 ```
 
 - `pending` — available, provided `blocked_by` is empty or all resolved
@@ -46,16 +47,37 @@ pending ──claim──> in_progress ──report──> verifying ──pass�
 - `verifying` — executor reported success; awaiting an independent check
 - `done` — verified by a *different* agent in a clean context. Never self-declared
 - `drifted` — the plan was wrong; a drift record exists; downstream may be invalid
+- `awaiting` — blocked on a user decision. Names the `DEC-nnn`; worktree kept
 - `blocked` — cannot proceed for an external reason, stated in the row
 
 Only the parent writes these. A task is never `done` because the executor said so —
 only because `ai-verify` confirmed it.
 
+`awaiting` returns to `pending` the moment its decision is marked `decided`. A fresh
+executor picks it up with the handoff, the worktree diff, and the resolved decision.
+
 ## Claiming
 
-Pick the lowest-id `pending` task whose `blocked_by` are all `done`. Earlier tasks
-usually establish groundwork later ones assume. If several are eligible and independent,
-they may run in parallel — each in its own worktree.
+Pick the lowest-id `pending` task whose `blocked_by` are all `done`.
+
+### Claiming several at once
+
+Multiple tasks may run concurrently, each in its own worktree, when **their change
+surfaces share no files**. That is the whole condition, and it is checkable — every task
+declares its surface, so compare the lists.
+
+- Cap concurrent executors at **3**. Beyond that, merge and cost overhead outweighs the
+  wall-clock win.
+- Record every holder in its row. Two rows may be `in_progress` at once; each names its
+  own worktree.
+- If all eligible tasks overlap, run one. Serial is the fallback, not a failure.
+
+Merge completed tasks **one at a time**, and re-run the project checks after each. Disjoint
+file lists rule out textual conflicts but not semantic ones — one task can rename something
+another calls without either touching the other's files.
+
+A task whose merge conflicts or breaks the checks goes back to `pending` with a note that
+the ground moved. Already-applied merges stay; do not unwind a whole batch for one.
 
 ## Crash reconciliation
 

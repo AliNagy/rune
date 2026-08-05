@@ -42,14 +42,24 @@ from nothing.
 outside every acceptance criterion in the ledger. Note it in the drift record and leave
 it.
 
+**You cannot talk to the user — the dispatcher can.** When you hit a choice the user would
+notice and might disagree with, and neither the task spec nor an existing convention
+settles it, write an open decision record with your recommendation and stop with
+`status: question`. Keep the worktree; the work so far is blocked, not wrong.
+
+Ask only for choices that change visible behaviour. Anything you could have determined
+from the spec or the surrounding code, determine — spending the user's attention on it is
+worse than deciding and noting it.
+
 ## Return (≤200 tokens)
 
 ```
-status: done | drifted | budget | blocked
+status: done | drifted | budget | blocked | question
 task: T-nnn
 worktree: kept | discarded
 summary: <one or two lines>
 drift: DRF-nnn        # if any
+decision: DEC-nnn     # if status is question
 ```
 
 Anything longer goes to `.agent/notes/`. The dispatcher must not have to read your

@@ -77,6 +77,24 @@ work that could have run in parallel and lengthens the whole milestone.
 Number tasks in the order you would naturally do them. When several are eligible, the
 parent picks lowest id first, so numbering carries your intent without imposing it.
 
+## Cutting for parallelism
+
+Tasks run concurrently when their **change surfaces share no files**. You control that
+directly, so cut with it in mind — it is the difference between a milestone that takes one
+pass and one that takes four.
+
+- Prefer cuts along module boundaries over cuts along layers. Two tasks in `auth/` and
+  `worker/` can run together; "the interfaces" and "the implementations" cannot.
+- When two tasks would both touch one shared file, ask whether that edit can be pulled
+  into a single earlier task that both then depend on. One extra dependency often unlocks
+  three parallel tasks.
+- Be honest in the change surface. A task that quietly touches a file it did not declare
+  will collide with whatever else is running, and the merge will be a mess nobody can
+  attribute.
+
+Do not contort a decomposition to manufacture parallelism. Correct and serial beats clever
+and tangled — the context ceiling is the constraint that matters, not wall-clock.
+
 ## Sanity pass
 
 Before writing files, check each task against:

@@ -94,28 +94,71 @@ default. `--auto` skips it when the user has earned confidence in the plan.
 
 ## 4. Dispatch
 
-Claim the lowest-id `pending` task whose `blocked_by` are resolved. Independent tasks may
-run in parallel.
+### Choosing a batch
 
-Each executor gets:
+A task is eligible when its `blocked_by` are all resolved. Among eligible tasks, dispatch
+several at once when — and only when — **their change surfaces are disjoint.**
+
+That second condition is the real constraint, and it is checkable: every task declares its
+change surface, so compare the file lists. Two tasks touching the same file will conflict
+at merge, and the time lost untangling that exceeds anything parallelism won.
+
+- **Cap: 3 concurrent executors.** Past that, merge conflicts and cost dominate.
+- Prefer lowest ids when choosing which eligible tasks to include — earlier tasks usually
+  establish ground later ones assume.
+- One task left, or all eligible tasks overlap? Run it alone. Serial is the fallback, not
+  a failure.
+
+Tell the user what went out, per `ai-report`:
+
+```
+Dispatched 3 in parallel: T-014 (auth), T-017 (worker), T-019 (api).
+No shared files. T-015 waits on T-014.
+```
+
+### What each executor gets
 
 - **`isolation: "worktree"`** — its own git worktree. This is what makes stateless
-  restart safe: a dead executor's torn state is discarded with the worktree, and the next
-  attempt starts from a clean base with no forensics.
+  restart safe *and* what makes parallelism safe: each executor edits its own checkout,
+  and a dead one's torn state is discarded with the worktree.
 - Cheap model, one task id, and nothing else. It reads its own task file.
 - `ai-taskfmt`, `ai-serena`, `ai-drift` loaded.
 
 Executors report ≤200 tokens:
 
 ```
-status: done | drifted | budget | blocked
+status: done | drifted | budget | blocked | question
 task: T-014
 worktree: kept | discarded | merged
 summary: rotate() implemented and wired; red-then-green recorded
 drift: DRF-003          # if any
+decision: DEC-012       # if status is question
 ```
 
 Record it. Do not read the worktree.
+
+### Merging a batch
+
+Verify each task independently first (step 5), then merge **one at a time, in the order
+they finished**. After every merge, re-run the project oracle.
+
+Disjoint file lists prevent textual conflicts, not semantic ones — task A can rename
+something task B calls without either touching the other's files. Running the checks after
+each merge is what catches that, and it tells you exactly which merge broke it.
+
+If a merge conflicts or the oracle fails after it: that task goes back to `pending` with a
+note saying the ground moved under it. The merges already applied stay. Do not unwind the
+whole batch for one bad merge.
+
+### When an executor asks a question
+
+`status: question` means the executor hit a choice it has no authority to make. It has
+written an open decision record and stopped.
+
+Do not answer it yourself. Surface it to the user per `ai-report` — question first,
+options, your recommendation — and keep the rest of the batch running while you wait. When
+the decision lands, re-dispatch the task; a fresh executor picks up the handoff, the
+worktree diff, and the now-resolved decision.
 
 ## 5. Verify
 
@@ -138,24 +181,35 @@ Per `ai-ledger`:
   it now is. Do not patch task files one at a time; patched specs accumulate
   contradictions with their own amendments until nobody can tell what is still true.
 
-Then loop to the next available task.
+Then report, and loop to the next batch.
+
+## Keeping the user informed
+
+Load `ai-report` and follow it. The cadence it defines is not optional — the user asked
+to hear from you at checkpoints, not only at the end.
+
+Report after **every** verified task, every completed batch, every milestone, and every
+blocker. Stay quiet in between: no narrating dispatches, no commentary on your own
+reasoning.
+
+Everything you write opens with a TL;DR and uses plain words. Say "the tests pass", not
+"the oracle is green". Say "the plan was wrong about X", not "DRF-003".
 
 ## Stopping
 
 Stop and return to the user when: the milestone is complete, an `open` decision blocks
-progress, drift invalidates a substantial part of the plan, the same task fails twice, or
-nothing is dispatchable.
-
-Report against the ledger, briefly:
+progress, an executor asked a question, drift invalidates a substantial part of the plan,
+the same task fails twice, or nothing is dispatchable.
 
 ```
-M-03 · 3 of 4 done
+TL;DR
+- M-03 is 3 of 4 done. Rotation, refresh endpoint, and the sweep job all work.
+- One task stalled: the plan assumed one entry point into session handling, there are two.
+- Need you: split it in two, or widen the existing task?
 
-  T-014  done       T-015  done       T-016  drifted (DRF-003)
-  T-017  blocked by DRF-003
-
-DRF-003: handle() has two call sites; T-016 assumed one.
-Re-decompose the remainder of M-03?
+Done       T-014 rotate tokens · T-015 refresh endpoint · T-017 expiry sweep
+Stalled    T-016 restart persistence
+Waiting    T-018, T-019 — they assumed the same single entry point
 ```
 
 A task failing twice is a signal about the *plan*, not the executor. Say so rather than

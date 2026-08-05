@@ -133,16 +133,32 @@ section and the open decision queue. Nothing is held in conversation memory.
 
 ## Finishing
 
-```
-Vision complete · 6 milestones to v1
+Follow `ai-report`.
 
-  M-01  thin slice: login → dashboard          ← start here
+```
+TL;DR
+- Vision done. 6 milestones between here and a working v1.
+- Start with M-01: login through to dashboard, the thinnest path through the whole stack.
+- Nothing is waiting on you.
+
+Milestones
+  M-01  login → dashboard          ← start here
   M-02  session lifecycle
   M-03  profile CRUD
-  ...
+  M-04  ...
 
-  decisions   9 decided · 0 open
-  discrepancies  3 gaps mapped (billing: user chose to cut)
+Decisions   9 settled, none outstanding
+Gaps        3 found between what you described and what exists
+            billing: you chose to cut it
 
-Next: /rune:work to decompose and start M-01.
+Next: /rune:work to break M-01 into tasks and start.
 ```
+
+## While the interview runs
+
+Report at natural section boundaries, not after every answer. When a section settles, say
+in two lines what was decided and what comes next — then continue.
+
+The exception is anything that changes the shape of the project: a discovery in the
+survey, a decision that invalidates something already settled, a scope question the user
+has not considered. Surface those immediately.
