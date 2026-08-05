@@ -44,7 +44,7 @@ each answer reshapes what is worth asking next.
 
 ## Mode B · In-progress project
 
-1. **Survey** — dispatch `ai-survey` (subagent, cheap model). Returns stack,
+1. **Survey** — dispatch `ai-survey` as a subagent. Returns stack,
    modules, conventions, and the completeness assessment: stubs, orphans, half-wired
    paths, contradictions, abandoned directions.
 2. **Present what is there.** Show the user what actually exists — including the awkward

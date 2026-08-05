@@ -11,7 +11,7 @@ that nobody else ever has to browse the repo to get oriented.
 
 **Always run as a subagent.** The caller — `rune:init` or `rune:vision` — must not
 read code. Survey burns context by design; that cost is quarantined in a worker that
-returns a digest and dies. Cheap model.
+returns a digest and dies.
 
 ## Order of work
 

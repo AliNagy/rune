@@ -22,9 +22,9 @@ decomposed as soon as vision completes.
 
 ## Before decomposing
 
-Read the real code. This is a **smart-model** step and it is the one place in Rune where
-paying for intelligence returns the most: a bad cut produces tasks that are not actually
-independent, and then every executor blows its budget rediscovering shared context.
+Read the real code. This is the step that most repays care: a bad cut produces tasks that
+are not actually independent, and then every executor blows its budget rediscovering
+shared context.
 
 1. Read `.agent/map.md` and the milestone's scope and acceptance.
 2. Use `ai-serena` to look at the actual symbols the milestone touches. Overview

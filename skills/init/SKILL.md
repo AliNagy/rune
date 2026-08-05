@@ -49,7 +49,7 @@ apply and the effective budget per task drops considerably.
 
 ### 3. Survey
 
-Dispatch `ai-survey` as a subagent, cheap model. It writes `.agent/map.md` and
+Dispatch `ai-survey` as a subagent. It writes `.agent/map.md` and
 Serena memories, and returns a ≤300 token digest.
 
 ### 4. Commands

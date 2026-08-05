@@ -42,8 +42,8 @@ Classification often cannot be done from the user's sentence. "Is this a bug or 
 simply not implemented?" is undecidable without evidence — and it is the most common
 ambiguity on an unfinished codebase.
 
-Since you cannot read code, **dispatch a triage subagent** (cheap model, tight budget,
-read-only, no edits). It returns:
+Since you cannot read code, **dispatch a triage subagent** (tight budget, read-only, no
+edits). It returns:
 
 ```
 type: bug | feature | refactor | investigation
@@ -69,9 +69,9 @@ is cheap.
 
 ## 2. Decompose
 
-Per `ai-decompose` plus the type protocol. **Smart model** — this is the one step
-where intelligence pays for itself. A bad cut produces tasks that are not independent,
-and then every executor blows its budget rediscovering shared context.
+Per `ai-decompose` plus the type protocol. This is the step that most repays care: a bad
+cut produces tasks that are not independent, and then every executor blows its budget
+rediscovering shared context.
 
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
@@ -160,7 +160,7 @@ No shared files. T-015 waits on T-014.
 
 - **`isolation: "worktree"`** where the harness supports it. Under Claude Code this is the
   Agent tool's own flag.
-- Cheap model, one task id, and nothing else. It reads its own task file.
+- One task id, and nothing else. It reads its own task file.
 - `ai-taskfmt`, `ai-serena`, `ai-drift` loaded.
 
 **No source code is ever modified outside a worktree.** The harness flag is a convenience,
@@ -210,8 +210,8 @@ worktree diff, and the now-resolved decision.
 ## 5. Verify
 
 Every `done` claim goes to a **separate** verifier in a **clean context** —
-`ai-verify`, cheap model. Never the same agent, never the same context. An executor
-is the worst possible judge of its own work.
+`ai-verify`. Never the same agent, never the same context. An executor is the worst
+possible judge of its own work.
 
 - `pass` → merge the worktree, mark `done`.
 - `fail` → back to `pending` with the finding attached. Do not have the verifier fix it.

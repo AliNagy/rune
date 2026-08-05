@@ -13,7 +13,7 @@ reasoning, only its artifacts. And **never verify your own work**; the agent tha
 the code is the worst possible judge of it. This is why verification is a separate
 dispatch and not the last step of the executor's turn.
 
-Cheap model. This is checking, not designing.
+This is checking, not designing.
 
 ## Inputs
 
