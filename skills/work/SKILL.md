@@ -26,6 +26,10 @@ workers are.
 
 ## Preconditions
 
+- **`.agent/PAUSED` exists → stop.** Report that work is paused, when and why, and that
+  `rune:pause` lifts it. Do not dispatch. Do not quietly resume because the user asked for
+  something — they may have forgotten the pause is set, and silently overriding a
+  deliberate stop makes it worthless.
 - No `.agent/rune.yml` → run `rune:init` first.
 - No `milestones.md` and the request is broad ("continue the project") → route to
   `rune:vision`. Do not invent a plan; that is vision's job and it requires the user.
@@ -181,7 +185,12 @@ Per `ai-ledger`:
   it now is. Do not patch task files one at a time; patched specs accumulate
   contradictions with their own amendments until nobody can tell what is still true.
 
-Then report, and loop to the next batch.
+Then report, and **re-check `.agent/PAUSED` before dispatching the next batch.** The user
+can pause at any point; the check belongs at the top of every loop iteration, not only at
+entry. If the flag appeared mid-run, finish and merge what is in flight, then stop — the
+same drain `pause` would have done.
+
+Otherwise, loop to the next batch.
 
 ## Keeping the user informed
 

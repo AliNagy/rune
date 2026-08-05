@@ -24,7 +24,11 @@ stranger with an empty context.
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # step ticks. single writer: the executor
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
+  PAUSED                 # present only while work is stopped. written by `pause`
 ```
+
+`PAUSED` is deliberately its own file rather than a field in the ledger. Pause is invoked
+from a separate turn by a separate agent, and the ledger has exactly one writer.
 
 ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` drift.
 

@@ -14,6 +14,7 @@ no longer true, and reporting them as status propagates the lie. Repair first.
 ## 1. Read state
 
 ```
+.agent/PAUSED       · paused? when, why, was the tree left clean?
 .agent/rune.yml     · initialized? stale? oracle?
 .agent/vision.md     · exists? complete?
 .agent/decisions.md  · any status: open?
@@ -52,6 +53,7 @@ reflected in the ledger's blocked list.
 
 | State on disk | Phase | Resume with |
 |---|---|---|
+| `.agent/PAUSED` present | deliberately stopped | **ask first** — see below |
 | no `.agent/` | nothing started | `rune:init`, then `rune:vision` |
 | `rune.yml` only | ground mapped, no plan | `rune:vision` |
 | `vision.md` partial | interview interrupted | `rune:vision` — from the last settled section |
@@ -61,6 +63,24 @@ reflected in the ledger's blocked list.
 | tasks pending | mid-milestone | `rune:work` — next available task |
 | tasks `blocked` by drift | plan needs repair | `rune:work` — re-decompose remainder |
 | all milestones done | v1 reached | report; ask what is next |
+
+### Resuming from a pause
+
+A pause is a decision someone made. Never lift it as a side effect of being asked for
+status.
+
+Reconcile as normal, report where things stand, then state the pause and **ask**:
+
+```
+TL;DR
+- Work is paused. You stopped it 3 days ago — "heading into a meeting".
+- The tree was left clean: everything in flight merged before it stopped.
+- 2 tasks still queued for M-03. Want me to pick them up?
+```
+
+Resume only on a clear yes, and delete `.agent/PAUSED` when you do. If the pause file says
+the tree was left dirty, say what is dangling before asking — the user may want to deal
+with it themselves rather than have an executor inherit it.
 
 ### Resuming a vision interview
 

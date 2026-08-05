@@ -55,9 +55,10 @@ isolation for subagents, which weakens the stateless-restart guarantee.
 | Start on a repo for the first time | `/rune:init` |
 | Map out what you're building | `/rune:vision` |
 | Build a feature, fix a bug, refactor | `/rune:work` |
+| Stop work cleanly, or check if it's stopped | `/rune:pause` |
 | Pick up in a fresh session | `/rune:continue` |
 
-Those four are the whole interface. The twelve `ai-*` skills load themselves when the
+Those five are the whole interface. The twelve `ai-*` skills load themselves when the
 situation calls for them and stay out of your slash-command palette.
 
 Typical first run on an existing project:
@@ -163,6 +164,10 @@ surrounding code settles it.
 **You hear from it at every checkpoint.** After each task, each batch, each milestone, and
 every blocker — TL;DR first, plain words, no commentary in between.
 
+**Pausing drains rather than aborts.** `/rune:pause` stops new work and lets what's
+running finish and merge, so you're never handed a half-applied change. The flag lives on
+disk, so nothing lifts it silently — not a new session, not a new request.
+
 ## Layout
 
 ```
@@ -171,7 +176,7 @@ every blocker — TL;DR first, plain words, no commentary in between.
   marketplace.json   so the repo is directly installable
 
 skills/
-  init  vision  work  continue          you invoke these, as /rune:<name>
+  init  vision  work  pause  continue   you invoke these, as /rune:<name>
 
   ai-taskfmt      the file schemas — the spine
   ai-report       when to speak to the user, and how
