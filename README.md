@@ -56,9 +56,10 @@ isolation for subagents, which weakens the stateless-restart guarantee.
 | Map out what you're building | `/rune:vision` |
 | Build a feature, fix a bug, refactor | `/rune:work` |
 | Stop work cleanly, or check if it's stopped | `/rune:pause` |
+| Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-Those five are the whole interface. The twelve `ai-*` skills load themselves when the
+Those six are the whole interface. The twelve `ai-*` skills load themselves when the
 situation calls for them and stay out of your slash-command palette.
 
 Typical first run on an existing project:
@@ -168,6 +169,16 @@ every blocker — TL;DR first, plain words, no commentary in between.
 running finish and merge, so you're never handed a half-applied change. The flag lives on
 disk, so nothing lifts it silently — not a new session, not a new request.
 
+**A killed session is recoverable, not just resettable.** Because edits always land before
+they're recorded, the only possible desync is a missing record — so the diff can be mapped
+back onto the task's declared steps to find the exact resume point. `/rune:continue` sends
+that diagnosis to a subagent rather than guessing or discarding by default.
+
+**Handing off is a first-class step, not a summary.** `/rune:handoff` sorts what's in the
+conversation into what belongs on disk permanently — conventions, decisions, constraints —
+and what's merely session context, then gives you three lines to paste into a fresh
+session.
+
 ## Layout
 
 ```
@@ -176,11 +187,13 @@ disk, so nothing lifts it silently — not a new session, not a new request.
   marketplace.json   so the repo is directly installable
 
 skills/
-  init  vision  work  pause  continue   you invoke these, as /rune:<name>
+  init  vision  work                    you invoke these, as /rune:<name>
+  pause  handoff  continue
 
   ai-taskfmt      the file schemas — the spine
   ai-report       when to speak to the user, and how
   ai-serena       context-frugal code access
+  ai-recover      salvaging a task abandoned mid-flight
   ai-oracle       establishing and running pass/fail checks
   ai-survey       codebase reconnaissance
   ai-decompose    milestone to tasks, sizing rules

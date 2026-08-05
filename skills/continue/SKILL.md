@@ -15,6 +15,7 @@ no longer true, and reporting them as status propagates the lie. Repair first.
 
 ```
 .agent/PAUSED       · paused? when, why, was the tree left clean?
+.agent/sessions/    · newest session handoff — context the ledger does not carry
 .agent/rune.yml     · initialized? stale? oracle?
 .agent/vision.md     · exists? complete?
 .agent/decisions.md  · any status: open?
@@ -39,10 +40,13 @@ session. For each:
    budget stop, `drifted` for drift.
 2. **No handoff?** The session died mid-flight. Inspect the worktree:
    - empty `git diff` → discard, set `pending`. Nothing lost.
-   - non-empty → work exists but is unexplained. **Default to discard and reset to
-     `pending`.** A fresh attempt from a clean base is cheaper and safer than asking the
-     next executor to reverse-engineer an abandoned edit. Keep only if the diff is large
-     and coherent — and say so.
+   - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** as a subagent.
+     It maps the diff onto the task's declared steps, decides whether the work is
+     salvageable, names the resume point, and writes the handoff the dead executor never
+     did. Apply its verdict — `salvage`, `discard`, or `partial` — and record it.
+
+   Do not inspect the diff yourself. Reading it is exactly the code-reading the dispatcher
+   is forbidden, and a torn worktree is expensive to read.
 3. **No row may remain `in_progress`** when you are done.
 
 Also check: orphaned worktrees with no ledger row (remove), `verifying` rows whose

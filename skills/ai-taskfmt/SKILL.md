@@ -24,8 +24,14 @@ stranger with an empty context.
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # step ticks. single writer: the executor
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
+  sessions/<stamp>.md    # session handoffs. written by `handoff`
   PAUSED                 # present only while work is stopped. written by `pause`
 ```
+
+Two different things are called a handoff, and they do not overlap. A **task** handoff
+(`notes/T-nnn.md`) explains one stopped task to the next executor. A **session** handoff
+(`sessions/<stamp>.md`) carries what a conversation knew but never wrote down, to a fresh
+session.
 
 `PAUSED` is deliberately its own file rather than a field in the ledger. Pause is invoked
 from a separate turn by a separate agent, and the ledger has exactly one writer.
