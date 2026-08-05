@@ -114,7 +114,20 @@ into Serena memories rather than `.agent/`, so the files people read stay readab
 
 ## How it works
 
-Four phases.
+You invoke one skill; it loads the others.
+
+Rune is 21 skills, but only seven can be called by name — `hello`, `init`, `vision`,
+`work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
+fourteen are marked as not user-invocable. The agent loads them itself when the situation
+calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
+sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
+
+The reason is the same one behind everything else here. Instructions for all 21 skills in
+one context window would crowd out your actual code, and most of them are irrelevant at any
+given moment. Loading them on demand means each agent carries only the rules for the job in
+front of it — and you only have to remember one command.
+
+Four phases:
 
 **1 · Set up** — `/rune:init` finds and *runs* the pass/fail command that proves the
 codebase works (`rune.yml` calls it the oracle). If there isn't one, it says so loudly and
@@ -134,72 +147,43 @@ checks each one in a separate, fresh context.
 **4 · Resume** — `/rune:continue` reads disk, sorts out state left behind by a dead
 session, and puts you back into whichever phase you were in.
 
-## The design decisions that matter
+## Why it's built this way
 
-**Agents restart instead of resuming.** Resuming a paused agent keeps its context — the
-opposite of what you want when context is the thing you're trying to save. An agent that
-runs into trouble writes a handoff note and exits; a fresh one starts again from the task
-file. With Serena, getting back up to speed costs about 10k.
+**Context is the budget.** The main session never reads source code — it holds the ledger
+and short reports, nothing else. One "just checking" file read would bring back the exact
+cost the design exists to avoid. Subagents return 200 tokens or less; anything longer goes
+to disk. And an agent in trouble writes a handoff note and exits rather than pausing,
+because resuming an agent keeps its context, which is the opposite of what you want here. A
+fresh one starts again from the task file — with Serena, about 10k to get back up to speed.
 
-**The main session never reads code.** When it dispatches subagents, everything they
-return piles up in its context. One "just checking" file read brings back the exact cost
-the whole design avoids. Subagents return 200 tokens or less; anything longer goes to disk.
+**Interrupting it is safe.** Every task runs in its own git worktree, and `git diff` is the
+authoritative record of what changed; it can't drift from reality the way a hand-updated
+progress file can. Changes are always made *before* they're recorded, so the only thing
+that can go missing is a record — and that fixes itself, because the next agent finds the
+step already done. The other order would leave a record with no change behind it, and real
+work would get skipped. That ordering is also what makes a killed session recoverable
+rather than merely resettable: the diff can be matched against the task's steps to find
+where to resume. `/rune:pause` stops new work but lets what's running finish and merge, so
+you're never left with a half-applied change, and the flag lives on disk so nothing clears
+it quietly.
 
-**Each task stands on its own.** A task carries its own goal, the files it may touch, what
-counts as done, and its test. It can be run, retried, or reviewed without knowing anything
-about the other tasks.
+**Work is checked, not claimed.** A task's test must be seen *failing* before the change is
+made, with the evidence recorded — a test written after the fix and never seen failing
+proves nothing, and a reviewer in a fresh context can't tell the two apart. Each finished
+task is then checked by a different agent that never saw the work. Tasks are self-contained
+— goal, files it may touch, what counts as done, its test — so any one can be run, retried,
+or reviewed without knowing about the others, and up to three run in parallel when their
+file lists don't overlap, merged one at a time with the checks re-run after each. Milestones
+are planned in full, but tasks only when it's time to build them: a task has to name real
+files, and for a milestone three steps out those files don't exist yet.
 
-**The test has to fail first.** A task's test must be seen *failing* before the change is
-made, with the evidence recorded. A test written after the fix and never seen failing
-proves nothing, and a reviewer working in a fresh context can't tell the two apart.
-
-**Make the change, then record it.** If a process dies between making a change and
-recording it, the only way things can end up out of step is a *missing* record — which
-fixes itself, because the next agent finds the step already done. The other order leaves a
-record with no change behind it, which makes real work get skipped.
-
-**git is the record.** Each agent works in its own worktree, and `git diff` is the
-authoritative account of what changed. It can't drift from reality the way a hand-updated
-progress file can.
-
-**Milestones are planned in full; tasks are not.** A task has to name real files and real
-functions. For a milestone three steps out, those files don't exist yet, so anything
-written now is fiction that falls apart on contact. Plan the whole road, pave one section
-at a time.
-
-**Tasks run in parallel when their file lists don't overlap.** Up to three at once, each in
-its own worktree, merged one at a time with the checks re-run after each — because separate
-file lists rule out conflicting edits but not conflicting behaviour.
-
-**Agents can ask you things.** An agent that hits a choice you'd want a say in writes down
-the open question along with its recommendation and stops, rather than guessing. It only
-asks when the answer changes behaviour you'd notice and neither the task nor the
-surrounding code settles it.
-
-**You hear from it at every checkpoint.** After each task, each batch, each milestone, and
-every blocker — summary first, plain words, no filler in between.
-
-**Pausing lets running work finish.** `/rune:pause` stops new work starting and lets what's
-already running finish and merge, so you're never left with a half-applied change. The flag
-lives on disk, so nothing clears it quietly — not a new session, not a new request.
-
-**A killed session can be picked up, not just reset.** Because changes always land before
-they're recorded, the only thing that can be missing is a record — so the diff can be
-matched against the task's steps to find exactly where to resume. `/rune:continue` hands
-that diagnosis to a subagent instead of guessing or throwing the work away.
-
-**Handing off is a real step, not a summary.** `/rune:handoff` sorts what's in the
-conversation into what belongs on disk for good — conventions, decisions, constraints — and
-what was only useful for this session, then gives you three lines to paste into a fresh
-one.
-
-**Nothing is built outside a worktree.** Agents check for one and create their own if they
-weren't given one, so the guarantee doesn't depend on which tool you're running.
-Coordination files still go to the main tree — they're needed before anything merges.
-
-**It always asks before it builds.** Every run stops once to show you the plan, the
-assumptions it made on your behalf, and what it's deliberately leaving out — then asks what
-you'd like to add. There's no flag to skip it.
+**You decide the things worth deciding.** Every run stops once before writing code to show
+you the plan, the assumptions it made on your behalf, and what it's deliberately leaving
+out — then asks what you'd like to add. There's no flag to skip it. An agent that hits a
+choice you'd want a say in writes down the question and its recommendation and stops rather
+than guessing, but only when the answer changes behaviour you'd notice and neither the task
+nor the surrounding code settles it. You get an update after each task, batch, milestone,
+and blocker: summary first, plain words.
 
 ## Layout
 
