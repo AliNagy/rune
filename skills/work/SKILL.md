@@ -78,23 +78,59 @@ user and stop. The gate is not negotiable.
 
 Write task files, register them in the ledger.
 
-## 3. Plan gate
+## 3. The gate — always
 
-**Default: stop here and show the user the ledger before any executor runs.**
+**Stop here. Every time. No implementation begins until the user has seen the plan and
+been asked whether they want to add anything.** There is no flag that skips this.
+
+Not "proceed?" — that invites a yes and nothing else. Ask for **additions**, and give them
+something concrete to react to: what you are about to do, what you decided on their behalf,
+and what you are deliberately leaving out.
 
 ```
-M-03 · Session lifecycle — 4 tasks
+About to start M-03 · session lifecycle — 4 tasks
 
-  T-014  Rotate refresh tokens        auth      ~3 files
-  T-015  Refresh endpoint             api       blocked by T-014
-  T-016  Session restart persistence  auth,db   ~4 files
-  T-017  Expiry sweep job             worker    ~2 files
+  T-014  rotate refresh tokens        auth      ~3 files
+  T-015  refresh endpoint             api       after T-014
+  T-016  session restart persistence  auth,db   ~4 files
+  T-017  expiry sweep job             worker    ~2 files
 
-Proceed?  (--auto to skip this gate in future runs)
+T-014, T-016 and T-017 touch different files, so they can run at the same time.
+
+Assumed
+- sessions expire after 30 days — nothing in the code says, I took the config default
+- rotation happens on refresh only, not on every request
+
+Not doing
+- device management and OAuth — those are M-06 and M-07
+
+Anything you want to add, change, or take out before I start?
 ```
 
-Fanning out executors that immediately start editing, off one sentence, is not a good
-default. `--auto` skips it when the user has earned confidence in the plan.
+The three things that make this gate earn its place:
+
+- **Assumptions, stated.** Anything you settled without being told. This is the last cheap
+  moment to correct them — after four tasks are built on one, it is not cheap.
+- **Exclusions, stated.** Users often assume something is included. Saying what is out
+  surfaces that before it becomes a surprise.
+- **An open question, not a yes/no.** "Proceed?" gets a yes. "Anything to add?" gets the
+  thing they had been meaning to mention.
+
+If they add something, fold it in and show the revised plan. If it changes the shape of the
+work, re-decompose rather than bolting a task on the end.
+
+A single-task fix gets a shorter version of the same thing, not a skipped one:
+
+```
+About to fix the login redirect bug.
+
+  one task, ~2 files in src/auth. Reproduced it first: the redirect drops the
+  query string when the session is renewed.
+
+Assumed you want the query string preserved rather than the redirect removed.
+
+Anything to add before I start?
+```
 
 ## 4. Dispatch
 
@@ -122,11 +158,18 @@ No shared files. T-015 waits on T-014.
 
 ### What each executor gets
 
-- **`isolation: "worktree"`** — its own git worktree. This is what makes stateless
-  restart safe *and* what makes parallelism safe: each executor edits its own checkout,
-  and a dead one's torn state is discarded with the worktree.
+- **`isolation: "worktree"`** where the harness supports it. Under Claude Code this is the
+  Agent tool's own flag.
 - Cheap model, one task id, and nothing else. It reads its own task file.
 - `ai-taskfmt`, `ai-serena`, `ai-drift` loaded.
+
+**No source code is ever modified outside a worktree.** The harness flag is a convenience,
+not the guarantee — executors verify they are in one and create their own if not, so the
+rule holds on any harness. See `agents/executor.md`. If an executor reports that it had to
+create its own, that is normal, not a fault.
+
+The rule exists twice over because it carries two loads: a dead executor's torn state is
+discarded with its worktree, and parallel executors cannot tread on each other.
 
 Executors report ≤200 tokens:
 

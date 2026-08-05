@@ -50,6 +50,17 @@ isolation for subagents, which weakens the stateless-restart guarantee.
 
 ## Use
 
+One command, and you don't need to know the others:
+
+```
+/rune:hello
+```
+
+Say what you want in plain language — "start a new project", "fix the login bug", "where
+were we", "stop". It reads the state, works out where that goes, and takes you there.
+
+The direct commands still exist if you prefer them:
+
 | You want to | Run |
 |---|---|
 | Start on a repo for the first time | `/rune:init` |
@@ -57,9 +68,7 @@ isolation for subagents, which weakens the stateless-restart guarantee.
 | Build a feature, fix a bug, refactor | `/rune:work` |
 | Stop work cleanly, or check if it's stopped | `/rune:pause` |
 | Move to a fresh session before context fills | `/rune:handoff` |
-| Pick up in a fresh session | `/rune:continue` |
-
-Those six are the whole interface. The twelve `ai-*` skills load themselves when the
+| Pick up in a fresh session | `/rune:continue` | The twelve `ai-*` skills load themselves when the
 situation calls for them and stay out of your slash-command palette.
 
 Typical first run on an existing project:
@@ -73,8 +82,9 @@ Typical first run on an existing project:
 New project, no code yet: `/rune:vision` first — init runs afterward, once the stack
 exists to inspect.
 
-`/rune:work` stops and shows you the plan before any executor runs. Pass `--auto` to skip
-that gate once you trust it.
+Before any code is written, work stops once and shows you the plan, the assumptions it
+made, and what it's leaving out — then asks what you'd like to add. That gate is not
+skippable.
 
 ## What Rune writes into your repo
 
@@ -179,6 +189,15 @@ conversation into what belongs on disk permanently — conventions, decisions, c
 and what's merely session context, then gives you three lines to paste into a fresh
 session.
 
+**Nothing is implemented outside a worktree.** Executors check and create their own if the
+harness didn't give them one, so the guarantee doesn't depend on which harness you're
+running. Coordination files still go to the main tree — they're needed before anything
+merges.
+
+**It always asks before it builds.** Every run stops once to show you the plan, the
+assumptions it made on your behalf, and what it's deliberately leaving out — then asks
+what you'd like to add. There's no flag to skip it.
+
 ## Layout
 
 ```
@@ -187,7 +206,8 @@ session.
   marketplace.json   so the repo is directly installable
 
 skills/
-  init  vision  work                    you invoke these, as /rune:<name>
+  hello                                 the front door — routes to the rest
+  init  vision  work                    or invoke these directly, as /rune:<name>
   pause  handoff  continue
 
   ai-taskfmt      the file schemas — the spine

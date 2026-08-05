@@ -36,6 +36,22 @@ session.
 `PAUSED` is deliberately its own file rather than a field in the ledger. Pause is invoked
 from a separate turn by a separate agent, and the ledger has exactly one writer.
 
+## Where writes land
+
+Source code is only ever modified inside a git worktree — never the main checkout. But
+**`.agent/` always lives in the main tree**, including files an executor writes while
+working in a worktree.
+
+| Written by an executor | Lands in |
+|---|---|
+| source changes | its worktree |
+| `notes/T-nnn.progress`, handoff notes | `.agent/` in the main tree |
+| drift and decision records | `.agent/` in the main tree |
+
+Coordination state has to be visible to the dispatcher, the verifier, and the next session
+*before* anything merges. Written inside a worktree it would appear only on merge — which
+is precisely when nobody needs it any more.
+
 ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` drift.
 
 ## Single-writer rule

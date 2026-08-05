@@ -69,22 +69,24 @@ one — that split is the whole reason the agents exist as separate definitions.
 
 ## Known gaps
 
-**No worktree isolation.** This is the significant one. Under Claude Code each executor
-runs in its own git worktree, which is what makes stateless restart safe: a dead
-executor's half-finished edits are discarded with the worktree and the next attempt starts
-clean. OpenCode's subagents have no equivalent, so executors work in the main tree.
+**No harness-level worktree isolation — handled in the executor instead.** Claude Code's
+Agent tool takes an `isolation: "worktree"` flag; OpenCode's subagents have no equivalent.
 
-The consequence is real — an executor that dies mid-task leaves the working tree in a
-state that neither matches the task's "before" nor its "after", and the next attempt has
-to diagnose that before it can work. Until this is addressed, either:
+This used to be the significant gap. It no longer is: executors verify they are in a
+worktree before touching source and run `git worktree add` themselves if not, so the
+guarantee holds on either harness. The flag is now a convenience rather than the
+mechanism.
 
-- commit before each task so `git reset --hard` is a clean undo, or
-- have the executor run `git worktree add` itself as its first step and `cd` into it.
+What you lose is automatic cleanup. Claude Code removes an unchanged worktree on its own;
+under OpenCode, abandoned worktrees accumulate under `.agent/worktrees/`. `/rune-continue`
+prunes ones with no matching ledger row, but check occasionally:
 
-Neither is as good as the harness doing it. Treat OpenCode support as usable but not at
-parity.
+```bash
+git worktree list
+git worktree prune
+```
 
-**All sixteen skills are visible.** `user-invocable: false` is a Claude Code field;
+**All the `rune-ai-*` skills are visible.** `user-invocable: false` is a Claude Code field;
 OpenCode ignores unknown frontmatter, so the twelve `rune-ai-*` skills appear in the
 palette alongside the four you actually invoke. They still work correctly if invoked by
 the model — they're just not hidden. Ignore anything starting with `rune-ai-`.

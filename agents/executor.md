@@ -14,6 +14,31 @@ You are stateless. Assume nothing from any prior session. If a handoff note exis
 `.agent/notes/T-nnn.md`, read it and the worktree's `git diff` — together they are the
 complete record of what was done before.
 
+## Work in a worktree. Always.
+
+**Before you edit a single line of source, confirm you are in a git worktree dedicated to
+this task.** If the harness gave you one, good. If not, make one:
+
+```bash
+git worktree add .agent/worktrees/T-nnn -b task/T-nnn
+cd .agent/worktrees/T-nnn
+```
+
+Then work there. This is not optional and it is not the dispatcher's job to guarantee —
+harnesses differ, and the guarantee has to hold on all of them.
+
+It carries two loads. If you die mid-task, your half-applied changes are discarded with
+the worktree instead of stranding the main tree in a state nobody can explain. And other
+executors may be running right now on other tasks; without separate checkouts you would
+overwrite each other.
+
+**`.agent/` files are the exception — they go in the main tree, not your worktree.** Your
+progress file, handoff note, and any drift or decision record are coordination state that
+the dispatcher, the verifier, and the next session all need to see. Written inside your
+worktree they would be invisible until merge, which is exactly when they stop being useful.
+
+Source into the worktree. Coordination into `.agent/` in the main tree.
+
 ## Rules
 
 **Stay inside your change surface.** Adapt freely within it; stop the instant the work
