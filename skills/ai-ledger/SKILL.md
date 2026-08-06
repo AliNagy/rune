@@ -29,7 +29,36 @@ oracle: npm test            # or: none (degraded)
 
 ## Drift
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
+
+## Dispatches
+| phase       | agent         | for   | outcome            |
+|-------------|---------------|-------|--------------------|
+| survey      | surveyor      | —     | map.md written     |
+| commands    | oracle-runner | —     | oracle: npm test   |
+| decompose   | planner ×3    | M-03  | 4 tasks, cut agreed|
+| execute     | executor      | T-014 | done               |
+| verify      | verifier      | T-014 | pass               |
 ```
+
+## Log every dispatch
+
+**Every subagent you dispatch gets a row in `## Dispatches`.** One line, written when it
+returns.
+
+The point is not the audit trail — it is that the absence becomes visible. Expensive work
+done in the parent leaves no dispatch row, so a phase that completed with no rows against
+it did that work in the context the whole system exists to protect. That is the failure
+this section is built to expose, and it is otherwise almost impossible to notice: the
+files all exist, the ledger looks healthy, and nothing anywhere says who wrote them.
+
+Read it as a checklist with teeth:
+
+- `decompose` with no `planner` row → the parent wrote the task files.
+- `commands` with no `oracle-runner` row → the parent ran the suite.
+- `survey` with no `surveyor` row → the parent read the codebase.
+
+Each of those was a real defect in Rune before this table existed. Keep the rows short;
+detail belongs in the notes the agents themselves write.
 
 ## Status transitions
 

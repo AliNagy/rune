@@ -11,6 +11,22 @@ remembered.
 **Reconcile before reporting.** A ledger left by a dead session contains claims that are
 no longer true, and reporting them as status propagates the lie. Repair first.
 
+## What you may do
+
+**You work out where things stand and say so.** Everything you are allowed to do follows
+from that, and this list is exhaustive:
+
+- **Read** `.agent/` coordination files.
+- **Write** `ledger.md`, repairing the rows a dead session left behind.
+- **Talk to the user** — the status report, and the question if one is owed.
+- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
+  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+
+**Anything not on that list is a dispatch** — above all reading a torn worktree's diff,
+which is the single most expensive thing you could do here and the reason `ai-recover`
+exists. You are the session that everything resumes from; arriving already full defeats
+the purpose of having resumed at all.
+
 ## 1. Read state
 
 ```

@@ -218,8 +218,9 @@ skills/
   ai-ledger       state updates, and cleaning up after a crash
 
 agents/
-  surveyor  triage  executor  verifier    sonnet
-  planner                                 opus
+  surveyor  triage  executor            sonnet
+  verifier  oracle-runner               sonnet
+  planner                               opus
 ```
 
 That last block is about cost: most of the work runs on the cheaper model, and only the
