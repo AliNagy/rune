@@ -33,7 +33,8 @@ const AGENTS = {
 
 const AI_SKILLS = [
   'taskfmt', 'serena', 'oracle', 'survey', 'decompose', 'report', 'recover',
-  'bug', 'feature', 'refactor', 'investigate', 'drift', 'verify', 'ledger',
+  'bug', 'feature', 'refactor', 'investigate', 'research', 'drift', 'verify',
+  'ledger',
 ]
 
 // Claude Code's /rune:init becomes OpenCode's /rune-init; bare ai-* skill
