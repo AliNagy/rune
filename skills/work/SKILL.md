@@ -13,7 +13,11 @@ The execution loop. Triage → plan → dispatch → verify → reconcile.
 from that, and this list is exhaustive:
 
 - **Read** `.agent/` coordination files — enough to report status accurately.
-- **Write** `ledger.md` and `.agent/PAUSED`.
+- **Write** `ledger.md`, and **append** the drain result to `.agent/PAUSED` if the flag
+  appears mid-run. You never create or delete that file — `pause` and `continue` do.
+- **Merge** a verified worktree into the main tree, one at a time. The only command you
+  run: bounded output either way, it must be serialised, and it is the act your ledger row
+  records.
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -85,8 +89,9 @@ Classification often cannot be done from the user's sentence. "Is this a bug or 
 simply not implemented?" is undecidable without evidence — and it is the most common
 ambiguity on an unfinished codebase.
 
-Since you cannot read code, **dispatch a subagent that follows `ai-triage`** — **one per issue**, per *One agent, one issue* above. If the user reported three
-things, that is three triage dispatches, run concurrently. Never hand one triage agent a
+Since you cannot read code, **dispatch a subagent that follows `ai-triage`** — **one per
+issue**, per *One agent, one issue* above. If the user reported three things, that is
+three triage dispatches, run concurrently. Never hand one triage agent a
 list, even when the issues sound related: "sounds related" is a hypothesis, and batching
 them destroys the independence needed to test it.
 
@@ -119,10 +124,10 @@ is cheap.
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
 
-**Dispatch a subagent that follows `ai-decompose`. You do not write task files.** Decomposition requires
-reading real code — the one thing you may not do — so it cannot happen in your context,
-and a task file written without reading code is fiction. The planner writes
-`.agent/tasks/T-nnn.md` per `ai-decompose` and returns the task list in ≤200 tokens.
+**Dispatch a subagent that follows `ai-decompose`. You do not write task files.**
+Decomposition requires reading real code — the one thing you may not do — so it cannot
+happen in your context, and a task file written without reading code is fiction. The
+worker writes `.agent/tasks/T-nnn.md` and returns the task list in ≤200 tokens.
 
 **Dispatch two or three planners in parallel, then reconcile.** This is the one step in
 Rune that earns a fan-out, per *Judgment fans out, mechanics do not* below. Give each the
@@ -263,7 +268,15 @@ Record it. Do not read the worktree.
 ### Merging a batch
 
 Verify each task independently first (step 5), then merge **one at a time, in the order
-they finished**. After every merge, re-run the project oracle.
+they finished**.
+
+After a merge, **dispatch `ai-oracle`** to re-run the project checks in the main tree. It
+returns pass/fail against the known-red baseline in ≤200 tokens; you never see the log.
+
+**Skip that dispatch when nothing else merged since this task was verified.** `ai-verify`
+already ran the oracle in that worktree, so on a serial batch the re-run is pure
+duplication. The condition is checkable, not a judgement call: re-run only if another task
+landed in between.
 
 Disjoint file lists prevent textual conflicts, not semantic ones — task A can rename
 something task B calls without either touching the other's files. Running the checks after
@@ -277,6 +290,10 @@ whole batch for one bad merge.
 
 `status: question` means the executor hit a choice it has no authority to make. It has
 written an open decision record and stopped.
+
+The record arrives in `.agent/decisions/open/T-nnn.md` with no id. **Assign the
+`DEC-nnn`, move it into `decisions.md`, and delete the open file.** That hop is yours
+because id allocation cannot be done safely by three concurrent workers.
 
 Do not answer it yourself. Surface it to the user per `ai-report` — question first,
 options, your recommendation — and keep the rest of the batch running while you wait. When

@@ -62,10 +62,17 @@ what you would do next.
 
 **3. Decide the worktree.**
 
-- **Discard** when the work was shallow, or built on the false premise, or you are not
-  confident it is right. Default.
-- **Keep** when a substantial and independently correct piece landed — and say so in the
-  handoff, with what `git diff` will show.
+First matching rule wins:
+
+1. Any change built on the false premise → **discard**.
+2. Any change outside the declared change surface → **discard**.
+3. A declared step is fully applied, passes on its own, and does not depend on the false
+   premise → **keep**, and name that step in the handoff.
+4. Otherwise → **discard**.
+
+Discard is the default because it is the safe direction, and rule 3 is deliberately narrow
+— "a step that is finished and independent" is checkable, where "substantial work" is
+not.
 
 You do not need to journal what you changed. `git diff` in the worktree is the record; it
 is atomic with the edit and cannot desync. Say whether to trust it, not what it contains.
@@ -112,11 +119,14 @@ task spec does not settle it.**
 An agent that asks about things it could have determined is worse than one that guesses,
 because it spends the user's attention, which is the scarcest thing in the system.
 
-When you do ask, write an open decision record rather than inventing a new artifact —
-`.agent/decisions.md` already exists and the same gate already blocks on it:
+When you do ask, write an open decision record rather than inventing a new artifact — the
+same gate already blocks on it. Write it to **`.agent/decisions/open/T-nnn.md`** and
+**do not assign an id**: three executors run at once, so a shared file races and two
+workers would both reach for `DEC-012`. The parent assigns the number and moves it into
+`decisions.md`.
 
 ```markdown
-## DEC-012 · Expired session rows
+## Expired session rows
 status: open
 raised_by: T-017
 options:

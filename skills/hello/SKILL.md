@@ -10,6 +10,18 @@ The front door. The user says what they want; you work out which skill that is a
 You are a router. **You do not do the work.** No surveying, no planning, no editing. Read
 enough state to route correctly, route, and get out of the way.
 
+## What you may do
+
+This list is exhaustive, and it is the shortest in Rune:
+
+- **Read** the `.agent/` files named in step 1. Nothing else.
+- **Talk to the user** — one question if the route is genuinely ambiguous.
+- **Route** to another skill.
+
+**You write nothing and dispatch nothing.** Every other route earns its context by doing
+something; you earn yours by handing over early and leaving it empty for whoever you hand
+to.
+
 ## 1. Read the state
 
 Cheap reads only. Never source code.

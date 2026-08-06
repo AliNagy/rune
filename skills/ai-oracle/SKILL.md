@@ -39,7 +39,10 @@ already do for free; running it is the entire reason this is a separate dispatch
    `pyproject.toml`, `Cargo.toml`, CI workflow files. CI config is the best single
    source: it states what the project itself believes verifies it.
 2. Execute the candidate on a clean tree.
-3. Record the outcome honestly in `rune.yml`:
+3. **Return** the outcome honestly. You do not write `rune.yml` — the parent does, from
+   what you hand back. You write only `.agent/notes/init-commands.md`. The canonical field
+   set lives in `init` §5; do not invent a second schema for it. What the parent records
+   looks like:
 
 ```yaml
 oracle:
@@ -112,10 +115,26 @@ Run it in the task's worktree, not the main tree.
 
 - Compare against the **known-red baseline**, not against zero failures.
 - A new failure anywhere is a regression, even if the task's own test passes.
-- A flaky test is not a pass. Re-run once; if it disagrees with itself, record it as
-  flaky in `rune.yml` and treat it as uninformative for this task rather than pretending
-  it verified something.
+- A flaky test is not a pass. Re-run once; if it disagrees with itself, **report**
+  `flaky: <test name>` in your verdict and return `unverified` for the task. You do not
+  write `rune.yml` — the parent appends it to `oracle.flaky:` alongside the known-red
+  baseline it belongs with.
 - Timeouts are failures, not inconclusive results.
+
+## Running the oracle after a merge
+
+`rune:work` dispatches this after landing a verified worktree in the main tree.
+
+Run the project oracle in the **main tree**, compare against the known-red baseline, and
+return ≤200 tokens:
+
+```
+oracle: pass    # or: fail — 2 new failures not in baseline
+detail: .agent/notes/merge-<T-nnn>.md    # only when it failed
+```
+
+The parent merges but never reads a suite log. That split is the whole point: merging is
+bounded, running the suite is not.
 
 ## Vacuous checks
 

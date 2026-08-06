@@ -6,8 +6,14 @@ description: Use when reading or updating .agent/ledger.md, or resuming work who
 
 # Ledger operations
 
-`.agent/ledger.md` holds **all** mutable state. One writer: the parent / dispatcher.
-Executors never touch it — they report, the parent records.
+`.agent/ledger.md` holds **all** mutable state. One writer: the parent — the same parent
+across every route, per `ai-taskfmt`. Workers never touch it; they report, the parent
+records.
+
+**This skill owns what the statuses mean and what the file looks like. The routes own the
+procedures.** Recovery belongs to `continue`, merging to `work`. Where this file used to
+restate them, it had already drifted out of step with both — so it now states the mapping
+and points at the owner.
 
 ## Shape
 
@@ -101,31 +107,31 @@ declares its surface, so compare the lists.
   own worktree.
 - If all eligible tasks overlap, run one. Serial is the fallback, not a failure.
 
-Merge completed tasks **one at a time**, and re-run the project checks after each. Disjoint
-file lists rule out textual conflicts but not semantic ones — one task can rename something
-another calls without either touching the other's files.
+**The merge procedure lives in `work`.** Here, only what it does to a row: a task whose
+merge conflicts or fails the checks goes back to `pending` with a note that the ground
+moved. Already-applied merges stay; do not unwind a whole batch for one.
 
-A task whose merge conflicts or breaks the checks goes back to `pending` with a note that
-the ground moved. Already-applied merges stay; do not unwind a whole batch for one.
-
-## Crash reconciliation
+## Crash reconciliation — what the verdicts mean
 
 A task marked `in_progress` with no live executor is a lie. Nobody is working on it.
-This is the most common way a ledger stops describing reality, and `rune:continue`
-must repair it rather than merely report it.
 
-For each `in_progress` row:
+**The procedure lives in `continue`.** It dispatches `ai-recover` and hands you a verdict.
+You record it. **Never inspect a worktree diff yourself** — that is unbounded reading in
+the one context that must stay small, and it is why the recovery dispatch exists.
 
-1. **Is there a handoff note?** (`notes/T-nnn.md`) If yes, the executor stopped
-   deliberately — follow its `worktree: kept|discarded` instruction and set the status
-   it implies (`pending` for budget stops, `drifted` for drift).
-2. **No handoff?** The session died mid-flight. Inspect the worktree:
-   - `git diff` empty → discard the worktree, set `pending`. Nothing was lost.
-   - `git diff` non-empty → the work is real but unexplained. Default to **discard and
-     reset to `pending`**; a fresh attempt from a clean base is cheaper and safer than
-     asking the next executor to reverse-engineer an abandoned edit. Keep it only if the
-     diff is large and coherent, and say so in the row.
-3. **Never leave a row `in_progress`** at the end of reconciliation.
+Your job is the mapping:
+
+| What comes back | Status | Worktree |
+|---|---|---|
+| handoff note says `budget` | `pending` | kept |
+| handoff note says `drift` | `drifted` | per the note |
+| `ai-recover` → `salvage` | `pending`, resume point in the row | kept |
+| `ai-recover` → `partial` | `pending`, note that the test must be redone red-first | kept |
+| `ai-recover` → `discard` | `pending` | dropped |
+| empty diff, no note | `pending` | dropped |
+
+**No row may remain `in_progress`** when reconciliation ends. That is the one invariant
+this section guarantees.
 
 ## Drift invalidation
 

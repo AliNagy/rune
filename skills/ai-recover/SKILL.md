@@ -48,31 +48,33 @@ So:
 
 ## Deciding
 
-**Salvage** — keep the worktree, resume from the named step. Requires all of:
+**Ordered rules. First match wins. Stop there.**
 
-- every changed file is inside the declared change surface
-- the applied steps are coherent — no half-renamed symbol, no import pointing at something
-  that was not created
-- enough was done that redoing it costs more than reading it
+| # | If | Verdict |
+|---|---|---|
+| 1 | any changed file is outside the declared change surface | **discard** |
+| 2 | the diff contradicts itself, or you cannot say what it was trying to do | **discard** |
+| 3 | the task's premise looks false in light of the diff | **discard** + write a drift record |
+| 4 | fewer than 20 changed lines | **discard** |
+| 5 | a test file exists but the progress file has no red evidence | **partial** |
+| 6 | any declared step is fully or partly applied | **salvage**, resume at the first unfinished step |
+| 7 | otherwise | **discard** |
 
-**Discard** — reset to `pending`, drop the worktree. Any of:
+Nothing here asks you to weigh "was it nearly done" or "is this coherent enough". Those
+were the old criteria and two agents reading one diff could answer them differently — which
+is the whole failure this table removes. Walk the rules in order and take the first hit.
 
-- the diff touches files outside the change surface. The executor had already drifted
-  before it died; whatever it was doing is not what the task says.
-- the changes are small. Under a handful of lines, restarting from clean is cheaper and
-  safer than reasoning about someone else's abandoned edit.
-- the diff contradicts itself, or you cannot explain what it was trying to do.
-- the task's premise looks false in light of what the diff reveals — that is drift, not a
-  recovery problem. Write a drift record and say so.
+**Why 20 lines.** Below that, restarting from clean is cheaper than any agent reading and
+reasoning about an abandoned edit. The exact number matters less than that it is a number.
 
-**Partial salvage** — keep the worktree but reset the test. If a test file exists and the
-progress file has **no red evidence**, the red-then-green chain is broken and cannot be
-reconstructed after the fact. The code may be fine; the test is unproven. The resumed task
-must revert the change, observe the test fail, and re-apply — or write a fresh test.
+**Why discard is the fallback.** Under Serena a fresh executor re-acquires its working set
+for about 10k. Abandoned work of unknown provenance is worth less than the clean base it
+occupies.
 
-That case is easy to miss and it matters. A test that was never seen failing is
-indistinguishable from one that cannot fail, and `ai-verify` will correctly refuse to pass
-it.
+**What partial means.** Keep the worktree, keep the code, reset the test. The red-then-green
+chain is broken and cannot be reconstructed after the fact — `ai-verify` will correctly
+refuse to pass a test that was never seen failing. The resumed task must revert, observe
+the failure, and re-apply, or write a fresh test.
 
 ## Return
 

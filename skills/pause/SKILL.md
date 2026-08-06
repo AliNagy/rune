@@ -26,11 +26,28 @@ minute is almost always cheaper.
 If nothing is running, pause still applies — it becomes a *don't start* flag. Useful
 before handing the repo to someone else.
 
+## What you may do
+
+**You stop the loop and leave the tree safe to walk away from.** This list is exhaustive:
+
+- **Read** `.agent/` coordination files.
+- **Write** `.agent/PAUSED`, and `ledger.md` to settle the rows you drained.
+- **Talk to the user** — the report, and the confirmation before `abandon`.
+- **Dispatch subagents**, naming the skill each one must follow.
+
+**Anything not on that list is a dispatch** — including the verification and the checks in
+the drain below. You do not run them; you dispatch them and record what comes back.
+
 ## What it writes
 
-Its own file, `.agent/PAUSED` — never the ledger. The ledger has exactly one writer, the
-dispatcher, and pause is invoked from a different turn by a different agent. A second
-writer there would be the one thing `ai-ledger` forbids.
+`.agent/PAUSED` is its own file rather than a ledger field so the flag can be set *before*
+the ledger is even read — step 1 below — and so `work`'s precondition is one
+file-existence test rather than a ledger parse.
+
+**You also write `ledger.md`.** Single-writer means one *role*, and pause is the parent,
+exactly as `work` and `continue` are. There is no second agent here, only the same main
+agent in a later turn — and without that write, step 4's promise that no task is left
+`in_progress` would be impossible to keep.
 
 ```markdown
 paused: 2026-08-05T14:22Z
@@ -50,8 +67,9 @@ state, say so explicitly and say what is dangling.
 1. **Set the flag first**, before anything else. If this turn dies, the pause still holds.
 2. Read the ledger. Identify what is in flight.
 3. Apply the mode:
-   - **drain** — wait for each in-flight executor, verify, merge one at a time, re-run the
-     checks after each. Then stop.
+   - **drain** — wait for each in-flight executor, **dispatch `ai-verify`** for each, merge
+     one at a time, and **dispatch `ai-oracle`** after the merges. Then stop. You merge;
+     you do not run the checks yourself.
    - **stop** — signal executors to write handoffs and stop. Set their tasks to `pending`
      with the handoff attached. Keep the worktrees.
    - **abandon** — discard in-flight worktrees, reset those tasks to `pending`.

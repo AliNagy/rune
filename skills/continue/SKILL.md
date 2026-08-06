@@ -18,6 +18,8 @@ from that, and this list is exhaustive:
 
 - **Read** `.agent/` coordination files.
 - **Write** `ledger.md`, repairing the rows a dead session left behind.
+- **Delete** `.agent/PAUSED` when the user confirms a resume. You never create it — that
+  is `pause`.
 - **Talk to the user** — the status report, and the question if one is owed.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -54,8 +56,9 @@ session. For each:
 1. **Handoff note present?** The executor stopped deliberately. Follow its
    `worktree: kept|discarded` instruction and set the status it implies — `pending` for a
    budget stop, `drifted` for drift.
-2. **No handoff?** The session died mid-flight. Inspect the worktree:
-   - empty `git diff` → discard, set `pending`. Nothing lost.
+2. **No handoff?** The session died mid-flight. Check only whether the worktree's diff is
+   empty — that is a yes/no, not a read:
+   - empty → discard, set `pending`. Nothing lost.
    - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** as a subagent.
      It maps the diff onto the task's declared steps, decides whether the work is
      salvageable, names the resume point, and writes the handoff the dead executor never
@@ -65,9 +68,15 @@ session. For each:
    is forbidden, and a torn worktree is expensive to read.
 3. **No row may remain `in_progress`** when you are done.
 
-Also check: orphaned worktrees with no ledger row (remove), `verifying` rows whose
-verifier never returned (back to `verifying`, re-dispatch), and drift records not yet
-reflected in the ledger's blocked list.
+Also check:
+
+- orphaned worktrees with no ledger row → remove
+- `verifying` rows whose verifier never returned → re-dispatch
+- drift records not yet reflected in the ledger's blocked list
+- **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
+  session died before it reached the user. Assign the `DEC-nnn`, move it into
+  `decisions.md`, set the task `awaiting`, and surface it. This is the self-healing path
+  and it is the whole reason those files exist.
 
 ## 3. Determine phase and route
 

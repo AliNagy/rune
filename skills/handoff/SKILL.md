@@ -21,6 +21,19 @@ currently lives only in a conversation that is about to end.
 Do not wait for the ceiling. A handoff written at 70% is thorough; one written at 95% is
 rushed and lossy, which defeats the point.
 
+## What you may do
+
+**You move what this conversation knows onto disk, then get out.** This list is exhaustive:
+
+- **Read** `.agent/` coordination files.
+- **Write** `vision.md`, `decisions.md`, and `sessions/<stamp>.md`.
+- **Talk to the user** — the paste block at the end.
+- **Dispatch subagents**, naming the skill each one must follow.
+
+**Anything not on that list is a dispatch**, including `map.md` and Serena memories. You
+are the most context-starved parent in the system by the time you run; this is the worst
+possible place to start reading files.
+
 ## 1. Settle the tree first
 
 If work is in flight, drain it exactly as `pause` does — let executors finish, verify,
@@ -41,11 +54,18 @@ twice.
 
 | What you found | Where it goes |
 |---|---|
-| a convention the user corrected you on | `map.md`, conventions section |
-| a choice made verbally | a decision record, `status: decided` |
-| a constraint on the project | `vision.md` |
-| something the user wants built later | a milestone, or a note on one |
-| a codebase gotcha you discovered | a Serena memory |
+| a convention the user corrected you on | **dispatch `ai-survey`** — one convention → `map.md` |
+| a codebase gotcha you discovered | **dispatch `ai-survey`** — one gotcha → a Serena memory |
+| a choice made verbally | you write it — `decisions.md`, `status: decided` |
+| a constraint on the project | you write it — `vision.md` |
+| something the user wants built later | you write it — `vision.md`, as a want |
+
+The two dispatches are not ceremony. You are running at ~70% context by definition — the
+worst possible moment to open `map.md`, find the right section, and check a new line does
+not contradict what is already there. One dispatch per item, never a list.
+
+A want goes to `vision.md`, **not** `milestones.md`. A passing remark is not a plan; the
+next `rune:vision` decides whether it becomes one, with the decision records that requires.
 
 **Session-transient → the handoff doc.** Approaches tried and rejected and why. Things the
 user said they would handle themselves. Threads left open that are not yet tasks. Judgement

@@ -82,8 +82,12 @@ it.
 
 **You cannot talk to the user — the dispatcher can.** When you hit a choice the user would
 notice and might disagree with, and neither the task spec nor an existing convention
-settles it, write an open decision record with your recommendation and stop with
+settles it, write an open decision record with your recommendation to
+`.agent/decisions/open/T-nnn.md` — **no id; the parent assigns it** — and stop with
 `status: question`. Keep the worktree; the work so far is blocked, not wrong.
+
+Write it to disk rather than only reporting it. Your worktree survives your death so the
+*work* is not lost; the question has to survive on the same terms.
 
 Ask only for choices that change visible behaviour. Anything you could have determined
 from the spec or the surrounding code, determine — spending the user's attention on it is
