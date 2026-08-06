@@ -152,7 +152,11 @@ session, and puts you back into whichever phase you were in.
 **Context is the budget.** The main session never reads source code — it holds the ledger
 and short reports, nothing else. One "just checking" file read would bring back the exact
 cost the design exists to avoid. Subagents return 200 tokens or less; anything longer goes
-to disk. And an agent in trouble writes a handoff note and exits rather than pausing,
+to disk. Each one carries exactly one issue — one bug, one task, one question, never a
+batch — so three reported bugs get three agents, running at the same time if they can;
+that keeps evidence from one out of the reading of another, and keeps one agent from
+holding three working sets. And an agent in trouble writes a handoff note and exits rather
+than pausing,
 because resuming an agent keeps its context, which is the opposite of what you want here. A
 fresh one starts again from the task file — with Serena, about 10k to get back up to speed.
 

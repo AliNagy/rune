@@ -17,6 +17,10 @@ the work was nearly done. Recovery is worth attempting; blind trust in a torn tr
 under 200 tokens; write the detail to `.agent/notes/T-nnn.md` as the handoff the dead
 executor never wrote.
 
+**One abandoned task per subagent.** A session that died mid-batch can leave three torn
+worktrees; that is three recovery dispatches. Each resume point has to be read off its own
+diff, and an agent holding three diffs at once will map a step it saw in one onto another.
+
 ## The diff is the truth, the ticks are a floor
 
 Executors are required to make the edit *first* and tick the step *second*. That ordering

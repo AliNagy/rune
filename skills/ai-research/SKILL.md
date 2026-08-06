@@ -33,6 +33,11 @@ Use whatever your harness provides for the first two. If it provides neither, or
 blocked, **stop and report that** — see §9. Do not fall back to memory and do not
 improvise a substitute.
 
+**Run as a subagent, and take exactly one question.** Research burns context by design;
+that cost is quarantined in a worker that returns a digest and dies. Two questions means
+two dispatches — sources gathered for one question bias the reading of the next, and a
+single certainty grade cannot honestly cover two bodies of evidence.
+
 ## 1. Fix the question before you search
 
 Write the question down first, and the criteria with it. Searching first and stating the

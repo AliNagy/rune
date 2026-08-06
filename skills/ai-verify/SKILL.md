@@ -8,10 +8,13 @@ description: Use when confirming a completed task actually passed. Checks accept
 
 An executor reporting success is a claim, not a fact. Verification turns it into one.
 
-**Two hard rules.** Verify in a **clean context** — you must not have the executor's
-reasoning, only its artifacts. And **never verify your own work**; the agent that wrote
-the code is the worst possible judge of it. This is why verification is a separate
-dispatch and not the last step of the executor's turn.
+**Three hard rules.** Verify in a **clean context** — you must not have the executor's
+reasoning, only its artifacts. **Never verify your own work**; the agent that wrote the
+code is the worst possible judge of it. This is why verification is a separate dispatch
+and not the last step of the executor's turn. And **verify exactly one task per agent** —
+a batch of three tasks handed to one verifier produces three correlated verdicts, because
+after passing the first two it is judging the third against its own accumulated sense of
+what this batch looks like rather than against the spec.
 
 This is checking, not designing.
 

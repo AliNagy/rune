@@ -73,6 +73,21 @@ files can disagree about the same fact.
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
 
+## Single-issue rule
+
+The counterpart for agents. Single-writer keeps two agents out of one file; **single-issue
+keeps two issues out of one agent.**
+
+Every dispatched subagent carries exactly one issue — one bug to reproduce, one task to
+execute, one task to verify, one question to research, one torn worktree to recover. Never
+a list, however related the items look. Dispatch them concurrently instead; the rule bounds
+what one agent holds, not how many run at once. Stated in full in `work` under *One agent,
+one issue*.
+
+The consequence for a worker: if you find a second issue while working, **report it and
+stop**. Whether it becomes another dispatch belongs to whoever dispatched you. Taking it on
+yourself merges two contexts that the system spent a dispatch to keep apart.
+
 ## Task file
 
 A task is **encapsulated**: it carries its own goal, change surface, acceptance, and

@@ -16,6 +16,10 @@ and will pass after. Everything else in this protocol follows from that.
 Before any planning, any decomposition, any ledger entry.
 
 Use a subagent — reproduction reads code and runs things, and the parent must stay clean.
+**One bug per subagent.** Several reported bugs get several reproduction agents, never one
+agent working a list: a reproduction that has just found the cause of one bug will see that
+same cause in the next, and two bugs with one root cause is a conclusion that has to be
+reached independently, not assumed by batching.
 
 - Establish the failing case as code where possible: a test, a script, a curl.
 - Confirm it fails **now**, on the current tree, and capture the exact output.
