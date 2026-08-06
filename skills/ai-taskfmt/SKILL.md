@@ -129,18 +129,18 @@ selection is a separate concern that does not belong in these files.
 
 ### The dispatch envelope — what a worker is given
 
-Every dispatch hands over the same four things and nothing else:
+Every dispatch hands over the same shape and nothing more:
 
 ```
-follow:    ai-execute
-issue:     T-014                  # the one id, always exactly one
-isolation: worktree               # where the harness offers it; otherwise omit
-pointers:  .agent/tasks/T-014.md  # paths only, never file contents
+follow:    ai-execute                # the skill, from the table above
+task:      T-014                     # the one id. always exactly one
+isolation: worktree                  # where the harness offers it; otherwise omit
+pointers:  .agent/tasks/T-014.md     # paths only, never file contents
 ```
 
 **Pointers, not payloads.** The parent names where things are; the worker reads them
 itself. Passing content down means the parent had to hold it first, which is the cost the
-whole system exists to avoid. It also keeps every dispatch the same size no matter how big
+whole system exists to avoid — and it keeps every dispatch the same size no matter how big
 the job is.
 
 If a worker needs something not reachable from those pointers, that is a missing pointer,
@@ -148,24 +148,36 @@ not a reason to paste text into the prompt.
 
 ### The return envelope — what a worker hands back
 
-Every worker returns these three lines first, then whatever its own skill defines:
+Two lines are shared by every worker:
 
 ```
-status:  ok | blocked | question | failed
-issue:   T-014
+task:    T-014                # or the id it worked on; omit only if the job had none
 summary: <one line, plain words>
 ```
 
-Then the skill-specific body — `ai-verify` adds its verdict block, `ai-execute` adds
-worktree state, `ai-recover` adds its resume point.
+Then **one outcome field, named and enumerated by that worker's own skill**:
 
-**The header is shared; the body is not.** Do not invent a common set of fields for every
-skill. A worker handed a field it has nothing to say about will fill it anyway, and an
-invented value is worse than an absent one. `ai-triage` has no worktree; it does not get a
-worktree line.
+| The worker followed | Its outcome field |
+|---|---|
+| `ai-execute` | `status: done \| drifted \| budget \| blocked \| question` |
+| `ai-verify` | `verdict: pass \| fail \| unverified` |
+| `ai-recover` | `verdict: salvage \| discard \| partial` |
+| `ai-triage` | `type: bug \| feature \| refactor \| investigation` |
+| `ai-oracle` | `oracle: passing \| failing \| none` |
 
-Whole return stays **≤200 tokens**. Anything longer goes to disk and the summary points at
-it.
+Then whatever else that skill defines.
+
+**Do not force one vocabulary across all of them.** A verifier's outcome genuinely is not
+an executor's outcome, and `ai-execute`'s values are the ones the ledger's state machine
+consumes by name. Collapsing them into a generic `ok | failed` would lose the transition
+and gain nothing.
+
+The same goes for fields. A worker handed a field it has nothing to say about will fill it
+anyway, and an invented value is worse than an absent one — `ai-triage` has no worktree,
+so it gets no worktree line.
+
+What *is* shared: the id, one plain-words summary, an enumerated outcome, and a hard
+**≤200 tokens**. Anything longer goes to disk and the summary points at it.
 
 ### Bounded state probes
 
