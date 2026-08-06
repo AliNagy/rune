@@ -24,6 +24,7 @@ stranger with an empty context.
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # step ticks. single writer: the executor
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
+  decisions/open/T-nnn.md # a worker's question, awaiting a DEC-nnn from the parent
   sessions/<stamp>.md    # session handoffs. written by `handoff`
   PAUSED                 # present only while work is stopped. written by `pause`
 ```
@@ -33,8 +34,9 @@ Two different things are called a handoff, and they do not overlap. A **task** h
 (`sessions/<stamp>.md`) carries what a conversation knew but never wrote down, to a fresh
 session.
 
-`PAUSED` is deliberately its own file rather than a field in the ledger. Pause is invoked
-from a separate turn by a separate agent, and the ledger has exactly one writer.
+`PAUSED` is its own file rather than a ledger field so the flag can be set *before* the
+ledger is even read, and so `work`'s precondition is one file-existence test rather than a
+ledger parse. Not because pause is a second writer — it is the same parent.
 
 ## Where writes land
 
@@ -60,29 +62,49 @@ ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` dr
 Every file has exactly one writer. Nothing races, nothing needs locking, and no two
 files can disagree about the same fact.
 
-| File | Sole writer | Which is a |
-|---|---|---|
-| `ledger.md` | parent / dispatcher | parent |
-| `PAUSED` | parent / dispatcher | parent |
-| `rune.yml` | `rune:init` | parent |
-| `vision.md`, `decisions.md` | `rune:vision` | parent |
-| `map.md` | a worker on `ai-survey` | **subagent** |
-| `milestones.md` | a worker on `ai-decompose` | **subagent** |
-| `tasks/T-nnn.md` | a worker on `ai-decompose` (creates), fixer (appends amendments only) | **subagent** |
-| `notes/T-nnn.progress` | the worker holding the task, on `ai-execute` | **subagent** |
-| `notes/T-nnn.md` | the worker holding the task, on `ai-execute` | **subagent** |
-| `notes/init-commands.md` | a worker on `ai-oracle` | **subagent** |
-| `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered | **subagent** |
-| `drift/DRF-nnn.md` | whoever detected the drift | either |
+**Writers are roles, not skills.** There is one parent — the main agent — and it is the
+same writer whether it is running `work`, `init`, `vision`, `continue`, `pause`, or
+`handoff`. Those are routes through one role, not six agents. Getting this backwards is
+what made `pause` and `handoff` look like second writers when they are the same writer.
 
-**The parent writes four things: `ledger.md`, `PAUSED`, `rune.yml`, and the vision pair.**
-Everything else on that list is produced by a subagent, and a parent about to write
-anything not in those four rows has found a dispatch it skipped.
+| File | Sole writer |
+|---|---|
+| `ledger.md` | the parent |
+| `PAUSED` | the parent |
+| `rune.yml` | the parent |
+| `vision.md`, `decisions.md`, `milestones.md` | the parent |
+| `sessions/<stamp>.md` | the parent |
+| `map.md` | a worker on `ai-survey` |
+| `tasks/T-nnn.md` | a worker on `ai-decompose` (creates), fixer (appends amendments only) |
+| `notes/T-nnn.progress` | the worker holding T-nnn |
+| `notes/T-nnn.md` | the worker holding T-nnn |
+| `decisions/open/T-nnn.md` | the worker holding T-nnn |
+| `notes/init-commands.md` | a worker on `ai-oracle` |
+| `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered |
+| `drift/DRF-nnn.md` | whoever detected the drift |
 
-That third column is the check. The parent's context is the budget the whole system
-defends, so which side of the line a file is written on is not an implementation detail —
-`milestones.md` and `tasks/T-nnn.md` were parent-written until the work that produced them
-was traced back to this table and moved.
+## The concurrency rule that generates this table
+
+**Any file that two workers could write at the same time must be per-task.**
+
+Up to three executors run concurrently. A shared file they all append to is a race by
+construction — and worse, they race on *id allocation*: two executors both reach for
+`DEC-012`. Per-task files have no such problem, because the filename already contains the
+thing that makes each writer unique.
+
+That rule is why `notes/T-nnn.progress` and `decisions/open/T-nnn.md` are shaped the way
+they are. Apply it to any new file before adding a row above.
+
+Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
+two copies of a mutable fact diverge within a day and then neither can be trusted.
+
+The parent writes coordination and planning state. Workers write everything that comes
+out of doing the work — maps, task files, progress, results. A parent about to write
+anything outside its rows has found a dispatch it skipped.
+
+`milestones.md` is the exception worth explaining: the parent owns the file, but it never
+composes it. A worker on `ai-decompose` writes the graph and the parent records it, for the
+same reason the parent does not read code.
 
 ## The dispatch table
 
@@ -105,6 +127,58 @@ which skill to follow. A dispatch names a job and a skill, and nothing else.
 **Never specify a model.** A subagent runs on whatever the session is running on. Model
 selection is a separate concern that does not belong in these files.
 
+### The dispatch envelope — what a worker is given
+
+Every dispatch hands over the same four things and nothing else:
+
+```
+follow:    ai-execute
+issue:     T-014                  # the one id, always exactly one
+isolation: worktree               # where the harness offers it; otherwise omit
+pointers:  .agent/tasks/T-014.md  # paths only, never file contents
+```
+
+**Pointers, not payloads.** The parent names where things are; the worker reads them
+itself. Passing content down means the parent had to hold it first, which is the cost the
+whole system exists to avoid. It also keeps every dispatch the same size no matter how big
+the job is.
+
+If a worker needs something not reachable from those pointers, that is a missing pointer,
+not a reason to paste text into the prompt.
+
+### The return envelope — what a worker hands back
+
+Every worker returns these three lines first, then whatever its own skill defines:
+
+```
+status:  ok | blocked | question | failed
+issue:   T-014
+summary: <one line, plain words>
+```
+
+Then the skill-specific body — `ai-verify` adds its verdict block, `ai-execute` adds
+worktree state, `ai-recover` adds its resume point.
+
+**The header is shared; the body is not.** Do not invent a common set of fields for every
+skill. A worker handed a field it has nothing to say about will fill it anyway, and an
+invented value is worse than an absent one. `ai-triage` has no worktree; it does not get a
+worktree line.
+
+Whole return stays **≤200 tokens**. Anything longer goes to disk and the summary points at
+it.
+
+### Bounded state probes
+
+The parent may not run commands — with one named exception class.
+
+**A bounded state probe reads state, changes nothing, and returns a fixed number of lines
+regardless of how big the project is.** `git rev-parse HEAD` is one. A test suite is not:
+its output grows with the codebase, which is the whole reason it gets dispatched.
+
+The class is documentation. **What makes it checkable is that each skill lists its own
+permitted probes by name** — an agent should never have to judge whether something
+qualifies. If a command is not written down in that skill, it is a dispatch.
+
 ### Why there are no agents
 
 Agent definitions bought exactly two things a skill cannot express: a tool allowlist, and
@@ -122,9 +196,6 @@ and prose is not.** A verifier that could not edit has become a verifier that is
 to. The skills that depend on that now say so explicitly, at the top, in the places where
 breaking the rule would be easiest — because a rule that used to be a wall now has to
 carry its own reasons.
-
-Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
-two copies of a mutable fact diverge within a day and then neither can be trusted.
 
 ## Single-issue rule
 
@@ -282,10 +353,20 @@ rationale: —
 converts "make suggestions, never assumptions" from a personality instruction into a
 checkable property. Recommendations are encouraged; silently adopting one is not.
 
-Executors use the same record to ask questions mid-task. They add `raised_by: T-nnn`, stop
-with `status: question`, and the task sits `awaiting` until the decision is made. Reusing
-this format rather than inventing a question artifact means one gate, one place to look,
-and one thing for the user to resolve.
+Workers use the same format to ask questions mid-task — but they write it to
+**`.agent/decisions/open/T-nnn.md`**, not to `decisions.md`, and they **do not assign an
+id**. They add `raised_by: T-nnn`, stop with `status: question`, and keep the worktree.
+
+The parent then assigns the `DEC-nnn`, moves the record into `decisions.md`, deletes the
+open file, and sets the task `awaiting`.
+
+Two reasons for the extra hop. Three executors run at once, so a shared append target
+races — and both would reach for the same next id. And a question that exists only in a
+return value dies with the worker, while the *work* survives in the kept worktree; the
+question has to survive on the same terms.
+
+**The gate scans both files.** A milestone is blocked by an `open` record in
+`decisions.md` *or* anything sitting in `decisions/open/`.
 
 ## Handoff note
 

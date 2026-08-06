@@ -14,14 +14,27 @@ interview. Re-runnable.
 from that, and this list is exhaustive:
 
 - **Read** `.agent/` coordination files, and manifests small enough to name a command from.
-- **Write** `.agent/rune.yml` and the `.agent/` scaffolding.
+- **Write** `.agent/rune.yml`, the `.agent/` scaffolding, and one line in `.gitignore`.
 - **Talk to the user** — the report at the end.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
 
 **Anything not on that list is a dispatch**, including reading source code and running any
-command. Both produce unbounded output, which is exactly what this skill exists to keep
-out of the session that everything else starts from.
+command that is not one of the **bounded state probes named below**. Unbounded output is
+exactly what this skill exists to keep out of the session everything else starts from.
+
+The probes you may run, and nothing else:
+
+```
+git status --porcelain | head -20
+git rev-parse HEAD
+git worktree list
+```
+
+plus Serena `activate_project` and a single symbol query to confirm the language server is
+up. Each returns a fixed number of lines whatever the project's size — see *Bounded state
+probes* in `ai-taskfmt`. Anything else, including any build or test command, is a
+dispatch.
 
 ## When it runs
 
@@ -38,10 +51,13 @@ inspect until the stack is chosen. Vision knows this and orders it correctly.
 ### 1. Git baseline
 
 ```
-git status --porcelain     # must be clean, or the user must accept the dirt
+git status --porcelain | head -20   # clean, or the user must accept the dirt
 git rev-parse HEAD
 git worktree list
 ```
+
+These three, and nothing else. The `head -20` is the bound: a repo with 500 dirty files is
+itself the finding, and you only need to know it is not clean.
 
 Rune isolates every executor in a worktree, so a repo that is not under git loses its
 rollback story. If there is no git, say so plainly and offer to `git init` — this is the
@@ -86,7 +102,7 @@ record what came back:
 A `none` or a red baseline is a real result. Do not re-run anything yourself to check —
 that is the leak this dispatch exists to close, and the evidence is already on disk.
 
-### 6. Write `.agent/rune.yml`
+### 5. Write `.agent/rune.yml`
 
 ```yaml
 initialized: 2026-08-04

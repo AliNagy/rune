@@ -73,6 +73,7 @@ local_test: pass (rotation.test.ts)
 red_evidence: present
 revert_check: test fails when change reverted — test is real
 oracle: pass (baseline: 3 known failures, unchanged)
+flaky: none                       # or: auth/session.test.ts disagreed with itself
 ticks: 3/3 match diff
 acceptance:
   - test passes .......... pass
