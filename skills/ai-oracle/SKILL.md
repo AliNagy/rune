@@ -26,8 +26,14 @@ That is what makes degraded mode survivable rather than hopeless.
 
 ## Establishing the global oracle (init)
 
+**Always run as a subagent.** Command output is unbounded — a failing suite can be tens of
+thousands of tokens — and `rune:init` is the session every other route starts from, so it
+is the worst place in Rune to absorb them. The dispatcher needs a verdict, not a log, and
+cannot get one without running the command.
+
 **Run it. Do not infer it.** A command in `package.json` proves nothing about whether it
-works in this checkout, on this machine, today.
+works in this checkout, on this machine, today. Inference is what the dispatcher could
+already do for free; running it is the entire reason this is a separate dispatch.
 
 1. Look for the obvious candidates — `package.json` scripts, `Makefile`, `justfile`,
    `pyproject.toml`, `Cargo.toml`, CI workflow files. CI config is the best single
@@ -54,6 +60,36 @@ it adds a failure not in that baseline. Getting the suite green is legitimate wo
 propose it as a milestone, do not smuggle it into an unrelated task.
 
 **None found.** Say so loudly. Set `oracle.status: none` and enter degraded mode.
+
+### Running the full command sweep
+
+`rune:init` needs more than the oracle — build, test, lint, typecheck, and run. Same
+dispatch, same discipline:
+
+- **Run every candidate**, on a clean tree, and leave the tree clean. You do not fix
+  anything you find; a failing build is a finding to report, not work to take on.
+- **Time each one.** Duration is what tells the dispatcher whether the oracle is usable
+  after every task or only at milestone boundaries.
+- **Full output goes to `.agent/notes/init-commands.md`** — every command, its exit code,
+  and enough output to diagnose a failure later. Nobody should have to re-run a 30-second
+  suite to find out what broke.
+- **Never summarise a failure you did not read.** The reason belongs in the note, quoted
+  from the actual output.
+
+Return ≤200 tokens:
+
+```
+build:     ok    22s
+test:      ok    34s
+lint:      fail  8s    14 pre-existing errors
+typecheck: ok    11s
+run:       none found
+
+oracle: npm test — passing, verified on a clean tree
+detail: .agent/notes/init-commands.md
+```
+
+The dispatcher acts on the verdict; the evidence stays on disk for whoever needs it.
 
 ## Degraded mode
 

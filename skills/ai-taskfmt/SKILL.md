@@ -66,12 +66,12 @@ files can disagree about the same fact.
 | `PAUSED` | parent / dispatcher | parent |
 | `rune.yml` | `rune:init` | parent |
 | `vision.md`, `decisions.md` | `rune:vision` | parent |
-| `map.md` | `surveyor` | **subagent** |
-| `milestones.md` | `planner` | **subagent** |
-| `tasks/T-nnn.md` | `planner` (creates), fixer (appends amendments only) | **subagent** |
-| `notes/T-nnn.progress` | the `executor` holding the task | **subagent** |
-| `notes/T-nnn.md` | the `executor` holding the task | **subagent** |
-| `notes/init-commands.md` | `oracle-runner` | **subagent** |
+| `map.md` | a worker on `ai-survey` | **subagent** |
+| `milestones.md` | a worker on `ai-decompose` | **subagent** |
+| `tasks/T-nnn.md` | a worker on `ai-decompose` (creates), fixer (appends amendments only) | **subagent** |
+| `notes/T-nnn.progress` | the worker holding the task, on `ai-execute` | **subagent** |
+| `notes/T-nnn.md` | the worker holding the task, on `ai-execute` | **subagent** |
+| `notes/init-commands.md` | a worker on `ai-oracle` | **subagent** |
 | `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered | **subagent** |
 | `drift/DRF-nnn.md` | whoever detected the drift | either |
 
@@ -86,25 +86,42 @@ was traced back to this table and moved.
 
 ## The dispatch table
 
-Which agent does which job. Dispatch by agent name where one exists; where none does,
-dispatch a subagent and name the skill it must follow.
+**There are no agent definitions in Rune.** Every worker is an ordinary subagent told
+which skill to follow. A dispatch names a job and a skill, and nothing else.
 
-| Job | Agent | Follows |
-|---|---|---|
-| map an unfamiliar codebase | `surveyor` | `ai-survey` |
-| classify a request | `triage` | — |
-| milestone graph, and milestone → tasks | `planner` | `ai-decompose` |
-| run build / test / lint / typecheck | `oracle-runner` | `ai-oracle` |
-| execute one task | `executor` | `ai-taskfmt`, `ai-serena`, `ai-drift` |
-| verify one finished task | `verifier` | `ai-verify` |
-| salvage an abandoned task | — | `ai-recover` |
-| answer a question about the code | — | `ai-investigate` |
-| answer a question from outside the repo | — | `ai-research` |
-| reproduce a bug | — | `ai-bug` |
+| Job | The worker follows |
+|---|---|
+| map an unfamiliar codebase | `ai-survey` |
+| classify a request | `ai-triage` |
+| milestone graph, and milestone → tasks | `ai-decompose` |
+| run build / test / lint / typecheck | `ai-oracle` |
+| execute one task | `ai-execute` (which also loads `ai-serena`, `ai-drift`) |
+| verify one finished task | `ai-verify` |
+| salvage an abandoned task | `ai-recover` |
+| answer a question about the code | `ai-investigate` |
+| answer a question from outside the repo | `ai-research` |
+| reproduce a bug | `ai-bug` |
 
-An agent nobody names is an agent that never runs. Both `surveyor` and `planner` sat
-defined and unreachable for exactly that reason — the skills that needed them dispatched a
-*skill* name instead, and no table existed to show that the wiring had a hole in it.
+**Never specify a model.** A subagent runs on whatever the session is running on. Model
+selection is a separate concern that does not belong in these files.
+
+### Why there are no agents
+
+Agent definitions bought exactly two things a skill cannot express: a tool allowlist, and
+a model tier. Every harness spells both differently — one earlier version of this repo
+compressed six agent definitions down to three bits each to cross a single harness
+boundary — while the skill is the one artifact that travels unchanged.
+
+The cost of keeping them was concrete. Behaviour split across two files, so four of the
+executor's five governing rules lived only in an agent definition and in no skill at all;
+any harness without an agent concept lost them silently. And two agents sat defined but
+unreachable for weeks because nothing named them.
+
+What that trade gives up is real and worth stating: **a tool allowlist was enforcement,
+and prose is not.** A verifier that could not edit has become a verifier that is told not
+to. The skills that depend on that now say so explicitly, at the top, in the places where
+breaking the rule would be easiest — because a rule that used to be a wall now has to
+carry its own reasons.
 
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.

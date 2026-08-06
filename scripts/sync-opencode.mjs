@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Generates an OpenCode variant of Rune from the canonical Claude Code source.
 //
-//   node scripts/sync-opencode.mjs [--provider <id>] [--target <dir>] [--dry-run]
+//   node scripts/sync-opencode.mjs [--target <dir>] [--dry-run]
 //
 // Claude Code namespaces plugin skills as /rune:<name>. OpenCode has no plugin
-// namespace, so every skill and agent is emitted with a literal rune- prefix
-// instead, and cross-references in skill bodies are rewritten to match.
+// namespace, so every skill is emitted with a literal rune- prefix instead, and
+// cross-references in skill bodies are rewritten to match.
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -17,40 +17,24 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const arg = (n, d) => { const i = argv.indexOf(`--${n}`); return i === -1 ? d : argv[i + 1] }
 const DRY = argv.includes('--dry-run')
-const PROVIDER = arg('provider', 'opencode')
 const TARGET = arg('target', join(homedir(), '.config', 'opencode'))
-
-const TIER = { fast: `${PROVIDER}/claude-sonnet-5`, strong: `${PROVIDER}/claude-opus-5` }
-
-// name -> [tier, may write files, may edit files]
-const AGENTS = {
-  surveyor: ['fast', true, false],
-  triage: ['fast', false, false],
-  planner: ['strong', true, true],
-  executor: ['fast', true, true],
-  verifier: ['fast', false, false],
-  'oracle-runner': ['fast', true, false],
-}
 
 const AI_SKILLS = [
   'taskfmt', 'serena', 'oracle', 'survey', 'decompose', 'report', 'recover',
   'bug', 'feature', 'refactor', 'investigate', 'research', 'drift', 'verify',
-  'ledger',
+  'ledger', 'execute', 'triage',
 ]
 
 // Claude Code's /rune:init becomes OpenCode's /rune-init; bare ai-* skill
 // references pick up the prefix they lose without a plugin namespace.
 //
-// Agent names are emitted as rune-<name>, and skills dispatch agents by name, so
-// those references need the same prefix. Only backtick-quoted occurrences are
-// rewritten — `planner` is the agent, "the planner" in prose is a word, and
-// rewriting the latter would produce "the rune-planner" throughout.
+// There is nothing else to translate. Rune defines no agents, so no tool lists,
+// model tiers, or agent names need mapping onto this harness's spelling of them.
 function rewriteBody(text) {
   return text
     .replace(/\/rune:/g, '/rune-')
     .replace(/rune:/g, 'rune-')
     .replace(new RegExp(`\\bai-(${AI_SKILLS.join('|')})\\b`, 'g'), 'rune-ai-$1')
-    .replace(new RegExp(`\`(${Object.keys(AGENTS).join('|')})\``, 'g'), '`rune-$1`')
 }
 
 function splitFrontmatter(raw) {
@@ -94,36 +78,7 @@ for (const name of readdirSync(join(ROOT, 'skills'))) {
   skillCount++
 }
 
-let agentCount = 0
-const agentsOut = join(TARGET, 'agents')
-
-for (const [name, [tier, canWrite, canEdit]] of Object.entries(AGENTS)) {
-  const src = join(ROOT, 'agents', `${name}.md`)
-  if (!existsSync(src)) { console.warn(`  ! missing agents/${name}.md`); continue }
-
-  const { fields, body } = splitFrontmatter(readFileSync(src, 'utf8'))
-
-  // The Claude Code `tools:` list enumerates mcp__serena__* names that do not
-  // exist under OpenCode's MCP naming. Coarse write/edit gates are used instead,
-  // so read and search tools stay available without naming them.
-  const fm = [
-    '---',
-    `description: ${rewriteBody(fields.description)}`,
-    'mode: subagent',
-    `model: ${TIER[tier]}`,
-    'temperature: 0.1',
-    'tools:',
-    `  write: ${canWrite}`,
-    `  edit: ${canEdit}`,
-    '---',
-  ].join('\n')
-
-  write(join(agentsOut, `rune-${name}.md`), `${fm}\n${rewriteBody(body)}`)
-  agentCount++
-}
-
 console.log(`${DRY ? '[dry run] ' : ''}rune -> opencode`)
 console.log(`  skills   ${skillCount}  -> ${skillsOut}`)
-console.log(`  agents   ${agentCount}  -> ${agentsOut}`)
-console.log(`  models   fast=${TIER.fast}  strong=${TIER.strong}`)
+console.log('  agents   none — Rune defines no agents')
 if (!DRY) console.log('\nRestart OpenCode, then run /rune-init')

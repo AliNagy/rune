@@ -15,8 +15,8 @@ from that, and this list is exhaustive:
 - **Read** `.agent/` coordination files — enough to report status accurately.
 - **Write** `ledger.md` and `.agent/PAUSED`.
 - **Talk to the user** — reports, the gate, questions.
-- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
-  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+- **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
+  `ai-taskfmt` says which skill does which job.
 
 **Anything not on that list is a dispatch.** Writing any other file, running any command,
 reading any source file — each one is a subagent's job, without exception and without a
@@ -85,8 +85,7 @@ Classification often cannot be done from the user's sentence. "Is this a bug or 
 simply not implemented?" is undecidable without evidence — and it is the most common
 ambiguity on an unfinished codebase.
 
-Since you cannot read code, **dispatch a triage subagent** (tight budget, read-only, no
-edits) — **one per issue**, per *One agent, one issue* above. If the user reported three
+Since you cannot read code, **dispatch a subagent that follows `ai-triage`** — **one per issue**, per *One agent, one issue* above. If the user reported three
 things, that is three triage dispatches, run concurrently. Never hand one triage agent a
 list, even when the issues sound related: "sounds related" is a hypothesis, and batching
 them destroys the independence needed to test it.
@@ -120,15 +119,15 @@ is cheap.
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
 
-**Dispatch the `planner` agent. You do not write task files.** Decomposition requires
+**Dispatch a subagent that follows `ai-decompose`. You do not write task files.** Decomposition requires
 reading real code — the one thing you may not do — so it cannot happen in your context,
 and a task file written without reading code is fiction. The planner writes
 `.agent/tasks/T-nnn.md` per `ai-decompose` and returns the task list in ≤200 tokens.
 
 **Dispatch two or three planners in parallel, then reconcile.** This is the one step in
 Rune that earns a fan-out, per *Judgment fans out, mechanics do not* below. Give each the
-same milestone and let them cut it independently; then dispatch one more planner to pick
-the best cut and write the final task files. Where they agree, the cut is probably sound.
+same milestone and let them cut it independently; then dispatch one more to reconcile —
+to pick the best cut and write the final task files. Where they agree, the cut is probably sound.
 Where they disagree, that seam is exactly where a decomposition goes wrong, and you now
 have it named instead of discovered four tasks later.
 
@@ -234,15 +233,16 @@ No shared files. T-015 waits on T-014.
 
 ### What each executor gets
 
+- **`ai-execute` to follow**, which loads `ai-taskfmt`, `ai-serena` and `ai-drift` itself.
 - **`isolation: "worktree"`** where the harness supports it. Under Claude Code this is the
   Agent tool's own flag.
 - One task id, and nothing else. It reads its own task file.
-- `ai-taskfmt`, `ai-serena`, `ai-drift` loaded.
 
 **No source code is ever modified outside a worktree.** The harness flag is a convenience,
 not the guarantee — executors verify they are in one and create their own if not, so the
-rule holds on any harness. See `agents/executor.md`. If an executor reports that it had to
-create its own, that is normal, not a fault.
+rule holds on any harness. `ai-execute` states this at length, because it is the rule most
+likely to be skipped by a worker that thinks it already has one. If an executor reports
+that it had to create its own, that is normal, not a fault.
 
 The rule exists twice over because it carries two loads: a dead executor's torn state is
 discarded with its worktree, and parallel executors cannot tread on each other.
