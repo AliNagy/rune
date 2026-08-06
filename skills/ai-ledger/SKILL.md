@@ -31,13 +31,13 @@ oracle: npm test            # or: none (degraded)
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
 
 ## Dispatches
-| phase       | agent         | for   | outcome            |
+| phase       | followed      | for   | outcome            |
 |-------------|---------------|-------|--------------------|
-| survey      | surveyor      | —     | map.md written     |
-| commands    | oracle-runner | —     | oracle: npm test   |
-| decompose   | planner ×3    | M-03  | 4 tasks, cut agreed|
-| execute     | executor      | T-014 | done               |
-| verify      | verifier      | T-014 | pass               |
+| survey      | ai-survey     | —     | map.md written     |
+| commands    | ai-oracle     | —     | oracle: npm test   |
+| decompose   | ai-decompose ×3| M-03 | 4 tasks, cut agreed|
+| execute     | ai-execute    | T-014 | done               |
+| verify      | ai-verify     | T-014 | pass               |
 ```
 
 ## Log every dispatch
@@ -53,12 +53,12 @@ files all exist, the ledger looks healthy, and nothing anywhere says who wrote t
 
 Read it as a checklist with teeth:
 
-- `decompose` with no `planner` row → the parent wrote the task files.
-- `commands` with no `oracle-runner` row → the parent ran the suite.
-- `survey` with no `surveyor` row → the parent read the codebase.
+- `decompose` with no `ai-decompose` row → the parent wrote the task files.
+- `commands` with no `ai-oracle` row → the parent ran the suite.
+- `survey` with no `ai-survey` row → the parent read the codebase.
 
 Each of those was a real defect in Rune before this table existed. Keep the rows short;
-detail belongs in the notes the agents themselves write.
+detail belongs in the notes the subagents themselves write.
 
 ## Status transitions
 

@@ -31,6 +31,28 @@ shared context.
    and signatures — not bodies, unless a specific decision depends on one.
 3. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
 
+## Which job you were given
+
+You are dispatched for one of three, and never more than one at a time:
+
+**Milestone graph** (from `rune:vision`) — read `vision.md`, `decisions.md`, and where they
+exist `map.md` and the survey digest. Write `.agent/milestones.md` per `ai-taskfmt`.
+Everything you need is on disk; the dispatcher's conversation is not available to you and
+is not supposed to be. If something the graph obviously needs is missing from those files,
+say so and stop rather than inventing it — a gap on disk is a real finding.
+
+**Task files** (from `rune:work`) — decompose one milestone into `.agent/tasks/T-nnn.md`
+against real code, per everything below.
+
+**Reconcile** (from `rune:work`) — you are given two or three independent cuts of the same
+milestone. Pick the strongest, graft anything better from the others, then write the final
+task files. Say which cut you took as the base and what you moved. Where the cuts
+disagreed, that seam is the part of the milestone that is genuinely hard to divide; treat
+it as the thing to get right, not a tie to break quickly.
+
+Return ≤200 tokens: ids, one-line titles, dependency edges. Nothing longer — the files are
+on disk.
+
 ## You may be one of several
 
 Decomposition is the one job in Rune worth running two or three times in parallel and

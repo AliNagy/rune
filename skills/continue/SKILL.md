@@ -19,8 +19,8 @@ from that, and this list is exhaustive:
 - **Read** `.agent/` coordination files.
 - **Write** `ledger.md`, repairing the rows a dead session left behind.
 - **Talk to the user** — the status report, and the question if one is owed.
-- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
-  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+- **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
+  `ai-taskfmt` says which skill does which job.
 
 **Anything not on that list is a dispatch** — above all reading a torn worktree's diff,
 which is the single most expensive thing you could do here and the reason `ai-recover`

@@ -16,8 +16,8 @@ from that, and this list is exhaustive:
 - **Read** `.agent/` coordination files, and manifests small enough to name a command from.
 - **Write** `.agent/rune.yml` and the `.agent/` scaffolding.
 - **Talk to the user** — the report at the end.
-- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
-  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+- **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
+  `ai-taskfmt` says which skill does which job.
 
 **Anything not on that list is a dispatch**, including reading source code and running any
 command. Both produce unbounded output, which is exactly what this skill exists to keep
@@ -61,15 +61,15 @@ apply and the effective budget per task drops considerably.
 
 ### 3. Survey
 
-Dispatch the `surveyor` agent, which follows `ai-survey`. It writes `.agent/map.md` and
-Serena memories, and returns a ≤300 token digest.
+Dispatch a subagent that follows `ai-survey`. It writes `.agent/map.md` and Serena
+memories, and returns a ≤300 token digest.
 
 ### 4. Commands and the oracle
 
-**Dispatch the `oracle-runner` agent. You do not run these commands yourself.** Build and
-test output is unbounded — a failing suite is tens of thousands of tokens — and this is
-the session every other route starts from, so it is the worst possible place to absorb
-them.
+**Dispatch a subagent that follows `ai-oracle`. You do not run these commands
+yourself.** Build and test output is unbounded — a failing suite is tens of thousands of
+tokens — and this is the session every other route starts from, so it is the worst
+possible place to absorb them.
 
 Pass it the candidates you can name from the survey digest and manifests. It runs each one
 on a clean tree, writes the full output to `.agent/notes/init-commands.md`, and returns a

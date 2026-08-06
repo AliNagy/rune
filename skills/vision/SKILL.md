@@ -16,8 +16,8 @@ delegated — you are the only agent talking to the user. Everything else follow
 - **Read** `.agent/` coordination files.
 - **Write** `vision.md` and `decisions.md`, incrementally, as the interview settles them.
 - **Talk to the user** — this is the job.
-- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
-  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+- **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
+  `ai-taskfmt` says which skill does which job.
 
 **Anything not on that list is a dispatch**, including reading source code and generating
 the milestone graph. Holding the interview is why your context is precious; spending it on
@@ -56,7 +56,7 @@ each answer reshapes what is worth asking next.
 
 ## Mode B · In-progress project
 
-1. **Survey** — dispatch the `surveyor` agent, which follows `ai-survey`. Returns stack,
+1. **Survey** — dispatch a subagent that follows `ai-survey`. Returns stack,
    modules, conventions, and the completeness assessment: stubs, orphans, half-wired
    paths, contradictions, abandoned directions.
 2. **Present what is there.** Show the user what actually exists — including the awkward
@@ -120,18 +120,18 @@ Anything unanswered is an open decision, not a default.
 
 Only once every blocking decision is `decided`.
 
-**Dispatch the `planner` agent to write `.agent/milestones.md`. You do not write it
-yourself.** By this point everything the graph needs is already on disk — `vision.md` and
+**Dispatch a subagent that follows `ai-decompose` to write `.agent/milestones.md`. You do
+not write it yourself.** By this point everything the graph needs is already on disk — `vision.md` and
 `decisions.md`, which you have been writing as the interview settled, plus the survey
-digest and `map.md` in Mode B. The planner reads those, writes the milestone graph per
+digest and `map.md` in Mode B. It reads those, writes the milestone graph per
 `ai-taskfmt`, and returns the list in ≤200 tokens for you to show the user.
 
 This is the reason `vision.md` and `decisions.md` are written incrementally rather than at
 the end: the graph is generated from the files, never from your conversation. If something
-settled in conversation never reached disk, the planner cannot see it — which is a bug in
+settled in conversation never reached disk, the subagent cannot see it — which is a bug in
 your note-taking, not a reason to write the graph yourself.
 
-Hand the planner these constraints:
+Hand it these constraints:
 
 - **Ordered by dependency**, not by importance.
 - **Each independently demonstrable.** "Auth works end to end" — not "the database

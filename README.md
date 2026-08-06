@@ -33,8 +33,7 @@ To try it against a local clone before installing:
 claude --plugin-dir /path/to/rune
 ```
 
-Skills, subagents, and the model settings all install together — there is nothing to copy
-by hand.
+Everything installs together — there is nothing to copy by hand.
 
 ### OpenCode
 
@@ -70,7 +69,7 @@ The direct commands still exist if you prefer them:
 | Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-The fifteen `ai-*` skills load themselves when they're needed and stay out of your
+The seventeen `ai-*` skills load themselves when they're needed and stay out of your
 slash-command list.
 
 Typical first run on an existing project:
@@ -116,13 +115,13 @@ into Serena memories rather than `.agent/`, so the files people read stay readab
 
 You invoke one skill; it loads the others.
 
-Rune is 22 skills, but only seven can be called by name — `hello`, `init`, `vision`,
+Rune is 24 skills, but only seven can be called by name — `hello`, `init`, `vision`,
 `work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-fifteen are marked as not user-invocable. The agent loads them itself when the situation
+seventeen are marked as not user-invocable. The agent loads them itself when the situation
 calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
 sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
 
-The reason is the same one behind everything else here. Instructions for all 22 skills in
+The reason is the same one behind everything else here. Instructions for all 24 skills in
 one context window would crowd out your actual code, and most of them are irrelevant at any
 given moment. Loading them on demand means each agent carries only the rules for the job in
 front of it — and you only have to remember one command.
@@ -156,9 +155,9 @@ to disk. Each one carries exactly one issue — one bug, one task, one question,
 batch — so three reported bugs get three agents, running at the same time if they can;
 that keeps evidence from one out of the reading of another, and keeps one agent from
 holding three working sets. And an agent in trouble writes a handoff note and exits rather
-than pausing,
-because resuming an agent keeps its context, which is the opposite of what you want here. A
-fresh one starts again from the task file — with Serena, about 10k to get back up to speed.
+than pausing, because resuming an agent keeps its context, which is the opposite of what
+you want here. A fresh one starts again from the task file — with Serena, about 10k to get
+back up to speed.
 
 **Interrupting it is safe.** Every task runs in its own git worktree, and `git diff` is the
 authoritative record of what changed; it can't drift from reality the way a hand-updated
@@ -207,7 +206,9 @@ skills/
   ai-recover      salvaging a task that stopped halfway
   ai-oracle       finding and running the pass/fail check
   ai-survey       looking around an unfamiliar codebase
+  ai-triage       is it a bug, a feature, a refactor, or a question
   ai-decompose    milestone to tasks, and how big a task should be
+  ai-execute      doing one task: worktree, red before green, when to stop
   ai-bug          reproduce before planning
   ai-feature      thin end-to-end slices, open questions decided first
   ai-refactor     cover behaviour with tests first, then leave them alone
@@ -216,16 +217,15 @@ skills/
   ai-drift        when the plan turns out to be wrong
   ai-verify       an independent second check
   ai-ledger       state updates, and cleaning up after a crash
-
-agents/
-  surveyor  triage  executor            sonnet
-  verifier  oracle-runner               sonnet
-  planner                               opus
 ```
 
-That last block is about cost: most of the work runs on the cheaper model, and only the
-step that splits a milestone into tasks — where a bad split ruins everything after it —
-runs on the stronger one.
+There is no `agents/` directory. Every worker is an ordinary subagent told which skill to
+follow, so a skill is the only thing Rune defines and the only thing a harness has to
+understand. Agent definitions bought two things — a tool allowlist and a model tier — and
+every harness spells both differently, while behaviour split across two files meant rules
+that lived in one and not the other. The trade is real: a verifier that *could not* edit is
+now a verifier that is told not to, so the skills that rely on that say it plainly rather
+than assuming a wall is there.
 
 ## Versioning
 

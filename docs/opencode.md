@@ -25,12 +25,11 @@ Restart OpenCode. The skills are auto-discovered — there is nothing to registe
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--provider <id>` | `opencode` | Model provider prefix. Use `anthropic` for a direct API key, `amazon-bedrock` for Bedrock. Run `opencode models` to see what you have. |
 | `--target <dir>` | `~/.config/opencode` | Write somewhere else — e.g. `.opencode` in a project for a repo-local install. |
 | `--dry-run` | | Report what would be written, touch nothing. |
 
 Re-run it after pulling changes. It overwrites, so delete the generated `skills/rune-*`
-and `agents/rune-*` first if you want a clean slate.
+first if you want a clean slate.
 
 ### Serena
 
@@ -57,15 +56,15 @@ simply be `/init`, which is both generic and likely to collide. So directories b
 `rune-init`, `rune-ai-taskfmt`, and so on, and every cross-reference inside skill bodies
 is rewritten to match.
 
-**Agent frontmatter is rewritten, not copied.** Claude Code agents declare
-`model: sonnet` and an explicit tool list including `mcp__serena__*` names. OpenCode wants
-`provider/model-id`, a `mode`, and a `tools` object — and its MCP tools are named
-differently, so enumerating them by Claude Code's names would silently disable them. The
-generator emits coarse `write` / `edit` gates instead, leaving read and search tools
-available without naming them.
+**That is the only change.** Rune defines no agents, so there is no tool list, model
+tier, or agent name to translate into this harness's spelling of them. Skills are the
+whole artifact, and a skill needs nothing rewritten but its name.
 
-**Model tiering is preserved.** `planner` gets the strong model, everything else the fast
-one — that split is the whole reason the agents exist as separate definitions.
+This is why the generator is thirty lines rather than a compatibility layer. An earlier
+version carried a table mapping each agent onto a model tier and a pair of write/edit
+gates, because Claude Code's `tools:` list enumerates `mcp__serena__*` names that OpenCode
+does not use and would have silently disabled. Removing agents removed that table and the
+whole class of harness-specific breakage it existed to paper over.
 
 ## Known gaps
 
@@ -103,6 +102,6 @@ break the system. Prefer living with the clutter.
 
 ## Staying in sync
 
-The Claude Code source under `skills/` and `agents/` is canonical. Never edit the
+The Claude Code source under `skills/` is canonical. Never edit the
 generated files under `~/.config/opencode/` — they are overwritten on every sync. Fix the
 source, re-run the generator.
