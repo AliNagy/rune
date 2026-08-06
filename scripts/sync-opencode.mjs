@@ -29,6 +29,7 @@ const AGENTS = {
   planner: ['strong', true, true],
   executor: ['fast', true, true],
   verifier: ['fast', false, false],
+  'oracle-runner': ['fast', true, false],
 }
 
 const AI_SKILLS = [
@@ -39,11 +40,17 @@ const AI_SKILLS = [
 
 // Claude Code's /rune:init becomes OpenCode's /rune-init; bare ai-* skill
 // references pick up the prefix they lose without a plugin namespace.
+//
+// Agent names are emitted as rune-<name>, and skills dispatch agents by name, so
+// those references need the same prefix. Only backtick-quoted occurrences are
+// rewritten — `planner` is the agent, "the planner" in prose is a word, and
+// rewriting the latter would produce "the rune-planner" throughout.
 function rewriteBody(text) {
   return text
     .replace(/\/rune:/g, '/rune-')
     .replace(/rune:/g, 'rune-')
     .replace(new RegExp(`\\bai-(${AI_SKILLS.join('|')})\\b`, 'g'), 'rune-ai-$1')
+    .replace(new RegExp(`\`(${Object.keys(AGENTS).join('|')})\``, 'g'), '`rune-$1`')
 }
 
 function splitFrontmatter(raw) {

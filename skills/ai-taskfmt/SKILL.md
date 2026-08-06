@@ -60,15 +60,51 @@ ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` dr
 Every file has exactly one writer. Nothing races, nothing needs locking, and no two
 files can disagree about the same fact.
 
-| File | Sole writer |
-|---|---|
-| `ledger.md` | parent / dispatcher |
-| `tasks/T-nnn.md` | planner (creates), fixer (appends amendments only) |
-| `notes/T-nnn.progress` | the executor holding the task |
-| `notes/T-nnn.md` | the executor holding the task |
-| `drift/DRF-nnn.md` | whoever detected the drift |
-| `rune.yml`, `map.md` | `rune:init` |
-| `vision.md`, `decisions.md`, `milestones.md` | `rune:vision` |
+| File | Sole writer | Which is a |
+|---|---|---|
+| `ledger.md` | parent / dispatcher | parent |
+| `PAUSED` | parent / dispatcher | parent |
+| `rune.yml` | `rune:init` | parent |
+| `vision.md`, `decisions.md` | `rune:vision` | parent |
+| `map.md` | `surveyor` | **subagent** |
+| `milestones.md` | `planner` | **subagent** |
+| `tasks/T-nnn.md` | `planner` (creates), fixer (appends amendments only) | **subagent** |
+| `notes/T-nnn.progress` | the `executor` holding the task | **subagent** |
+| `notes/T-nnn.md` | the `executor` holding the task | **subagent** |
+| `notes/init-commands.md` | `oracle-runner` | **subagent** |
+| `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered | **subagent** |
+| `drift/DRF-nnn.md` | whoever detected the drift | either |
+
+**The parent writes four things: `ledger.md`, `PAUSED`, `rune.yml`, and the vision pair.**
+Everything else on that list is produced by a subagent, and a parent about to write
+anything not in those four rows has found a dispatch it skipped.
+
+That third column is the check. The parent's context is the budget the whole system
+defends, so which side of the line a file is written on is not an implementation detail —
+`milestones.md` and `tasks/T-nnn.md` were parent-written until the work that produced them
+was traced back to this table and moved.
+
+## The dispatch table
+
+Which agent does which job. Dispatch by agent name where one exists; where none does,
+dispatch a subagent and name the skill it must follow.
+
+| Job | Agent | Follows |
+|---|---|---|
+| map an unfamiliar codebase | `surveyor` | `ai-survey` |
+| classify a request | `triage` | — |
+| milestone graph, and milestone → tasks | `planner` | `ai-decompose` |
+| run build / test / lint / typecheck | `oracle-runner` | `ai-oracle` |
+| execute one task | `executor` | `ai-taskfmt`, `ai-serena`, `ai-drift` |
+| verify one finished task | `verifier` | `ai-verify` |
+| salvage an abandoned task | — | `ai-recover` |
+| answer a question about the code | — | `ai-investigate` |
+| answer a question from outside the repo | — | `ai-research` |
+| reproduce a bug | — | `ai-bug` |
+
+An agent nobody names is an agent that never runs. Both `surveyor` and `planner` sat
+defined and unreachable for exactly that reason — the skills that needed them dispatched a
+*skill* name instead, and no table existed to show that the wiring had a hole in it.
 
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.

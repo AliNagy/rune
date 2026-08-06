@@ -7,14 +7,28 @@ description: Use when building a feature, fixing a bug, refactoring, or advancin
 
 The execution loop. Triage → plan → dispatch → verify → reconcile.
 
-## The rule that makes this work
+## What you may do
 
-**You never read source code.** Not once. You are a dispatcher: you hold the ledger and
-tiny reports, and nothing else.
+**You exist to tell the user what is happening.** Everything you are allowed to do follows
+from that, and this list is exhaustive:
 
-This is not a style preference. With subagent dispatch, the parent accumulates every
-result it receives. Read one file "just to check" and you have imported the exact cost the
-whole system exists to avoid. Two consequences are load-bearing:
+- **Read** `.agent/` coordination files — enough to report status accurately.
+- **Write** `ledger.md` and `.agent/PAUSED`.
+- **Talk to the user** — reports, the gate, questions.
+- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
+  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+
+**Anything not on that list is a dispatch.** Writing any other file, running any command,
+reading any source file — each one is a subagent's job, without exception and without a
+case where it is quicker to just do it yourself.
+
+Stated this way round on purpose. A list of forbidden actions can always be stepped
+around by an action nobody thought to forbid — which is exactly how task files ended up
+being written here. A list derived from a reason covers the cases nobody anticipated: if
+a thing is not needed to report status, route correctly, or record what happened, it does
+not belong in the context you are protecting.
+
+Two consequences are load-bearing:
 
 - Every subagent returns **≤200 tokens**. Anything longer goes to disk; you read it only
   if you must act on it.
@@ -103,14 +117,42 @@ is cheap.
 
 ## 2. Decompose
 
-Per `ai-decompose` plus the type protocol. This is the step that most repays care: a bad
-cut produces tasks that are not independent, and then every executor blows its budget
-rediscovering shared context.
-
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
 
-Write task files, register them in the ledger.
+**Dispatch the `planner` agent. You do not write task files.** Decomposition requires
+reading real code — the one thing you may not do — so it cannot happen in your context,
+and a task file written without reading code is fiction. The planner writes
+`.agent/tasks/T-nnn.md` per `ai-decompose` and returns the task list in ≤200 tokens.
+
+**Dispatch two or three planners in parallel, then reconcile.** This is the one step in
+Rune that earns a fan-out, per *Judgment fans out, mechanics do not* below. Give each the
+same milestone and let them cut it independently; then dispatch one more planner to pick
+the best cut and write the final task files. Where they agree, the cut is probably sound.
+Where they disagree, that seam is exactly where a decomposition goes wrong, and you now
+have it named instead of discovered four tasks later.
+
+Then register the tasks in the ledger — that part is yours, `ledger.md` is your file.
+
+## Judgment fans out, mechanics do not
+
+How many agents a job gets is not a matter of taste. It follows from what kind of job it is:
+
+| The job is | Dispatch | Because |
+|---|---|---|
+| **Judgment under uncertainty**, where a wrong answer surfaces late | 2–3 in parallel, then reconcile | Disagreement between independent attempts is the only cheap signal that the call was hard |
+| **Mechanical**, with one correct outcome | one | A second agent running the same command returns the same string and costs the same again |
+
+Decomposition is the clearest case for fanning out — a bad cut poisons every task under
+it and does not show up until executors start colliding. Triage classification is the
+second, when the evidence is genuinely ambiguous on an unfinished codebase.
+
+Running a command, writing a file from a settled spec, verifying red-before-green
+evidence: one agent. Fanning these out buys nothing and spends the budget twice.
+
+Each parallel agent still gets **one issue** — the rule above is unaffected. Three
+planners on one milestone is three agents on the same single issue, which is fan-out.
+One planner on three milestones is batching, which is forbidden.
 
 ## 3. The gate — always
 

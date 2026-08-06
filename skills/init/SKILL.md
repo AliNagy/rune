@@ -8,8 +8,20 @@ description: Use when starting Rune on a repository for the first time, or re-ru
 Establishes ground truth so nothing downstream has to re-derive it. Mechanical, no
 interview. Re-runnable.
 
-**You do not read source code.** Survey runs as a subagent (`ai-survey`) and returns
-a digest. Your context stays small and clean.
+## What you may do
+
+**You establish ground truth and report it.** Everything you are allowed to do follows
+from that, and this list is exhaustive:
+
+- **Read** `.agent/` coordination files, and manifests small enough to name a command from.
+- **Write** `.agent/rune.yml` and the `.agent/` scaffolding.
+- **Talk to the user** — the report at the end.
+- **Dispatch subagents.** Name the agent when one exists for the job; otherwise name
+  the skill the worker must follow. The dispatch table in `ai-taskfmt` says which.
+
+**Anything not on that list is a dispatch**, including reading source code and running any
+command. Both produce unbounded output, which is exactly what this skill exists to keep
+out of the session that everything else starts from.
 
 ## When it runs
 
@@ -49,25 +61,30 @@ apply and the effective budget per task drops considerably.
 
 ### 3. Survey
 
-Dispatch `ai-survey` as a subagent. It writes `.agent/map.md` and
+Dispatch the `surveyor` agent, which follows `ai-survey`. It writes `.agent/map.md` and
 Serena memories, and returns a ≤300 token digest.
 
-### 4. Commands
+### 4. Commands and the oracle
 
-From the survey digest and manifests, identify build, test, lint, typecheck, and run.
-**Execute each one.** A script in `package.json` proves nothing about whether it works
-here, today.
+**Dispatch the `oracle-runner` agent. You do not run these commands yourself.** Build and
+test output is unbounded — a failing suite is tens of thousands of tokens — and this is
+the session every other route starts from, so it is the worst possible place to absorb
+them.
 
-Record real outcomes, including failures and durations.
+Pass it the candidates you can name from the survey digest and manifests. It runs each one
+on a clean tree, writes the full output to `.agent/notes/init-commands.md`, and returns a
+per-command verdict with durations plus the oracle result, in ≤200 tokens.
 
-### 5. The oracle
-
-The most important output. Per `ai-oracle`:
+The rule it enforces on your behalf, per `ai-oracle`: **run it, do not infer it.** Then
+record what came back:
 
 - **Passing** → normal operation.
 - **Failing on arrival** → record the exact known-red baseline. Do not fix it as a side
   effect; propose it as a milestone.
 - **None found** → `oracle.status: none`, degraded mode, and say so loudly.
+
+A `none` or a red baseline is a real result. Do not re-run anything yourself to check —
+that is the leak this dispatch exists to close, and the evidence is already on disk.
 
 ### 6. Write `.agent/rune.yml`
 

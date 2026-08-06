@@ -31,6 +31,22 @@ shared context.
    and signatures — not bodies, unless a specific decision depends on one.
 3. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
 
+## You may be one of several
+
+Decomposition is the one job in Rune worth running two or three times in parallel and
+reconciling, because a bad cut does not announce itself — it surfaces later as executors
+colliding on files that were supposed to be disjoint, by which point tasks have been built
+on it.
+
+If you are one of several planners on the same milestone, **cut it independently.** Do not
+hedge toward what you imagine the others will produce. Where independent cuts agree, the
+milestone divided cleanly; where they disagree, that seam is the genuinely hard part, and
+the disagreement is the only cheap signal anyone gets that it was hard. A planner that
+hedges erases exactly the information the fan-out was dispatched to buy.
+
+A reconciling planner then picks the strongest cut, grafts what is better from the others,
+and writes the final task files.
+
 ## Cutting rules
 
 **Vertical, not horizontal.** Cut through the layers, not across them. "Token rotation
