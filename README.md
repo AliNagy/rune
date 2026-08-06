@@ -70,7 +70,7 @@ The direct commands still exist if you prefer them:
 | Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-The fourteen `ai-*` skills load themselves when they're needed and stay out of your
+The fifteen `ai-*` skills load themselves when they're needed and stay out of your
 slash-command list.
 
 Typical first run on an existing project:
@@ -116,13 +116,13 @@ into Serena memories rather than `.agent/`, so the files people read stay readab
 
 You invoke one skill; it loads the others.
 
-Rune is 21 skills, but only seven can be called by name — `hello`, `init`, `vision`,
+Rune is 22 skills, but only seven can be called by name — `hello`, `init`, `vision`,
 `work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-fourteen are marked as not user-invocable. The agent loads them itself when the situation
+fifteen are marked as not user-invocable. The agent loads them itself when the situation
 calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
 sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
 
-The reason is the same one behind everything else here. Instructions for all 21 skills in
+The reason is the same one behind everything else here. Instructions for all 22 skills in
 one context window would crowd out your actual code, and most of them are irrelevant at any
 given moment. Loading them on demand means each agent carries only the rules for the job in
 front of it — and you only have to remember one command.
@@ -208,6 +208,7 @@ skills/
   ai-feature      thin end-to-end slices, open questions decided first
   ai-refactor     cover behaviour with tests first, then leave them alone
   ai-investigate  read-only, ends in an answer
+  ai-research     evidence from outside the repo, graded and cited
   ai-drift        when the plan turns out to be wrong
   ai-verify       an independent second check
   ai-ledger       state updates, and cleaning up after a crash

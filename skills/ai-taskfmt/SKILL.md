@@ -52,7 +52,8 @@ Coordination state has to be visible to the dispatcher, the verifier, and the ne
 *before* anything merges. Written inside a worktree it would appear only on merge — which
 is precisely when nobody needs it any more.
 
-ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` drift.
+ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` drift,
+`INV-` investigation, `RES-` research.
 
 ## Single-writer rule
 

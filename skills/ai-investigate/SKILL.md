@@ -29,6 +29,11 @@ question you wrote down, you have drifted into something else.
 Read-only. `ai-serena` applies with full force — this protocol is where exploration
 sprawl is most likely, because there is no change surface bounding you.
 
+If the question needs evidence from **outside** the repository — prior art, a spec
+detail, whether a library is maintained, what other teams found — load `ai-research` and
+follow it for that part. Do not improvise it. A remembered fact presented as a looked-up
+one is exactly the failure both protocols exist to prevent.
+
 - Prefer measurement to reading. A profile, a timing, a query count, a row count beats an
   hour of reasoning about which code path looks expensive.
 - Cite specifics. `src/api/dashboard.ts :: load — 4 sequential queries, no join` is
