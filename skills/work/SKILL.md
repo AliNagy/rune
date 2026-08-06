@@ -24,6 +24,35 @@ whole system exists to avoid. Two consequences are load-bearing:
 If either slips, the parent hits its ceiling around task 25 no matter how clean the
 workers are.
 
+## One agent, one issue
+
+**A subagent handles exactly one issue. Never two, never a batch.**
+
+Three bug reports in one message is three triage subagents — not one triage subagent
+handed a list of three. The same holds at every dispatch point in the system: one
+reproduction per bug, one task per executor, one verification per task, one question per
+researcher, one recovery per abandoned task.
+
+This governs **scope, not concurrency.** Dispatching three agents at once is fine and
+usually right. What is forbidden is a single agent carrying more than one issue's context.
+
+Why it holds without exception:
+
+- **Evidence bleeds between issues.** An agent that has just established issue A is an
+  unimplemented stub is primed to read issue B the same way. The second verdict is
+  contaminated by the first, and nothing in the returned text shows that it was.
+- **Failure stops being isolated.** An agent that exhausts its budget on the third issue
+  loses the work it did on the first two. Separate agents fail separately and retry cheaply.
+- **A wrong answer cannot be attributed.** When a batched return is wrong, the evidence for
+  every issue sits in one context, and there is no way to tell which issue's reading drove
+  the error.
+- **It spends the budget it was meant to save.** One agent holding three issues holds three
+  working sets at once — precisely the accumulation the ≤200 token rule exists to prevent.
+
+If a subagent finds a second issue while working, it **reports it and stops**. It does not
+take it on. Whether that becomes another dispatch is the dispatcher's decision, not the
+worker's.
+
 ## Preconditions
 
 - **`.agent/PAUSED` exists → stop.** Report that work is paused, when and why, and that
@@ -43,7 +72,12 @@ simply not implemented?" is undecidable without evidence — and it is the most 
 ambiguity on an unfinished codebase.
 
 Since you cannot read code, **dispatch a triage subagent** (tight budget, read-only, no
-edits). It returns:
+edits) — **one per issue**, per *One agent, one issue* above. If the user reported three
+things, that is three triage dispatches, run concurrently. Never hand one triage agent a
+list, even when the issues sound related: "sounds related" is a hypothesis, and batching
+them destroys the independence needed to test it.
+
+Each returns:
 
 ```
 type: bug | feature | refactor | investigation
