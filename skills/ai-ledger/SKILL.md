@@ -11,7 +11,8 @@ across every route, per `ai-taskfmt`. Workers never touch it; they report, the p
 records.
 
 **This skill owns what the statuses mean and what the file looks like. The routes own the
-procedures.** Recovery belongs to `continue`, merging to `work`. Where this file used to
+procedures.** Recovery belongs to `continue`, the landing loop to `work`, and the merge
+itself to `ai-land`. Where this file used to
 restate them, it had already drifted out of step with both — so it now states the mapping
 and points at the owner.
 
@@ -23,6 +24,7 @@ and points at the owner.
 vision: complete            # absent | drafting | complete
 current_milestone: M-03
 oracle: npm test            # or: none (degraded)
+main: green                 # green | red — red halts all dispatch. only ai-land sets it
 
 ## M-03 · Session lifecycle   [decomposed]
 
@@ -69,21 +71,29 @@ detail belongs in the notes the subagents themselves write.
 ## Status transitions
 
 ```
-pending ──claim──> in_progress ──report──> verifying ──pass──> done
-                        │                      │
-                        │                      └──fail──> pending (attempt++)
-                        ├──drift────> drifted
-                        ├──budget───> pending (handoff written)
-                        └──question─> awaiting (open decision recorded)
+pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─landed─> done
+                      │                    │                │
+                      │                    │                └─conflict──> pending
+                      │                    │                  reverted    (worktree kept)
+                      │                    └─fail──────────> pending (attempt++)
+                      ├─drift────────────> drifted
+                      ├─budget───────────> pending (handoff written)
+                      └─question─────────> awaiting (open decision recorded)
 ```
 
 - `pending` — available, provided `blocked_by` is empty or all resolved
 - `in_progress` — an executor holds it. Records which, and its worktree path
 - `verifying` — executor reported success; awaiting an independent check
-- `done` — verified by a *different* agent in a clean context. Never self-declared
+- `landing` — verified; a lander is merging it into the main tree. Worktree kept
+- `done` — verified by a *different* agent **and** landed without breaking the main tree.
+  Never self-declared, and never set straight off a `pass`
 - `drifted` — the plan was wrong; a drift record exists; downstream may be invalid
 - `awaiting` — blocked on a user decision. Names the `DEC-nnn`; worktree kept
 - `blocked` — cannot proceed for an external reason, stated in the row
+
+`landing` exists because passing verification and surviving the merge are two separate
+claims, and there was previously no state between them — so a task that had landed and
+broken the build was indistinguishable from one that had never been tried.
 
 Only the parent writes these. A task is never `done` because the executor said so —
 only because `ai-verify` confirmed it.
@@ -107,9 +117,27 @@ declares its surface, so compare the lists.
   own worktree.
 - If all eligible tasks overlap, run one. Serial is the fallback, not a failure.
 
-**The merge procedure lives in `work`.** Here, only what it does to a row: a task whose
-merge conflicts or fails the checks goes back to `pending` with a note that the ground
-moved. Already-applied merges stay; do not unwind a whole batch for one.
+**The landing procedure lives in `work`; the merge itself lives in `ai-land`.** Here, only
+what a landing does to a row:
+
+| `ai-land` returned | Row |
+|---|---|
+| `landed` | `done`, worktree `merged` |
+| `conflict` or `reverted` | `pending`, worktree **kept**, attempt++ |
+| `stuck` | `blocked`, and set `main: red` at the top of the file |
+
+Earlier landings that succeeded stay landed — one task that could not land is not a reason
+to unwind the ones that did. What does **not** stay is the merge that failed: `ai-land`
+rolls that one back before it returns, so `pending` here always means the main tree is
+genuinely free of it.
+
+That is the distinction the old rule got wrong. "Already-applied merges stay" is right for
+a conflict, where nothing was applied — and wrong for a failed oracle, where the merge that
+just broke the build *is* one of the already-applied merges.
+
+**`main: red` halts dispatch.** No task is claimed, no batch starts, nothing lands while
+that flag is set. It is cleared by a human, not by the next agent that finds it
+inconvenient.
 
 ## Crash reconciliation — what the verdicts mean
 
@@ -130,8 +158,15 @@ Your job is the mapping:
 | `ai-recover` → `discard` | `pending` | dropped |
 | empty diff, no note | `pending` | dropped |
 
-**No row may remain `in_progress`** when reconciliation ends. That is the one invariant
-this section guarantees.
+**A row left at `landing` is the dangerous one.** A dead lander may have merged and never
+rolled back, so the main tree is in a state nobody recorded. Re-dispatch `ai-land` on that
+task rather than looking: its sequence starts by establishing what the tree actually
+contains, a merge that already happened re-runs as a no-op, and the oracle then tells you
+whether main is green. That is the same path the live case takes, which is why it needs no
+special handling here.
+
+**No row may remain `in_progress` or `landing`** when reconciliation ends. That is the one
+invariant this section guarantees.
 
 ## Drift invalidation
 

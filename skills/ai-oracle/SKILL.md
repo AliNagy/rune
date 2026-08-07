@@ -123,18 +123,16 @@ Run it in the task's worktree, not the main tree.
 
 ## Running the oracle after a merge
 
-`rune:work` dispatches this after landing a verified worktree in the main tree.
+This one is not a dispatch of its own. A worker on **`ai-land`** merges a verified worktree
+into the main tree and runs the oracle there itself, as step 4 of its own sequence — because
+if the oracle fails, the same worker has to roll the merge back, and splitting those two
+across two agents leaves a window where the tree is red and nobody owns it.
 
-Run the project oracle in the **main tree**, compare against the known-red baseline, and
-return ≤200 tokens:
+What this skill contributes there is unchanged: run it in the **main tree**, compare against
+the known-red baseline, and treat any new failure as a regression. `ai-land` owns what
+happens to the merge afterwards.
 
-```
-oracle: pass    # or: fail — 2 new failures not in baseline
-detail: .agent/notes/merge-<T-nnn>.md    # only when it failed
-```
-
-The parent merges but never reads a suite log. That split is the whole point: merging is
-bounded, running the suite is not.
+The parent never merges and never reads a suite log. That split is the whole point.
 
 ## Vacuous checks
 
