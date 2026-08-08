@@ -15,7 +15,7 @@ Target: under ~150k context per piece of work, on projects of any size.
 | | |
 |---|---|
 | **Claude Code** | Recent enough to have `/plugin`. Run `/help` — if you don't see it, update. |
-| **git** | Required. Every task runs in its own worktree, and `git diff` is how Rune knows what changed. Without git there's no way to undo a bad change. |
+| **git** | Required. Every task runs in its own worktree; partial work lives in `git diff`, while completed work is published as a commit that Rune verifies and lands by SHA. Without git there is no durable handoff or safe rollback. |
 | **[Serena](https://github.com/oraios/serena)** | Strongly recommended, as an MCP server. Looking up individual functions and classes beats reading whole files, and it saves more context than anything else here. Rune works without it, but each task gets much less room. |
 
 ## Install
@@ -159,21 +159,22 @@ than pausing, because resuming an agent keeps its context, which is the opposite
 you want here. A fresh one starts again from the task file — with Serena, about 10k to get
 back up to speed.
 
-**Interrupting it is safe.** Every task runs in its own git worktree, and `git diff` is the
-authoritative record of what changed; it can't drift from reality the way a hand-updated
-progress file can. Changes are always made *before* they're recorded, so the only thing
-that can go missing is a record — and that fixes itself, because the next agent finds the
-step already done. The other order would leave a record with no change behind it, and real
-work would get skipped. That ordering is also what makes a killed session recoverable
-rather than merely resettable: the diff can be matched against the task's steps to find
-where to resume. `/rune:pause` stops new work but lets what's running finish and merge, so
-you're never left with a half-applied change, and the flag lives on disk so nothing clears
-it quietly.
+**Interrupting it is safe.** Every task runs in its own git worktree. An unfinished task's
+`git diff` is the authoritative partial record; a finished task is committed, and that
+commit SHA is recorded on disk before an independent agent verifies it. Changes are always
+made *before* they're recorded, so the only thing that can go missing is a record — and
+that fixes itself, because the next agent finds the step already done. The other order
+would leave a record with no change behind it, and real work would get skipped. That
+ordering is also what makes a killed session recoverable rather than merely resettable:
+the diff can be matched against the task's steps to find where to resume. `/rune:pause`
+stops new work but lets what's running finish and land, so you're never left with a
+half-applied change, and the flag lives on disk so nothing clears it quietly.
 
 **Work is checked, not claimed.** A task's test must be seen *failing* before the change is
 made, with the evidence recorded — a test written after the fix and never seen failing
 proves nothing, and a reviewer in a fresh context can't tell the two apart. Each finished
-task is then checked by a different agent that never saw the work. Tasks are self-contained
+task is then committed and checked by a different agent that never saw the work. The SHA
+that agent approves is the only SHA the lander may merge. Tasks are self-contained
 — goal, files it may touch, what counts as done, its test — so any one can be run, retried,
 or reviewed without knowing about the others, and up to three run in parallel when their
 file lists don't overlap, merged one at a time with the checks re-run after each. A merge
@@ -210,7 +211,7 @@ skills/
   ai-survey       looking around an unfamiliar codebase
   ai-triage       is it a bug, a feature, a refactor, or a question
   ai-decompose    milestone to tasks, and how big a task should be
-  ai-execute      doing one task: worktree, red before green, when to stop
+  ai-execute      doing one task: worktree, red before green, publishing its commit
   ai-bug          reproduce before planning
   ai-feature      thin end-to-end slices, open questions decided first
   ai-refactor     cover behaviour with tests first, then leave them alone
@@ -218,7 +219,7 @@ skills/
   ai-research     evidence from outside the repo, graded and cited
   ai-drift        when the plan turns out to be wrong
   ai-verify       an independent second check
-  ai-land         merging a verified task, and backing it out if that breaks the build
+  ai-land         merging the exact verified commit, and backing it out if checks break
   ai-ledger       state updates, and cleaning up after a crash
 ```
 

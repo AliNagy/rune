@@ -123,7 +123,7 @@ Run it in the task's worktree, not the main tree.
 
 ## Running the oracle after a merge
 
-This one is not a dispatch of its own. A worker on **`ai-land`** merges a verified worktree
+This one is not a dispatch of its own. A worker on **`ai-land`** merges the exact verified commit
 into the main tree and runs the oracle there itself, as step 4 of its own sequence — because
 if the oracle fails, the same worker has to roll the merge back, and splitting those two
 across two agents leaves a window where the tree is red and nobody owns it.

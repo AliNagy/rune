@@ -1,7 +1,7 @@
 ---
 name: ai-execute
 user-invocable: false
-description: Use when executing one Rune task - you have been dispatched with a task id and nothing else. Covers worktree isolation, the change surface boundary, red-before-green, edit-then-tick ordering, budget stops, and the return format. Never used by the dispatcher on its own behalf.
+description: Use when executing one Rune task - you have been dispatched with a task id and nothing else. Covers worktree isolation, the change surface boundary, red-before-green, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
 ---
 
 # Executing a task
@@ -12,8 +12,13 @@ description: Use when executing one Rune task - you have been dispatched with a 
 Also load `ai-taskfmt`, `ai-serena`, and `ai-drift`.
 
 You are stateless. Assume nothing from any prior session. If a handoff note exists at
-`.agent/notes/T-nnn.md`, read it and the worktree's `git diff` — together they are the
-complete record of what was done before.
+`.agent/notes/T-nnn.md`, read it and inspect both records of source state: the latest
+`base_commit..artifact_commit` publication in `.agent/notes/T-nnn.progress`, if one
+exists, and the worktree's uncommitted `git diff`. The committed range is what a prior
+attempt published; the dirty diff is what happened after it. If there is no publication
+but the task branch is ahead of its merge base with main, a prior executor died between
+`git commit` and recording the SHA. Inspect that committed range too; an empty dirty diff
+does not mean an empty task.
 
 **If `.agent/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
 been through verification before and came back. The last block is why the previous attempt
@@ -65,7 +70,8 @@ progress file, handoff note, and any drift or decision record are coordination s
 the dispatcher, the verifier, and the next session all need to see. Written inside your
 worktree they would be invisible until merge, which is exactly when they stop being useful.
 
-Source into the worktree. Coordination into `.agent/` in the main tree.
+Source into the worktree and, on completion, its task branch. Coordination into `.agent/`
+in the main tree.
 
 ## Rules
 
@@ -110,13 +116,56 @@ Ask only for choices that change visible behaviour. Anything you could have dete
 from the spec or the surrounding code, determine — spending the user's attention on it is
 worse than deciding and noting it.
 
+## Publish before reporting `done`
+
+`status: done` means **a commit exists**, not merely that the files look right in one
+worktree. Verification and landing run in fresh contexts; an uncommitted diff has no path
+through git into the main tree.
+
+Only a completed task is published. `budget`, `blocked`, `question`, and `drifted` keep or
+discard their dirty worktree exactly as their stopping rules say; do not commit partial
+work merely to make it durable.
+
+After the task-local check and project oracle pass:
+
+1. Stage only files in the declared change surface. Never use a broad add to sweep an
+   unexplained file into the artifact.
+2. Commit the staged source changes on the task branch with the task id in the subject:
+   `git commit -m "T-nnn: <task title>"`. On a retry, earlier task commits may remain; the
+   artifact is the complete range, not necessarily one commit.
+3. If the worktree is already clean and the task branch already contains the finished
+   change, do not create an empty commit. Publish its current `HEAD`.
+4. Set `artifact_commit` to `git rev-parse HEAD`. Set `base_commit` to the merge base of
+   the main branch and `artifact_commit`.
+5. Prove the publication is usable: `base_commit` is an ancestor of `artifact_commit`,
+   `git diff <base_commit>..<artifact_commit>` is non-empty, and
+   `git status --porcelain` in the task worktree is empty. Any failure means you cannot
+   report `done`.
+6. Append the publication to `.agent/notes/T-nnn.progress` before returning:
+
+```yaml
+publication: 2
+base_commit: a3f91c2
+artifact_commit: 4a91c02
+```
+
+Append; never replace an earlier publication. Verification findings and landing failures
+can send a task around the loop, and each attempt needs to say exactly which immutable
+range it produced. The last publication is live.
+
+The two commit ids are the handoff interface. The verifier checks that exact artifact;
+the lander merges only the commit the verifier names. A return value alone is not durable,
+so the progress file is authoritative and the return repeats the ids for routing only.
+
 ## Return (≤200 tokens)
 
 ```
 status: done | drifted | budget | blocked | question
 task: T-nnn
-worktree: kept | discarded
+worktree: kept | discarded        # done always means kept until ai-land cleans it
 summary: <one or two lines>
+base_commit: a3f91c2       # required for status: done
+artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any
 decision: DEC-nnn     # if status is question
 ```

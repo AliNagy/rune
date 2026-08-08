@@ -1,14 +1,14 @@
 ---
 name: ai-land
 user-invocable: false
-description: Use when merging one verified task's worktree into the main tree. Merges, re-runs the project oracle, reverts the merge if the oracle fails, and records why so the next attempt is not blind. Never used on unverified work, and never by the parent on its own behalf.
+description: Use when merging one verified task commit into the main tree. Binds the branch to the verifier's exact commit, merges it, re-runs the project oracle, reverts the merge if the oracle fails, and records why so the next attempt is not blind. Never used on unverified work, and never by the parent on its own behalf.
 ---
 
 # Landing a verified task
 
-A verified task is proven **in its own worktree**. Landing asks a different question: does
-the main tree still work with this change in it? Only merging can answer that, and only
-running the suite afterwards can prove it.
+A verified task is proven **as one immutable artifact** in its own worktree. Landing asks a
+different question: does the main tree still work with that exact commit in it? Only
+merging can answer that, and only running the suite afterwards can prove it.
 
 Two tasks can each pass verification and still break the project together — task A renames
 something task B calls, neither touches the other's files, git merges both without
@@ -33,9 +33,12 @@ because the situation seems to call for one.
 
 ## Inputs
 
-- the task id, and its worktree branch
+- the task id, its worktree path, and its task branch
 - `.agent/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
   task's to answer for
+- `.agent/notes/T-nnn.progress` — the executor's latest `base_commit` and
+  `artifact_commit`
+- `.agent/notes/T-nnn.verify.md` — the verifier's latest verdict and `verified_commit`
 - `.agent/rune.yml` — the oracle command and its known-red baseline
 - `.agent/notes/T-nnn.landing.md` — earlier landing attempts, if this is a retry
 
@@ -48,26 +51,64 @@ the ceiling below.
 
 Fixed order. Do not reorder, do not skip.
 
-**1. Check the tree is clean outside `.agent/`.** `git status --porcelain` — anything
+**1. Check the main tree is clean outside `.agent/`.** `git status --porcelain` — anything
 modified beyond `.agent/` means someone left source changes in the main checkout, and a
 rollback could not tell them apart from the merge. Stop, record the attempt, return `stuck`,
 and say what is dirty.
 
 `stuck` is the outcome for **any state only a human can resolve** — a dirty main tree here,
-or a rollback that did not restore one at step 6. Both mean the same thing to the parent:
+or a rollback that did not restore one at step 7. Both mean the same thing to the parent:
 land nothing else until someone looks.
 
-**2. Record the rollback point.** `git rev-parse HEAD` in the main tree. Every undo below
+**2. Bind the landing to the verified artifact.** Read the last publication and last
+verification blocks. Require all of these:
+
+- the latest verdict is `pass`;
+- `base_commit` and `artifact_commit` in the verification block match the latest
+  publication block;
+- `verified_commit` equals `artifact_commit`;
+- `base_commit` is an ancestor of `verified_commit`, and
+  `git diff <base_commit>..<verified_commit>` is non-empty.
+
+Any mismatch means the thing in the worktree is unpublished, changed since verification,
+or empty. Touch nothing in main, append the exact mismatch to the landing record, and
+return `refused` with `main: green`. Never commit it, choose a nearby SHA, or re-verify it
+yourself. The executor publishes; the verifier approves; you land.
+
+If `verified_commit` is already an ancestor of main, the artifact already landed before a
+prior lander returned. Do not create an empty merge. Run the oracle against main: green
+means `landed` and you skip to step 8 for cleanup; red means `stuck`, because there is no
+recorded rollback point that safely distinguishes this task from later history.
+
+Only when the artifact is not already in main, also require the task branch HEAD to equal
+the verified commit and `git status --porcelain` in its worktree to be empty. This ordering
+is deliberate: a prior lander may have merged, removed the worktree and branch, then died
+before returning. The durable commit in main is enough to recover that case. Before the
+first merge, a missing branch, missing worktree, dirty worktree, or moved branch is
+`refused`.
+
+**3. Record the rollback point.** `git rev-parse HEAD` in the main tree. Every undo below
 depends on this one line. Capture it before you touch anything.
 
-**3. Merge the task's branch** into the main tree.
+**4. Merge the exact verified commit** into the main tree:
+
+```bash
+git merge <verified_commit>
+```
+
+Do not merge the branch name. The branch is checked only to prove it still names the
+artifact; the SHA is what passed verification and is the only thing authorised to land.
 
 Conflict → `git merge --abort`, record the attempt, return `conflict`. Nothing landed and
-the tree is untouched, so there is nothing to roll back — you skip step 5's rollback and
+the tree is untouched, so there is nothing to roll back — you skip step 6's rollback and
 write the record alone. What this needs is not a code fix: the worktree has fallen behind
 main and has to catch up before it can land.
 
-**4. Run the project oracle** in the main tree, per `ai-oracle`. Compare against the
+After git reports success, require `verified_commit` to be an ancestor of main `HEAD`.
+Otherwise roll back: a successful command that did not make the authorised artifact
+reachable did not land the task.
+
+**5. Run the project oracle** in the main tree, per `ai-oracle`. Compare against the
 known-red baseline in `rune.yml`, never against zero failures.
 
 **Skip this only when the merge was a fast-forward.** The tree is then byte-identical to
@@ -75,9 +116,9 @@ the worktree `ai-verify` already ran the oracle in, so a re-run cannot say anyth
 Any other merge produced a tree nobody has tested yet. That is a git fact you check, not
 a call you make — and it is the only permitted reason to skip.
 
-Pass → return `landed`. You are done.
+Pass → the artifact landed. Continue to cleanup below, then return `landed`.
 
-**5. Roll the merge back, then write the record.**
+**6. On oracle failure, roll the merge back, then write the record.**
 
 Undo first, record second — the same write-order rule executors follow, and for the same
 reason. If you die between the two, a missing record is recoverable and a record with the
@@ -98,15 +139,34 @@ then treats the branch as already merged — so the fixed worktree would land as
 diff on the next attempt. Re-landing the same branch is the entire point of this loop, and
 that one command quietly breaks it.
 
-**6. Run the oracle again** to confirm the rollback actually restored the tree.
+**7. Run the oracle again** to confirm the rollback actually restored the tree.
 
 Green → return `reverted`. Main is back to known-good.
 Still red → return `stuck`. Say so plainly. The rollback did not restore the tree, and no
 further landing is safe until a human looks.
 
-Step 6 is the step most worth not skipping. A rollback assumed to have worked and did not
+Step 7 is the step most worth not skipping. A rollback assumed to have worked and did not
 leaves main red while your return value says it is green — which is the exact failure this
 skill exists to prevent, moved one step later where nobody is looking for it.
+
+**8. Record success, then clean up.** Append a `landed` block naming `base_commit`,
+`artifact_commit`, `verified_commit`, and the resulting main `HEAD`. Write that durable
+fact before cleanup: if you die after it, reconciliation knows the code landed and only
+garbage collection remains.
+
+Then remove the clean task worktree, and delete its merged task branch when they still
+exist:
+
+```bash
+git worktree remove <worktree_path>
+git branch -d <task_branch>
+```
+
+Cleanup is after the oracle because the worktree is the recovery asset for every earlier
+failure. If either cleanup command fails after the artifact is green in main, do not roll
+the merge back and do not call the task failed. Return `landed` with `cleanup: pending` and
+record what remains; `continue` can remove the orphan later. Otherwise return
+`cleanup: complete`.
 
 ## The landing record
 
@@ -126,7 +186,10 @@ Append one block per attempt; never edit an earlier one. The history is the poin
 ```markdown
 ## attempt 2 — 2026-08-07
 outcome: reverted
-merged: 4a91c02             # the merge commit, now rolled back
+base_commit: a3f91c2
+artifact_commit: 4a91c02
+verified_commit: 4a91c02
+merged: b72de10             # resulting main HEAD, now rolled back
 rolled_back_to: 8f3e1d7     # HEAD before the merge
 oracle: 2 new failures, neither in the known-red baseline
 failing:
@@ -153,8 +216,8 @@ this is. On the fifth, escalate whatever it looks like. A task that has not land
 tries is telling you something about the plan, and the sixth attempt does not find it out.
 
 **A `landed` outcome never escalates**, whatever attempt it was on — the loop ended
-because it succeeded. Everything below applies only when the outcome is `conflict`,
-`reverted`, or `stuck`.
+because it succeeded. Everything below applies only when the outcome is `refused`,
+`conflict`, `reverted`, or `stuck`.
 
 Before the ceiling, escalate on any of these. **Ordered rules, first match wins.** Each is
 a check against the record, not a call you make:
@@ -180,20 +243,22 @@ making a decision — the parent decides what happens next, it just cannot see w
 
 ```
 task: T-014
-landing: landed | conflict | reverted | stuck
+landing: landed | refused | conflict | reverted | stuck
 main: green | red
+verified_commit: 4a91c02
 attempt: 2 of 5
 summary: rotation drops the device id the api layer reads back
 escalate: no             # or: yes (rule 3) — session.test.ts failed on attempt 1 too
 detail: .agent/notes/T-014.landing.md
+cleanup: complete | pending   # only for landed
 ```
 
 `main` is not decoration — it is the parent's dispatch gate. It must not send new work into
 a tree you have just told it is red.
 
-Keep the task's worktree in every outcome except `landed`. The fix goes back into that
-worktree, and discarding it throws away work that passed verification for the sake of a
-merge problem.
+Keep the task's worktree in every outcome except a `landed` result whose cleanup completed.
+The fix goes back into that worktree, and discarding it throws away work that passed
+verification for the sake of a publication or merge problem.
 
 ## What you are not
 

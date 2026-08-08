@@ -53,12 +53,22 @@ everything *looks* fine.
 **Every `in_progress` row is a lie** — no executor is holding it; they died with the
 session. For each:
 
-1. **Handoff note present?** The executor stopped deliberately. Follow its
+1. **Valid complete publication present?** The executor committed the task and appended
+   `base_commit` plus `artifact_commit` to its progress file, the task branch still points
+   to that artifact, and its worktree is clean. It died after publication but before its
+   short return reached the parent. Set the row to `verifying` and dispatch `ai-verify`;
+   its artifact preflight proves the remaining invariants. Do not discard it because the
+   uncommitted diff is empty — a completed artifact should have an empty diff.
+2. **Handoff note present?** The executor stopped deliberately. Follow its
    `worktree: kept|discarded` instruction and set the status it implies — `pending` for a
    budget stop, `drifted` for drift.
-2. **No handoff?** The session died mid-flight. Check only whether the worktree's diff is
-   empty — that is a yes/no, not a read:
-   - empty → discard, set `pending`. Nothing lost.
+3. **No handoff?** The session died mid-flight. Check only whether the worktree's diff is
+   empty and whether the task branch is ahead of its merge base with main — both are
+   bounded state probes, not source reads:
+   - empty diff, branch ahead → keep it and set `pending`. The executor may have died
+     between `git commit` and writing the publication block; a fresh executor inspects the
+     committed range and either publishes that `HEAD` or resumes the task.
+   - empty diff, branch not ahead → discard, set `pending`. Nothing lost.
    - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** as a subagent.
      It maps the diff onto the task's declared steps, decides whether the work is
      salvageable, names the resume point, and writes the handoff the dead executor never
@@ -66,11 +76,12 @@ session. For each:
 
    Do not inspect the diff yourself. Reading it is exactly the code-reading the dispatcher
    is forbidden, and a torn worktree is expensive to read.
-3. **No row may remain `in_progress`** when you are done.
+4. **No row may remain `in_progress`** when you are done.
 
 Also check:
 
-- orphaned worktrees with no ledger row → remove
+- orphaned worktrees with no ledger row → remove; if their task commit is already in main,
+  delete the merged task branch too
 - `verifying` rows whose verifier never returned → re-dispatch
 - drift records not yet reflected in the ledger's blocked list
 - **`decisions/open/` files with no `awaiting` row** → a worker asked something and the

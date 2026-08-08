@@ -39,7 +39,7 @@ checks pass, unmodified**.
 
 ```
 - [ ] Project oracle passes — identical results to baseline
-- [ ] No test file appears in git diff
+- [ ] No test file appears in `git diff <base_commit>..<artifact_commit>`
 - [ ] Public API surface unchanged (or: changed exactly as declared)
 ```
 
