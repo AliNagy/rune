@@ -26,9 +26,16 @@ Only these:
 - `.agent/notes/T-nnn.progress` — ticks and red-then-green evidence
 - `git diff` in the task's worktree — what actually changed
 - `.agent/rune.yml` — the project oracle and its known-red baseline
+- `.agent/notes/T-nnn.verify.md` — earlier verdicts on this task, if this is a retry
 
 Not the executor's summary. That is the claim under examination; reading it primes you to
 agree with it.
+
+**The record tells you which attempt this is. It does not tell you what to check.** Run all
+seven steps below whether this is attempt 1 or attempt 4. Narrowing to "did they fix the
+last finding" is how the second defect in a task ships: the executor answered the finding,
+you confirmed the finding was answered, and nobody looked at the rest. Read it for the
+count and for what has already been rejected — then verify the task, not the finding.
 
 ## Procedure
 
@@ -63,6 +70,69 @@ would have skipped real work.
 **7. Walk the acceptance criteria** one at a time. Each is pass, fail, or unverifiable.
 There is no partial credit and no "essentially done".
 
+## The verification record
+
+`.agent/notes/T-nnn.verify.md` — where your finding goes. Sole writer: the verifier
+holding T-nnn.
+
+**Write it before you return.** Your verdict block is a pointer; this file is the finding.
+A `fail` that exists only in a return value dies in the parent's context, and the next
+executor of this task reads the task file, the handoff, and the diff — none of which say
+why the last attempt was rejected. It would repeat that attempt move for move.
+
+This is the counterpart to `.agent/notes/T-nnn.landing.md`, and it sits where it does for
+the same three reasons. It is **per-task**, so it satisfies the concurrency rule in
+`ai-taskfmt` without anyone having to think about it. It has a **different sole writer**
+from the executor's two files, and merging writers is the one thing that rule exists to
+prevent. And it lives under `.agent/` in the **main tree**, so it is visible to the parent
+and the next executor immediately, rather than at merge — and it survives the worktree
+being discarded.
+
+Append one block per attempt; never edit or delete an earlier one. The history is the
+point: a task rejected three times for three different reasons is a different problem from
+one rejected three times for the same reason, and only the history tells them apart.
+
+```markdown
+## attempt 2 — 2026-08-08
+verdict: fail
+failing_criterion: "rotate() is called exactly once per refresh"
+observed: rotate() fires twice — once in handle(), once in the refresh path
+evidence: |
+  rotation.test.ts :: "refresh rotates once"
+  Expected 1 call, received 2
+in_surface: yes — both call sites are inside T-014's declared surface
+reading: handle() already rotated; the new call duplicates it rather than replacing it
+```
+
+Quote what you actually saw. Do not paraphrase a failure from memory — the next agent
+needs the output it will meet, and a summary of a stack trace is not one.
+
+`in_surface` earns its place for the same reason it does in the landing record. A failure
+inside the task's declared change surface is the task's own bug and the fix belongs in its
+worktree. Outside it, the task collided with something it was never told about — usually
+drift, and fixing it inside the task hides the real problem.
+
+Write a block on **every** verdict, `pass` included — though a passing one is three lines,
+because there is no finding to carry:
+
+```markdown
+## attempt 3 — 2026-08-08
+verdict: pass
+summary: rotation fires once per refresh; oracle clean against baseline
+```
+
+A `pass` block is what closes the chain, and it is how a later reader tells a resolved
+history from a live one.
+
+**Live, superseded, resolved.** The last block is live; everything above it is history. A
+finding is *superseded* when a later `fail` block replaces it — the new one is what the
+next executor must answer. It is *resolved* when a later block reads `pass`. Nothing is
+rewritten to mark either; position in the file already says it.
+
+If you die between writing the block and returning, the parent sees no verdict and
+dispatches a fresh verifier, which appends its own. A duplicate block is noise. A missing
+one sends the next executor in blind.
+
 ## Verdict
 
 ```
@@ -79,11 +149,18 @@ acceptance:
   - test passes .......... pass
   - no regression ........ pass
   - rotate called once ... pass
+attempt: 2                        # count the blocks in the record, including this one
+detail: .agent/notes/T-014.verify.md
 ```
 
+`attempt` is not decoration. The parent stops a task that has failed twice, and it cannot
+count reliably across a context that may have been compacted. You are reading the number
+off disk, so you are the one who can.
+
 **pass** — every criterion met, evidence present.
-**fail** — a criterion is not met. Say which and what you observed. The task returns to
-`pending` with your finding attached; do not fix it yourself.
+**fail** — a criterion is not met. Say which and what you observed — in the record, where
+the next executor will find it. The task returns to `pending` and a fresh executor is
+given your record; do not fix it yourself.
 **unverified** — you could not establish the truth. Missing red evidence, a flaky oracle,
 an acceptance criterion that is not actually checkable. This is not a soft pass. An
 unverifiable acceptance criterion is a defect in the *task*, and it should go back to
@@ -94,6 +171,12 @@ decomposition.
 You are not a reviewer. Do not comment on style, naming, or how you would have done it.
 Do not suggest improvements. Do not fix anything, however small — you have no worktree of
 your own and no acceptance criterion covering your change.
+
+**You write exactly one file: `.agent/notes/T-nnn.verify.md`.** That is not an exception to
+the rule below and should not be read as one. It is coordination state, the same category
+as the executor's progress file and the lander's landing record — it records what you
+observed and changes nothing about the work. Everything else on disk, source and `.agent/`
+alike, you read only.
 
 **Nothing stops you from editing.** You are an ordinary subagent holding ordinary
 permissions, so "makes no changes" is a rule you keep rather than a wall you hit. It is
