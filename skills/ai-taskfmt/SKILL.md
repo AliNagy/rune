@@ -22,7 +22,7 @@ stranger with an empty context.
   ledger.md              # ALL mutable state. single writer: the parent
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
-  notes/T-nnn.progress   # step ticks. single writer: the executor
+  notes/T-nnn.progress   # step ticks, red evidence, commit publications. executor-owned
   notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
   notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
@@ -48,7 +48,8 @@ working in a worktree.
 
 | Written by an executor | Lands in |
 |---|---|
-| source changes | its worktree |
+| source changes while incomplete | its worktree as an uncommitted diff |
+| source changes when complete | commits on its task branch |
 | `notes/T-nnn.progress`, handoff notes | `.agent/` in the main tree |
 | drift and decision records | `.agent/` in the main tree |
 
@@ -166,7 +167,7 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 |---|---|
 | `ai-execute` | `status: done \| drifted \| budget \| blocked \| question` |
 | `ai-verify` | `verdict: pass \| fail \| unverified` |
-| `ai-land` | `landing: landed \| conflict \| reverted \| stuck` |
+| `ai-land` | `landing: landed \| refused \| conflict \| reverted \| stuck` |
 | `ai-recover` | `verdict: salvage \| discard \| partial` |
 | `ai-triage` | `type: bug \| feature \| refactor \| investigation` |
 | `ai-oracle` | `oracle: passing \| failing \| none` |
@@ -184,6 +185,31 @@ so it gets no worktree line.
 
 What *is* shared: the id, one plain-words summary, an enumerated outcome, and a hard
 **≤200 tokens**. Anything longer goes to disk and the summary points at it.
+
+### The published task artifact
+
+One small interface crosses execution, verification, and landing:
+
+```yaml
+base_commit: a3f91c2
+artifact_commit: 4a91c02
+verified_commit: 4a91c02   # added only by a passing verifier
+```
+
+Only an executor returning `status: done` publishes an artifact. It commits the completed
+source change on the task branch, proves the worktree clean, and appends `base_commit` plus
+`artifact_commit` to `notes/T-nnn.progress`. Incomplete outcomes keep their uncommitted
+diff and do not invent an artifact.
+
+The verifier reads the latest publication and checks exactly
+`git diff <base_commit>..<artifact_commit>`. A pass writes the identical SHA as
+`verified_commit` in `notes/T-nnn.verify.md`. The lander refuses unless the task branch
+still points to that SHA and merges the SHA itself, never an unnamed worktree diff or a
+branch that moved after verification.
+
+**Invariant: the executor publishes one immutable range, the verifier approves its head,
+and the lander merges that same head.** The ids are repeated in short returns for routing,
+but the per-task files are authoritative because they survive a dead parent.
 
 ### Bounded state probes
 
@@ -310,7 +336,8 @@ Steps are coarse intent, not a script.
 
 ### Progress and the write-order rule
 
-Ticks live in `notes/T-nnn.progress`, owned by the executor.
+Ticks, red evidence, and publication blocks live in `notes/T-nnn.progress`, owned by the
+executor.
 
 **Always make the edit first, then tick.** This is not stylistic. If the process dies
 between the two, the only reachable desync is a *missing* tick — and that self-heals,
@@ -319,9 +346,11 @@ The reverse order permits a tick with no edit, which makes the record lie and ca
 next executor to skip real work. One direction is recoverable; the other is silent
 corruption.
 
-The ticks are a convenience, not the truth. `git diff` in the task's worktree is the
-authoritative record of what changed — it is atomic with the edit by construction and
-cannot desync.
+The ticks are a convenience, not the truth. While a task is incomplete, its uncommitted
+`git diff` is the authoritative record of partial work. Once an executor reports `done`,
+the last `base_commit..artifact_commit` publication is authoritative and the worktree must
+be clean. That split preserves crash recovery for half-finished work while giving
+verification and landing one immutable artifact.
 
 ### Red-then-green
 

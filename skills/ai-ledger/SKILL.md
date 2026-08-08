@@ -44,8 +44,9 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 | survey      | ai-survey     | —     | map.md written     |
 | commands    | ai-oracle     | —     | oracle: npm test   |
 | decompose   | ai-decompose ×3| M-03 | 4 tasks, cut agreed|
-| execute     | ai-execute    | T-014 | done               |
-| verify      | ai-verify     | T-014 | pass               |
+| execute     | ai-execute    | T-014 | done @ 4a91c02     |
+| verify      | ai-verify     | T-014 | pass @ 4a91c02     |
+| land        | ai-land       | T-014 | landed @ 4a91c02   |
 ```
 
 ## Log every dispatch
@@ -73,8 +74,9 @@ detail belongs in the notes the subagents themselves write.
 ```
 pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─landed─> done
                       │                    │                │
-                      │                    │                └─conflict──> pending
-                      │                    │                  reverted    (worktree kept)
+                      │                    │                └─refused───> pending
+                      │                    │                  conflict     (worktree kept)
+                      │                    │                  reverted
                       │                    └─fail──────────> pending (attempt++)
                       ├─drift────────────> drifted
                       ├─budget───────────> pending (handoff written)
@@ -83,8 +85,9 @@ pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─
 
 - `pending` — available, provided `blocked_by` is empty or all resolved
 - `in_progress` — an executor holds it. Records which, and its worktree path
-- `verifying` — executor reported success; awaiting an independent check
-- `landing` — verified; a lander is merging it into the main tree. Worktree kept
+- `verifying` — executor published a commit; awaiting an independent check of that artifact
+- `landing` — the published commit was independently verified; a lander is merging that
+  exact SHA into the main tree. Worktree kept
 - `done` — verified by a *different* agent **and** landed without breaking the main tree.
   Never self-declared, and never set straight off a `pass`
 - `drifted` — the plan was wrong; a drift record exists; downstream may be invalid
@@ -95,8 +98,8 @@ pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─
 claims, and there was previously no state between them — so a task that had landed and
 broken the build was indistinguishable from one that had never been tried.
 
-Only the parent writes these. A task is never `done` because the executor said so —
-only because `ai-verify` confirmed it.
+Only the parent writes these. A task is never `done` because the executor said so — it is
+done only after `ai-verify` names the published commit and `ai-land` lands that same SHA.
 
 `awaiting` returns to `pending` the moment its decision is marked `decided`. A fresh
 executor picks it up with the handoff, the worktree diff, and the resolved decision.
@@ -122,8 +125,8 @@ what a landing does to a row:
 
 | `ai-land` returned | Row |
 |---|---|
-| `landed` | `done`, worktree `merged` |
-| `conflict` or `reverted` | `pending`, worktree **kept**, attempt++ |
+| `landed` | `done`, worktree removed or cleanup `pending` as returned |
+| `refused`, `conflict`, or `reverted` | `pending`, worktree **kept**, attempt++ |
 | `stuck` | `blocked`, and set `main: red` at the top of the file |
 
 Earlier landings that succeeded stay landed — one task that could not land is not a reason
@@ -151,19 +154,20 @@ Your job is the mapping:
 
 | What comes back | Status | Worktree |
 |---|---|---|
+| valid complete publication, executor return missing | `verifying` | kept; dispatch `ai-verify` |
 | handoff note says `budget` | `pending` | kept |
 | handoff note says `drift` | `drifted` | per the note |
 | `ai-recover` → `salvage` | `pending`, resume point in the row | kept |
 | `ai-recover` → `partial` | `pending`, note that the test must be redone red-first | kept |
 | `ai-recover` → `discard` | `pending` | dropped |
-| empty diff, no note | `pending` | dropped |
+| empty diff, branch ahead, no publication | `pending` | kept; executor recovers the committed range |
+| empty diff, branch not ahead, no note | `pending` | dropped |
 
 **A row left at `landing` is the dangerous one.** A dead lander may have merged and never
 rolled back, so the main tree is in a state nobody recorded. Re-dispatch `ai-land` on that
-task rather than looking: its sequence starts by establishing what the tree actually
-contains, a merge that already happened re-runs as a no-op, and the oracle then tells you
-whether main is green. That is the same path the live case takes, which is why it needs no
-special handling here.
+task rather than looking: it reads the durable `verified_commit`, detects whether that
+exact SHA is already an ancestor of main, and runs the oracle instead of creating an empty
+merge. That is the same artifact and the same gate the live case uses.
 
 **No row may remain `in_progress` or `landing`** when reconciliation ends. That is the one
 invariant this section guarantees.

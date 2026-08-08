@@ -23,8 +23,9 @@ This is checking, not designing.
 Only these:
 
 - `.agent/tasks/T-nnn.md` — the spec, including acceptance and the stated test
-- `.agent/notes/T-nnn.progress` — ticks and red-then-green evidence
-- `git diff` in the task's worktree — what actually changed
+- `.agent/notes/T-nnn.progress` — ticks, red-then-green evidence, and the latest
+  `base_commit` / `artifact_commit` publication
+- the clean task worktree at `artifact_commit`
 - `.agent/rune.yml` — the project oracle and its known-red baseline
 - `.agent/notes/T-nnn.verify.md` — earlier verdicts on this task, if this is a retry
 
@@ -32,42 +33,57 @@ Not the executor's summary. That is the claim under examination; reading it prim
 agree with it.
 
 **The record tells you which attempt this is. It does not tell you what to check.** Run all
-seven steps below whether this is attempt 1 or attempt 4. Narrowing to "did they fix the
+eight steps below whether this is attempt 1 or attempt 4. Narrowing to "did they fix the
 last finding" is how the second defect in a task ships: the executor answered the finding,
 you confirmed the finding was answered, and nobody looked at the rest. Read it for the
 count and for what has already been rejected — then verify the task, not the finding.
 
 ## Procedure
 
-**1. Does the diff match the declared change surface?**
+**1. Bind verification to the published artifact.** Read the last publication block from
+the progress file, then establish all of these mechanically:
+
+- `git rev-parse HEAD` in the task worktree equals `artifact_commit`.
+- `git status --porcelain` in that worktree is empty.
+- `base_commit` is an ancestor of `artifact_commit`.
+- `git diff <base_commit>..<artifact_commit>` is non-empty.
+
+If any check fails, return `unverified`. Do not infer an id, verify a nearby commit, commit
+the dirty files yourself, or silently accept an empty artifact. From this point onward,
+"the diff" means only `git diff <base_commit>..<artifact_commit>`. Set
+`reason: artifact` so `work` routes this back to an executor for publication rather than
+mistaking it for a defective acceptance criterion.
+
+**2. Does the diff match the declared change surface?**
 Files touched outside the surface are a finding, not a detail — the tripwire in
 `ai-drift` exists precisely to prevent this, so a violation means either the rule
 was broken or the task was mis-scoped. Report either way.
 
-**2. Run the task-local test.** It must exist and pass.
+**3. Run the task-local test.** It must exist and pass.
 
-**3. Check red-then-green evidence.** The progress file must record the test observed
+**4. Check red-then-green evidence.** The progress file must record the test observed
 failing before the change. If that evidence is absent, the result is **unverified**, not
 passed. A test written after a fix and never seen red proves nothing, and you cannot
 reconstruct that evidence after the fact.
 
-**4. Hunt vacuous checks.** Read the test.
+**5. Hunt vacuous checks.** Read the test.
 - Does it assert anything meaningful, or does it assert `true`?
 - Is the subject mocked so thoroughly that only the mock is exercised?
 - Would it still pass if the change were reverted? If you can answer that cheaply — by
-  reverting in the worktree and re-running — do it. It is the single most informative
-  check available to you.
+  using a disposable worktree without changing the published task worktree — do it. It is
+  the single most informative check available to you. If no disposable check is cheap,
+  record that the revert check was skipped; never mutate the artifact you are verifying.
 
-**5. Run the project oracle.** In the worktree. Compare against the known-red baseline,
+**6. Run the project oracle.** In the worktree. Compare against the known-red baseline,
 not against zero failures. Any new failure is a regression, even if the task's own test
 passes.
 
-**6. Audit the ticks.** Steps are phrased to be checkable. Spot-check two against the
+**7. Audit the ticks.** Steps are phrased to be checkable. Spot-check two against the
 diff. A ticked step with no corresponding change means the write-order rule was violated
 and the record is lying — report it, because it means the *next* executor of this task
 would have skipped real work.
 
-**7. Walk the acceptance criteria** one at a time. Each is pass, fail, or unverifiable.
+**8. Walk the acceptance criteria** one at a time. Each is pass, fail, or unverifiable.
 There is no partial credit and no "essentially done".
 
 ## The verification record
@@ -95,6 +111,8 @@ one rejected three times for the same reason, and only the history tells them ap
 ```markdown
 ## attempt 2 — 2026-08-08
 verdict: fail
+base_commit: a3f91c2
+artifact_commit: 4a91c02
 failing_criterion: "rotate() is called exactly once per refresh"
 observed: rotate() fires twice — once in handle(), once in the refresh path
 evidence: |
@@ -112,12 +130,15 @@ inside the task's declared change surface is the task's own bug and the fix belo
 worktree. Outside it, the task collided with something it was never told about — usually
 drift, and fixing it inside the task hides the real problem.
 
-Write a block on **every** verdict, `pass` included — though a passing one is three lines,
-because there is no finding to carry:
+Write a block on **every** verdict, `pass` included — though a passing one is short because
+there is no finding to carry:
 
 ```markdown
 ## attempt 3 — 2026-08-08
 verdict: pass
+base_commit: a3f91c2
+artifact_commit: 62be8d1
+verified_commit: 62be8d1
 summary: rotation fires once per refresh; oracle clean against baseline
 ```
 
@@ -138,6 +159,10 @@ one sends the next executor in blind.
 ```
 verdict: pass | fail | unverified
 task: T-014
+reason: artifact | evidence | oracle | acceptance   # required for unverified
+base_commit: a3f91c2
+artifact_commit: 62be8d1
+verified_commit: 62be8d1              # required only for pass; exactly artifact_commit
 surface: clean                    # or: touched src/api/routes.ts, outside surface
 local_test: pass (rotation.test.ts)
 red_evidence: present
@@ -157,7 +182,8 @@ detail: .agent/notes/T-014.verify.md
 count reliably across a context that may have been compacted. You are reading the number
 off disk, so you are the one who can.
 
-**pass** — every criterion met, evidence present.
+**pass** — every criterion met, evidence present, and `verified_commit` names the exact
+published artifact you checked.
 **fail** — a criterion is not met. Say which and what you observed — in the record, where
 the next executor will find it. The task returns to `pending` and a fresh executor is
 given your record; do not fix it yourself.
@@ -185,7 +211,8 @@ over something you can see how to fix in one line.
 
 Write the `fail`. A verifier that fixes what it found has destroyed the only independent
 check in the system — there is now no agent left who did not touch this code, and the next
-`pass` means nothing. The diff in the worktree records what you did either way.
+`pass` means nothing. A dirty worktree or changed `HEAD` exposes the mutation, but detecting
+it after the fact does not restore independence.
 
 You answer exactly one question: **does this task meet its stated acceptance, on
 evidence?**

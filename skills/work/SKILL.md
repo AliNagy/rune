@@ -260,19 +260,25 @@ Executors report ≤200 tokens:
 ```
 status: done | drifted | budget | blocked | question
 task: T-014
-worktree: kept | discarded | merged
+worktree: kept | discarded        # done requires kept until ai-land cleans it
 summary: rotate() implemented and wired; red-then-green recorded
+base_commit: a3f91c2       # required for done; repeated from the progress file
+artifact_commit: 4a91c02   # required for done; the task branch HEAD
 drift: DRF-003          # if any
 decision: DEC-012       # if status is question
 ```
 
-Record it. Do not read the worktree.
+For `done`, require both commit ids. They are routing data, not the durable record — the
+executor wrote the same publication to `.agent/notes/T-nnn.progress`. Record the outcome
+and dispatch the verifier with pointers to the task and progress files. Do not read the
+worktree or accept an uncommitted success claim.
 
 ### Landing a batch
 
 Verify each task independently first (step 5), then land them **one at a time, in the order
-they finished**. Each landing is a **dispatch to `ai-land`** carrying one task id — never
-two at once, because two landers are two writers on the main tree.
+they finished**. Each landing is a **dispatch to `ai-land`** carrying one task id and
+pointers to its progress and verification records — never two at once, because two landers
+are two writers on the main tree.
 
 The lander merges, re-runs the project oracle in the main tree, and rolls the merge back if
 that fails. You never see a suite log and never touch the main tree yourself.
@@ -282,24 +288,27 @@ something task B calls without either touching the other's files. Re-running the
 after each landing is what catches that, and landing one at a time is what tells you which
 one did it.
 
-Four outcomes:
+Five outcomes:
 
 | `landing:` | What happened | What you record |
 |---|---|---|
-| `landed` | merged, oracle passed | `done`, worktree `merged` |
+| `landed` | exact verified commit merged, oracle passed | `done`, cleanup result from lander |
+| `refused` | artifact missing, dirty, empty, or changed since verification | `pending`, **worktree kept** |
 | `conflict` | merge refused, nothing landed | `pending`, **worktree kept** — it has fallen behind main |
 | `reverted` | merged, oracle failed, rolled back | `pending`, **worktree kept** — the landing record says what broke |
 | `stuck` | the main tree needs a human — dirty on arrival, or a rollback that did not restore it | stop everything, below |
 
-**Keep the worktree on anything but `landed`.** What is in it passed independent
-verification; what failed was the merge. Discarding it throws away a verified change to
-solve a landing problem.
+**Keep the worktree on anything but `landed` with `cleanup: complete`.** What is in it
+passed independent verification; what failed was publication or integration. Discarding
+it throws away a verified change to solve a landing problem. A landed task with cleanup
+pending is done; `continue` removes the orphan later.
 
 ### The landing loop
 
-`conflict` and `reverted` mean the same thing operationally: the task is not done, its
-worktree still holds real work, and something has to change *in that worktree* before it
-can land.
+`refused`, `conflict`, and `reverted` mean the same thing operationally: the task is not
+done, its worktree still holds real work, and something has to change *in that worktree*
+before it can land. The landing record distinguishes publication failure, integration
+conflict, and a post-merge regression so the next executor works the right problem.
 
 So dispatch a fresh executor on `ai-execute` for the same task, and give it
 `.agent/notes/T-nnn.landing.md` as a second pointer alongside its task file. That record is
@@ -308,7 +317,7 @@ re-verify, and land again.
 
 ```
 execute → verify → land ─┐
-   ▲                     │ conflict | reverted
+   ▲                     │ refused | conflict | reverted
    └─────────────────────┘
 ```
 
@@ -350,15 +359,22 @@ Every `done` claim goes to a **separate** verifier in a **clean context** —
 `ai-verify`. Never the same agent, never the same context. An executor is the worst
 possible judge of its own work.
 
-- `pass` → hand it to `ai-land`. It is not `done` until that returns `landed` — passing in
-  a worktree and surviving the merge are two different claims.
+- Before acting on the verdict, require its `artifact_commit` to match the executor's
+  latest publication and require `verified_commit` to equal it on `pass`. A mismatch is
+  `unverified`; never choose which SHA the verifier probably meant.
+- `pass` → hand the task id plus pointers to the progress and verification records to
+  `ai-land`. It is not `done` until that returns `landed` — publishing, passing in a
+  worktree, and surviving the merge are three different claims tied together by the same
+  commit.
 - `fail` → back to `pending`. The verifier wrote its finding to
   `.agent/notes/T-nnn.verify.md` and returned that path on its `detail` line. **Give the
   path to the retry executor as a second pointer, alongside the task file.** Do not have
   the verifier fix it, and do not restate its finding in the dispatch — the record is the
   payload, your dispatch carries the pointer.
-- `unverified` → not a soft pass. Usually a defect in the task (an acceptance criterion
-  that is not actually checkable) — send it back to decomposition.
+- `unverified` → not a soft pass. `reason: artifact` goes to `pending` with the worktree
+  kept and a fresh executor; it must publish one clean immutable range. `reason: evidence`
+  or `acceptance` is usually a defect in the task — send it back to decomposition.
+  `reason: oracle` stops the batch until the flaky or unavailable project check is resolved.
 
 **The verifier counts the attempts, not you.** It returns `attempt: n`, read off the blocks
 in the record. A second `fail` on the same task is a stop condition below — act on the
