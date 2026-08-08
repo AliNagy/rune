@@ -67,14 +67,15 @@ state, say so explicitly and say what is dangling.
 1. **Set the flag first**, before anything else. If this turn dies, the pause still holds.
 2. Read the ledger. Identify what is in flight.
 3. Apply the mode:
-   - **drain** — wait for each in-flight executor, **dispatch `ai-verify`** for each, merge
-     one at a time, and **dispatch `ai-oracle`** after the merges. Then stop. You merge;
-     you do not run the checks yourself.
+   - **drain** — wait for each in-flight executor, **dispatch `ai-verify`** for each, then
+     **dispatch `ai-land`** one task at a time. Then stop. You neither merge nor run the
+     checks yourself. A task the lander could not land goes back to `pending` with its
+     worktree kept; a drain does not force work in on the way out.
    - **stop** — signal executors to write handoffs and stop. Set their tasks to `pending`
      with the handoff attached. Keep the worktrees.
    - **abandon** — discard in-flight worktrees, reset those tasks to `pending`.
-4. Confirm no task is left `in_progress`. A paused ledger with a task still marked in
-   progress is a lie about the state of the world, same as after a crash.
+4. Confirm no task is left `in_progress` or `landing`. A paused ledger with a task still
+   marked in progress is a lie about the state of the world, same as after a crash.
 5. Report.
 
 ## Report

@@ -15,9 +15,6 @@ from that, and this list is exhaustive:
 - **Read** `.agent/` coordination files — enough to report status accurately.
 - **Write** `ledger.md`, and **append** the drain result to `.agent/PAUSED` if the flag
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
-- **Merge** a verified worktree into the main tree, one at a time. The only command you
-  run: bounded output either way, it must be serialised, and it is the act your ledger row
-  records.
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -25,6 +22,12 @@ from that, and this list is exhaustive:
 **Anything not on that list is a dispatch.** Writing any other file, running any command,
 reading any source file — each one is a subagent's job, without exception and without a
 case where it is quicker to just do it yourself.
+
+**You do not merge.** That was once on this list, as the single command you were allowed to
+run. It came off because a merge cannot be separated from what has to follow it: the suite
+is re-run against the merged tree, and if it fails the merge has to come back out. Only the
+first of those three is bounded, so the sequence is one dispatch — `ai-land` — and not a
+command of yours with two dispatches around it.
 
 Stated this way round on purpose. A list of forbidden actions can always be stepped
 around by an action nobody thought to forbid — which is exactly how task files ended up
@@ -265,26 +268,67 @@ decision: DEC-012       # if status is question
 
 Record it. Do not read the worktree.
 
-### Merging a batch
+### Landing a batch
 
-Verify each task independently first (step 5), then merge **one at a time, in the order
-they finished**.
+Verify each task independently first (step 5), then land them **one at a time, in the order
+they finished**. Each landing is a **dispatch to `ai-land`** carrying one task id — never
+two at once, because two landers are two writers on the main tree.
 
-After a merge, **dispatch `ai-oracle`** to re-run the project checks in the main tree. It
-returns pass/fail against the known-red baseline in ≤200 tokens; you never see the log.
-
-**Skip that dispatch when nothing else merged since this task was verified.** `ai-verify`
-already ran the oracle in that worktree, so on a serial batch the re-run is pure
-duplication. The condition is checkable, not a judgement call: re-run only if another task
-landed in between.
+The lander merges, re-runs the project oracle in the main tree, and rolls the merge back if
+that fails. You never see a suite log and never touch the main tree yourself.
 
 Disjoint file lists prevent textual conflicts, not semantic ones — task A can rename
-something task B calls without either touching the other's files. Running the checks after
-each merge is what catches that, and it tells you exactly which merge broke it.
+something task B calls without either touching the other's files. Re-running the checks
+after each landing is what catches that, and landing one at a time is what tells you which
+one did it.
 
-If a merge conflicts or the oracle fails after it: that task goes back to `pending` with a
-note saying the ground moved under it. The merges already applied stay. Do not unwind the
-whole batch for one bad merge.
+Four outcomes:
+
+| `landing:` | What happened | What you record |
+|---|---|---|
+| `landed` | merged, oracle passed | `done`, worktree `merged` |
+| `conflict` | merge refused, nothing landed | `pending`, **worktree kept** — it has fallen behind main |
+| `reverted` | merged, oracle failed, rolled back | `pending`, **worktree kept** — the landing record says what broke |
+| `stuck` | the main tree needs a human — dirty on arrival, or a rollback that did not restore it | stop everything, below |
+
+**Keep the worktree on anything but `landed`.** What is in it passed independent
+verification; what failed was the merge. Discarding it throws away a verified change to
+solve a landing problem.
+
+### The landing loop
+
+`conflict` and `reverted` mean the same thing operationally: the task is not done, its
+worktree still holds real work, and something has to change *in that worktree* before it
+can land.
+
+So dispatch a fresh executor on `ai-execute` for the same task, and give it
+`.agent/notes/T-nnn.landing.md` as a second pointer alongside its task file. That record is
+the only thing standing between it and repeating the last attempt move for move. Then
+re-verify, and land again.
+
+```
+execute → verify → land ─┐
+   ▲                     │ conflict | reverted
+   └─────────────────────┘
+```
+
+**The lander enforces the ceiling, not you.** It counts attempts in the landing record and
+stops at five. You do not track that — you act on the `escalate` line it returns.
+
+- `escalate: no` → round the loop again.
+- `escalate: yes` → **stop and go to the user**, per `ai-report`. Give them the reason the
+  lander named and what has already been tried. The record holds the detail if they want it.
+
+**`stuck` stops everything at once.** The main tree is in a state no agent can safely act
+on. Set `main: red` in the ledger, land nothing else, dispatch nothing else, do not start
+the next batch. Tell the user what state the tree is in and that it needs them — this is
+the one failure Rune cannot get itself out of.
+
+**Never dispatch into a red tree.** The lander returns `main: green | red` for exactly this
+reason. A red main poisons every check downstream of it: the next task's verifier compares
+against a baseline that no longer matches reality, so it either blames that task for a
+regression it did not cause, or the baseline gets widened until the real failure is
+invisible.
 
 ### When an executor asks a question
 
@@ -306,7 +350,8 @@ Every `done` claim goes to a **separate** verifier in a **clean context** —
 `ai-verify`. Never the same agent, never the same context. An executor is the worst
 possible judge of its own work.
 
-- `pass` → merge the worktree, mark `done`.
+- `pass` → hand it to `ai-land`. It is not `done` until that returns `landed` — passing in
+  a worktree and surviving the merge are two different claims.
 - `fail` → back to `pending` with the finding attached. Do not have the verifier fix it.
 - `unverified` → not a soft pass. Usually a defect in the task (an acceptance criterion
   that is not actually checkable) — send it back to decomposition.
@@ -344,7 +389,8 @@ Everything you write opens with a TL;DR and uses plain words. Say "the tests pas
 
 Stop and return to the user when: the milestone is complete, an `open` decision blocks
 progress, an executor asked a question, drift invalidates a substantial part of the plan,
-the same task fails twice, or nothing is dispatchable.
+the same task fails twice, a lander returns `escalate: yes` or `stuck`, or nothing is
+dispatchable.
 
 ```
 TL;DR

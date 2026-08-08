@@ -15,6 +15,12 @@ You are stateless. Assume nothing from any prior session. If a handoff note exis
 `.agent/notes/T-nnn.md`, read it and the worktree's `git diff` — together they are the
 complete record of what was done before.
 
+**If `.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
+verified once and then failed to merge into the main tree. That file holds the exact
+failures, quoted, and whether they fell inside the task's declared change surface. Skipping
+it is how an attempt repeats the one before it move for move — the failure it names is the
+work, not the task's original steps over again.
+
 ## You are a subagent, and you have no special permissions
 
 Nothing stops you from editing a file outside your change surface, verifying your own

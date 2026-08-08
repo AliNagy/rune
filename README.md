@@ -69,7 +69,7 @@ The direct commands still exist if you prefer them:
 | Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-The seventeen `ai-*` skills load themselves when they're needed and stay out of your
+The eighteen `ai-*` skills load themselves when they're needed and stay out of your
 slash-command list.
 
 Typical first run on an existing project:
@@ -115,13 +115,13 @@ into Serena memories rather than `.agent/`, so the files people read stay readab
 
 You invoke one skill; it loads the others.
 
-Rune is 24 skills, but only seven can be called by name — `hello`, `init`, `vision`,
+Rune is 25 skills, but only seven can be called by name — `hello`, `init`, `vision`,
 `work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-seventeen are marked as not user-invocable. The agent loads them itself when the situation
+eighteen are marked as not user-invocable. The agent loads them itself when the situation
 calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
 sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
 
-The reason is the same one behind everything else here. Instructions for all 24 skills in
+The reason is the same one behind everything else here. Instructions for all 25 skills in
 one context window would crowd out your actual code, and most of them are irrelevant at any
 given moment. Loading them on demand means each agent carries only the rules for the job in
 front of it — and you only have to remember one command.
@@ -176,7 +176,9 @@ proves nothing, and a reviewer in a fresh context can't tell the two apart. Each
 task is then checked by a different agent that never saw the work. Tasks are self-contained
 — goal, files it may touch, what counts as done, its test — so any one can be run, retried,
 or reviewed without knowing about the others, and up to three run in parallel when their
-file lists don't overlap, merged one at a time with the checks re-run after each. Milestones
+file lists don't overlap, merged one at a time with the checks re-run after each. A merge
+that breaks those checks is rolled straight back out, with the reason written down, so the
+main tree is never left broken while the records claim otherwise. Milestones
 are planned in full, but tasks only when it's time to build them: a task has to name real
 files, and for a milestone three steps out those files don't exist yet.
 
@@ -216,6 +218,7 @@ skills/
   ai-research     evidence from outside the repo, graded and cited
   ai-drift        when the plan turns out to be wrong
   ai-verify       an independent second check
+  ai-land         merging a verified task, and backing it out if that breaks the build
   ai-ledger       state updates, and cleaning up after a crash
 ```
 

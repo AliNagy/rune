@@ -22,7 +22,7 @@ const TARGET = arg('target', join(homedir(), '.config', 'opencode'))
 const AI_SKILLS = [
   'taskfmt', 'serena', 'oracle', 'survey', 'decompose', 'report', 'recover',
   'bug', 'feature', 'refactor', 'investigate', 'research', 'drift', 'verify',
-  'ledger', 'execute', 'triage',
+  'ledger', 'execute', 'triage', 'land',
 ]
 
 // Claude Code's /rune:init becomes OpenCode's /rune-init; bare ai-* skill

@@ -23,6 +23,7 @@ stranger with an empty context.
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # step ticks. single writer: the executor
+  notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
   decisions/open/T-nnn.md # a worker's question, awaiting a DEC-nnn from the parent
   sessions/<stamp>.md    # session handoffs. written by `handoff`
@@ -78,6 +79,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `tasks/T-nnn.md` | a worker on `ai-decompose` (creates), fixer (appends amendments only) |
 | `notes/T-nnn.progress` | the worker holding T-nnn |
 | `notes/T-nnn.md` | the worker holding T-nnn |
+| `notes/T-nnn.landing.md` | a worker on `ai-land` |
 | `decisions/open/T-nnn.md` | the worker holding T-nnn |
 | `notes/init-commands.md` | a worker on `ai-oracle` |
 | `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered |
@@ -119,6 +121,7 @@ which skill to follow. A dispatch names a job and a skill, and nothing else.
 | run build / test / lint / typecheck | `ai-oracle` |
 | execute one task | `ai-execute` (which also loads `ai-serena`, `ai-drift`) |
 | verify one finished task | `ai-verify` |
+| land one verified task in the main tree | `ai-land` |
 | salvage an abandoned task | `ai-recover` |
 | answer a question about the code | `ai-investigate` |
 | answer a question from outside the repo | `ai-research` |
@@ -161,6 +164,7 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 |---|---|
 | `ai-execute` | `status: done \| drifted \| budget \| blocked \| question` |
 | `ai-verify` | `verdict: pass \| fail \| unverified` |
+| `ai-land` | `landing: landed \| conflict \| reverted \| stuck` |
 | `ai-recover` | `verdict: salvage \| discard \| partial` |
 | `ai-triage` | `type: bug \| feature \| refactor \| investigation` |
 | `ai-oracle` | `oracle: passing \| failing \| none` |
