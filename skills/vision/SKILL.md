@@ -13,11 +13,17 @@ not a generation task. Take the time it needs.
 **Your context is for the interview.** That is the one thing here that genuinely cannot be
 delegated — you are the only agent talking to the user. Everything else follows from it:
 
-- **Read** `.agent/` coordination files.
-- **Write** `vision.md` and `decisions.md`, incrementally, as the interview settles them.
+- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
+- **Read** `<main_root>/.agent/` coordination files.
+- **Write** `<main_root>/.agent/vision.md` and `decisions.md`, incrementally, as the
+  interview settles them.
 - **Talk to the user** — this is the job.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
+
+Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`. Resolve
+every coordination path against that absolute root and include it, plus absolute pointers,
+in every dispatch.
 
 **Anything not on that list is a dispatch**, including reading source code and generating
 the milestone graph. Holding the interview is why your context is precious; spending it on
@@ -25,7 +31,7 @@ work a subagent could do is how the interview ends early.
 
 ## First: is the ground ready?
 
-Check `.agent/rune.yml`.
+Check `<main_root>/.agent/rune.yml`.
 
 - **Missing, and the repo has code** → run `rune:init` first. Do not ask; just do it and
   say so. Vision without a map produces a plan disconnected from the codebase.
@@ -56,7 +62,8 @@ each answer reshapes what is worth asking next.
 
 ## Mode B · In-progress project
 
-1. **Survey** — dispatch a subagent that follows `ai-survey`. Returns stack,
+1. **Survey** — dispatch a subagent that follows `ai-survey`, carrying `main_root` and
+   absolute coordination pointers. Returns stack,
    modules, conventions, and the completeness assessment: stubs, orphans, half-wired
    paths, contradictions, abandoned directions.
 2. **Present what is there.** Show the user what actually exists — including the awkward
@@ -84,7 +91,7 @@ finishing and deleting are both legitimate, and the agent may not choose.
 **Suggest. Never assume.**
 
 Every choice with more than one defensible answer becomes a decision record in
-`.agent/decisions.md`, per `ai-taskfmt`:
+`<main_root>/.agent/decisions.md`, per `ai-taskfmt`:
 
 ```markdown
 ## DEC-007 · State management
@@ -120,8 +127,9 @@ Anything unanswered is an open decision, not a default.
 
 Only once every blocking decision is `decided`.
 
-**Dispatch a subagent that follows `ai-decompose` to write `.agent/milestones.md`. You do
-not write it yourself.** By this point everything the graph needs is already on disk — `vision.md` and
+**Dispatch a subagent that follows `ai-decompose` with `main_root` and absolute pointers
+to write `<main_root>/.agent/milestones.md`. You do not write it yourself.** By this point
+everything the graph needs is already on disk — `vision.md` and
 `decisions.md`, which you have been writing as the interview settled, plus the survey
 digest and `map.md` in Mode B. It reads those, writes the milestone graph per
 `ai-taskfmt`, and returns the list in ≤200 tokens for you to show the user.

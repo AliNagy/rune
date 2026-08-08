@@ -16,13 +16,19 @@ no longer true, and reporting them as status propagates the lie. Repair first.
 **You work out where things stand and say so.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Read** `.agent/` coordination files.
-- **Write** `ledger.md`, repairing the rows a dead session left behind.
-- **Delete** `.agent/PAUSED` when the user confirms a resume. You never create it — that
+- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
+- **Read** `<main_root>/.agent/` coordination files.
+- **Write** `<main_root>/.agent/ledger.md`, repairing the rows a dead session left behind.
+- **Delete** `<main_root>/.agent/PAUSED` when the user confirms a resume. You never create it — that
   is `pause`.
 - **Talk to the user** — the status report, and the question if one is owed.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
+
+Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel` before
+reading state. Resolve every `.agent/...` path against it. Every recovery, verification,
+or landing dispatch carries that `main_root`, the absolute `worktree_path` recorded in the
+task's ledger row, and absolute coordination pointers.
 
 **Anything not on that list is a dispatch** — above all reading a torn worktree's diff,
 which is the single most expensive thing you could do here and the reason `ai-recover`
@@ -32,14 +38,14 @@ the purpose of having resumed at all.
 ## 1. Read state
 
 ```
-.agent/PAUSED       · paused? when, why, was the tree left clean?
-.agent/sessions/    · newest session handoff — context the ledger does not carry
-.agent/rune.yml     · initialized? stale? oracle?
-.agent/vision.md     · exists? complete?
-.agent/decisions.md  · any status: open?
-.agent/milestones.md · exists? which is current?
-.agent/ledger.md     · task statuses, drift records
-.agent/notes/        · handoff notes
+<main_root>/.agent/PAUSED        · paused? when, why, was the tree left clean?
+<main_root>/.agent/sessions/     · newest session handoff — context the ledger does not carry
+<main_root>/.agent/rune.yml      · initialized? stale? oracle?
+<main_root>/.agent/vision.md     · exists? complete?
+<main_root>/.agent/decisions.md  · any status: open?
+<main_root>/.agent/milestones.md · exists? which is current?
+<main_root>/.agent/ledger.md     · task statuses, drift records
+<main_root>/.agent/notes/        · handoff notes
 ```
 
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
@@ -56,20 +62,23 @@ session. For each:
 1. **Valid complete publication present?** The executor committed the task and appended
    `base_commit` plus `artifact_commit` to its progress file, the task branch still points
    to that artifact, and its worktree is clean. It died after publication but before its
-   short return reached the parent. Set the row to `verifying` and dispatch `ai-verify`;
-   its artifact preflight proves the remaining invariants. Do not discard it because the
-   uncommitted diff is empty — a completed artifact should have an empty diff.
+   short return reached the parent. Set the row to `verifying` and dispatch `ai-verify`
+   with the row's exact `worktree_path`; its artifact preflight proves the remaining
+   invariants. Do not discard it because the uncommitted diff is empty — a completed
+   artifact should have an empty diff.
 2. **Handoff note present?** The executor stopped deliberately. Follow its
    `worktree: kept|discarded` instruction and set the status it implies — `pending` for a
    budget stop, `drifted` for drift.
-3. **No handoff?** The session died mid-flight. Check only whether the worktree's diff is
+3. **No handoff?** The session died mid-flight. At the ledger's exact absolute
+   `worktree_path`, check only whether the worktree's diff is
    empty and whether the task branch is ahead of its merge base with main — both are
    bounded state probes, not source reads:
    - empty diff, branch ahead → keep it and set `pending`. The executor may have died
      between `git commit` and writing the publication block; a fresh executor inspects the
      committed range and either publishes that `HEAD` or resumes the task.
    - empty diff, branch not ahead → discard, set `pending`. Nothing lost.
-   - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** as a subagent.
+   - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** with the same
+     `main_root`, exact `worktree_path`, and absolute task/progress pointers.
      It maps the diff onto the task's declared steps, decides whether the work is
      salvageable, names the resume point, and writes the handoff the dead executor never
      did. Apply its verdict — `salvage`, `discard`, or `partial` — and record it.
@@ -82,7 +91,8 @@ Also check:
 
 - orphaned worktrees with no ledger row → remove; if their task commit is already in main,
   delete the merged task branch too
-- `verifying` rows whose verifier never returned → re-dispatch
+- `verifying` rows whose verifier never returned → re-dispatch against the row's exact
+  `worktree_path`; never create a fresh verifier checkout
 - drift records not yet reflected in the ledger's blocked list
 - **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
   session died before it reached the user. Assign the `DEC-nnn`, move it into
@@ -93,8 +103,8 @@ Also check:
 
 | State on disk | Phase | Resume with |
 |---|---|---|
-| `.agent/PAUSED` present | deliberately stopped | **ask first** — see below |
-| no `.agent/` | nothing started | `rune:init`, then `rune:vision` |
+| `<main_root>/.agent/PAUSED` present | deliberately stopped | **ask first** — see below |
+| no `<main_root>/.agent/` | nothing started | `rune:init`, then `rune:vision` |
 | `rune.yml` only | ground mapped, no plan | `rune:vision` |
 | `vision.md` partial | interview interrupted | `rune:vision` — from the last settled section |
 | vision done, decisions `open` | blocked on the user | present the open decisions |
@@ -118,7 +128,7 @@ TL;DR
 - 2 tasks still queued for M-03. Want me to pick them up?
 ```
 
-Resume only on a clear yes, and delete `.agent/PAUSED` when you do. If the pause file says
+Resume only on a clear yes, and delete `<main_root>/.agent/PAUSED` when you do. If the pause file says
 the tree was left dirty, say what is dangling before asking — the user may want to deal
 with it themselves rather than have an executor inherit it.
 

@@ -42,7 +42,8 @@ irrelevant and expensive. Opening one is a budget violation. If the work genuine
 requires a forbidden path, that is drift — stop and report it (`ai-drift`), do not
 quietly widen your reach.
 
-**Never read a file "to get oriented."** Orientation comes from `.agent/map.md`, which
+**Never read a file "to get oriented."** Orientation comes from
+`<main_root>/.agent/map.md`, which
 already exists precisely so nobody has to re-derive it. If the map is missing or stale,
 that is an `rune:init` problem, not something to solve by browsing.
 

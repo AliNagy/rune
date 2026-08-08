@@ -1,33 +1,35 @@
 ---
 name: ai-execute
 user-invocable: false
-description: Use when executing one Rune task - you have been dispatched with a task id and nothing else. Covers worktree isolation, the change surface boundary, red-before-green, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
+description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, red-before-green, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
 ---
 
 # Executing a task
 
-**You execute one task.** You were given an id and nothing else — read
-`.agent/tasks/T-nnn.md` yourself.
+**You execute one task.** The dispatch gives you its id, absolute `main_root`, absolute
+`worktree_path`, and absolute pointers. Read
+`<main_root>/.agent/tasks/T-nnn.md` yourself. Reject relative paths; your starting
+directory is not an identity.
 
 Also load `ai-taskfmt`, `ai-serena`, and `ai-drift`.
 
 You are stateless. Assume nothing from any prior session. If a handoff note exists at
-`.agent/notes/T-nnn.md`, read it and inspect both records of source state: the latest
-`base_commit..artifact_commit` publication in `.agent/notes/T-nnn.progress`, if one
+`<main_root>/.agent/notes/T-nnn.md`, read it and inspect both records of source state: the latest
+`base_commit..artifact_commit` publication in `<main_root>/.agent/notes/T-nnn.progress`, if one
 exists, and the worktree's uncommitted `git diff`. The committed range is what a prior
 attempt published; the dirty diff is what happened after it. If there is no publication
 but the task branch is ahead of its merge base with main, a prior executor died between
 `git commit` and recording the SHA. Inspect that committed range too; an empty dirty diff
 does not mean an empty task.
 
-**If `.agent/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
+**If `<main_root>/.agent/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
 been through verification before and came back. The last block is why the previous attempt
 was rejected; the blocks above it are what earlier attempts tried and had refused.
 **Answering the last block is the work.** Running the task's original steps again without
 reading it earns the same verdict a second time, which is how a task burns its two attempts
 and lands on the user's desk with nothing learned.
 
-**If `.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
+**If `<main_root>/.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
 verified once and then failed to merge into the main tree. That file holds the exact
 failures, quoted, and whether they fell inside the task's declared change surface. Skipping
 it is how an attempt repeats the one before it move for move — the failure it names is the
@@ -47,31 +49,48 @@ That is worth stating plainly rather than assuming: every rule here exists becau
 breaking it is *easy* and the damage shows up somewhere else, in a context that cannot see
 what you did.
 
-## Work in a worktree. Always.
+## Bind the two checkout identities first
 
-**Before you edit a single line of source, confirm you are in a git worktree dedicated to
-this task.** If the harness gave you one, good. If not, make one:
+Before reading source or changing anything:
+
+1. Confirm `main_root` and `worktree_path` are absolute.
+2. Confirm `git -C <main_root> rev-parse --show-toplevel` resolves to `main_root`.
+3. If `worktree_path` exists, confirm it is a registered worktree of the same repository
+   and is on `task/T-nnn`. A wrong repository, path, or branch is `status: blocked`.
+4. If it does not exist, create **that exact path** from `main_root`. Create
+   `task/T-nnn` when the branch is new; attach the existing branch when recovering one
+   whose worktree directory was lost.
+
+Never search for a similar worktree, accept the harness's current directory, or allocate a
+new path on a retry. The ledger path is the task checkout.
+
+## Work in the supplied worktree. Always.
+
+**Before you edit a single line of source, enter the supplied `worktree_path`.** On a new
+task, create it exactly as allocated:
 
 ```bash
-git worktree add .agent/worktrees/T-nnn -b task/T-nnn
-cd .agent/worktrees/T-nnn
+git -C <main_root> worktree add <worktree_path> -b task/T-nnn
+cd <worktree_path>
 ```
 
-Then work there. This is not optional and it is not the dispatcher's job to guarantee —
-harnesses differ, and the guarantee has to hold on all of them.
+If `task/T-nnn` already exists but the registered worktree does not, attach it without
+`-b`. Then work at `worktree_path`. This is not optional; harnesses differ, so the
+absolute identity in the dispatch is the guarantee.
 
 It carries two loads. If you die mid-task, your half-applied changes are discarded with
 the worktree instead of stranding the main tree in a state nobody can explain. And other
 executors may be running right now on other tasks; without separate checkouts you would
 overwrite each other.
 
-**`.agent/` files are the exception — they go in the main tree, not your worktree.** Your
+**`.agent/` files are the exception — they go under `<main_root>/.agent/`, never under
+`<worktree_path>/.agent/`.** Your
 progress file, handoff note, and any drift or decision record are coordination state that
 the dispatcher, the verifier, and the next session all need to see. Written inside your
 worktree they would be invisible until merge, which is exactly when they stop being useful.
 
-Source into the worktree and, on completion, its task branch. Coordination into `.agent/`
-in the main tree.
+Source into `worktree_path` and, on completion, its task branch. Coordination into
+`<main_root>/.agent/`.
 
 ## Rules
 
@@ -106,7 +125,7 @@ it.
 **You cannot talk to the user — the dispatcher can.** When you hit a choice the user would
 notice and might disagree with, and neither the task spec nor an existing convention
 settles it, write an open decision record with your recommendation to
-`.agent/decisions/open/T-nnn.md` — **no id; the parent assigns it** — and stop with
+`<main_root>/.agent/decisions/open/T-nnn.md` — **no id; the parent assigns it** — and stop with
 `status: question`. Keep the worktree; the work so far is blocked, not wrong.
 
 Write it to disk rather than only reporting it. Your worktree survives your death so the
@@ -141,7 +160,7 @@ After the task-local check and project oracle pass:
    `git diff <base_commit>..<artifact_commit>` is non-empty, and
    `git status --porcelain` in the task worktree is empty. Any failure means you cannot
    report `done`.
-6. Append the publication to `.agent/notes/T-nnn.progress` before returning:
+6. Append the publication to `<main_root>/.agent/notes/T-nnn.progress` before returning:
 
 ```yaml
 publication: 2
@@ -163,6 +182,7 @@ so the progress file is authoritative and the return repeats the ids for routing
 status: done | drifted | budget | blocked | question
 task: T-nnn
 worktree: kept | discarded        # done always means kept until ai-land cleans it
+worktree_path: /workspace/acme/.agent/worktrees/T-nnn
 summary: <one or two lines>
 base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
@@ -170,5 +190,5 @@ drift: DRF-nnn        # if any
 decision: DEC-nnn     # if status is question
 ```
 
-Anything longer goes to `.agent/notes/`. The dispatcher must not have to read your
+Anything longer goes to `<main_root>/.agent/notes/`. The dispatcher must not have to read your
 reasoning.

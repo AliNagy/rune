@@ -12,12 +12,19 @@ The execution loop. Triage → plan → dispatch → verify → reconcile.
 **You exist to tell the user what is happening.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Read** `.agent/` coordination files — enough to report status accurately.
-- **Write** `ledger.md`, and **append** the drain result to `.agent/PAUSED` if the flag
+- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
+- **Read** `<main_root>/.agent/` coordination files — enough to report status accurately.
+- **Write** `<main_root>/.agent/ledger.md`, and **append** the drain result to
+  `<main_root>/.agent/PAUSED` if the flag
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
+
+Before any coordination read or dispatch, resolve `main_root` once with
+`git rev-parse --show-toplevel`. This bounded identity probe is the only command added by
+this contract. Resolve every `.agent/...` read against that absolute root and carry the
+same value in every dispatch.
 
 **Anything not on that list is a dispatch.** Writing any other file, running any command,
 reading any source file — each one is a subagent's job, without exception and without a
@@ -76,11 +83,11 @@ worker's.
 
 ## Preconditions
 
-- **`.agent/PAUSED` exists → stop.** Report that work is paused, when and why, and that
+- **`<main_root>/.agent/PAUSED` exists → stop.** Report that work is paused, when and why, and that
   `rune:pause` lifts it. Do not dispatch. Do not quietly resume because the user asked for
   something — they may have forgotten the pause is set, and silently overriding a
   deliberate stop makes it worthless.
-- No `.agent/rune.yml` → run `rune:init` first.
+- No `<main_root>/.agent/rune.yml` → run `rune:init` first.
 - No `milestones.md` and the request is broad ("continue the project") → route to
   `rune:vision`. Do not invent a plan; that is vision's job and it requires the user.
 - A specific request ("fix the login bug") with no vision → proceed. Not everything needs
@@ -127,10 +134,12 @@ is cheap.
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
 
-**Dispatch a subagent that follows `ai-decompose`. You do not write task files.**
+**Dispatch a subagent that follows `ai-decompose`. You do not write task files.** Include
+`main_root` and absolute pointers under `<main_root>/.agent/`, per the canonical dispatch
+envelope.
 Decomposition requires reading real code — the one thing you may not do — so it cannot
 happen in your context, and a task file written without reading code is fiction. The
-worker writes `.agent/tasks/T-nnn.md` and returns the task list in ≤200 tokens.
+worker writes `<main_root>/.agent/tasks/T-nnn.md` and returns the task list in ≤200 tokens.
 
 **Dispatch two or three planners in parallel, then reconcile.** This is the one step in
 Rune that earns a fan-out, per *Judgment fans out, mechanics do not* below. Give each the
@@ -242,15 +251,20 @@ No shared files. T-015 waits on T-014.
 ### What each executor gets
 
 - **`ai-execute` to follow**, which loads `ai-taskfmt`, `ai-serena` and `ai-drift` itself.
-- **`isolation: "worktree"`** where the harness supports it. Under Claude Code this is the
-  Agent tool's own flag.
-- One task id, and nothing else. It reads its own task file.
+- **`main_root`**, the same absolute orchestration checkout used by the parent.
+- **`worktree_path`**, preallocated as the absolute
+  `<main_root>/.agent/worktrees/T-nnn` and recorded in the ledger before dispatch.
+- One task id and absolute pointers to its task file plus any handoff, verification, or
+  landing record it must consume.
 
-**No source code is ever modified outside a worktree.** The harness flag is a convenience,
-not the guarantee — executors verify they are in one and create their own if not, so the
-rule holds on any harness. `ai-execute` states this at length, because it is the rule most
-likely to be skipped by a worker that thinks it already has one. If an executor reports
-that it had to create its own, that is normal, not a fault.
+The first executor creates `worktree_path` if it is absent. Every later executor reuses
+that exact path. Do not request harness isolation that creates an anonymous worktree; use
+it only if the harness can target the supplied path exactly.
+
+**No source code is ever modified outside `worktree_path`.** Executors validate the path
+against `main_root`'s Git repository before editing and create it at the supplied location
+when needed. The current working directory supplied by the harness is never accepted as a
+substitute.
 
 The rule exists twice over because it carries two loads: a dead executor's torn state is
 discarded with its worktree, and parallel executors cannot tread on each other.
@@ -261,6 +275,7 @@ Executors report ≤200 tokens:
 status: done | drifted | budget | blocked | question
 task: T-014
 worktree: kept | discarded        # done requires kept until ai-land cleans it
+worktree_path: /workspace/acme/.agent/worktrees/T-014
 summary: rotate() implemented and wired; red-then-green recorded
 base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
@@ -269,16 +284,18 @@ decision: DEC-012       # if status is question
 ```
 
 For `done`, require both commit ids. They are routing data, not the durable record — the
-executor wrote the same publication to `.agent/notes/T-nnn.progress`. Record the outcome
-and dispatch the verifier with pointers to the task and progress files. Do not read the
-worktree or accept an uncommitted success claim.
+executor wrote the same publication to
+`<main_root>/.agent/notes/T-nnn.progress`. Record the outcome and dispatch the verifier
+with the same `main_root`, the same exact `worktree_path`, and absolute pointers to the
+task and progress files. Do not read the worktree or accept an uncommitted success claim.
 
 ### Landing a batch
 
 Verify each task independently first (step 5), then land them **one at a time, in the order
 they finished**. Each landing is a **dispatch to `ai-land`** carrying one task id and
-pointers to its progress and verification records — never two at once, because two landers
-are two writers on the main tree.
+the same `main_root` and `worktree_path`, plus absolute pointers to its progress and
+verification records — never two at once, because two landers are two writers on the main
+tree.
 
 The lander merges, re-runs the project oracle in the main tree, and rolls the merge back if
 that fails. You never see a suite log and never touch the main tree yourself.
@@ -311,9 +328,10 @@ before it can land. The landing record distinguishes publication failure, integr
 conflict, and a post-merge regression so the next executor works the right problem.
 
 So dispatch a fresh executor on `ai-execute` for the same task, and give it
-`.agent/notes/T-nnn.landing.md` as a second pointer alongside its task file. That record is
-the only thing standing between it and repeating the last attempt move for move. Then
-re-verify, and land again.
+`<main_root>/.agent/notes/T-nnn.landing.md` as a second absolute pointer alongside its
+task file. Reuse the ledger's exact `worktree_path`; never ask the harness for a fresh
+checkout. That record and that kept worktree are the only things standing between the
+retry and repeating the last attempt move for move. Then re-verify, and land again.
 
 ```
 execute → verify → land ─┐
@@ -363,14 +381,15 @@ possible judge of its own work.
   latest publication and require `verified_commit` to equal it on `pass`. A mismatch is
   `unverified`; never choose which SHA the verifier probably meant.
 - `pass` → hand the task id plus pointers to the progress and verification records to
-  `ai-land`. It is not `done` until that returns `landed` — publishing, passing in a
-  worktree, and surviving the merge are three different claims tied together by the same
-  commit.
+  `ai-land`, with the same `main_root` and exact `worktree_path`. It is not `done` until
+  that returns `landed` — publishing, passing in a worktree, and surviving the merge are
+  three different claims tied together by the same commit.
 - `fail` → back to `pending`. The verifier wrote its finding to
-  `.agent/notes/T-nnn.verify.md` and returned that path on its `detail` line. **Give the
-  path to the retry executor as a second pointer, alongside the task file.** Do not have
-  the verifier fix it, and do not restate its finding in the dispatch — the record is the
-  payload, your dispatch carries the pointer.
+  `<main_root>/.agent/notes/T-nnn.verify.md` and returned that path on its `detail` line.
+  **Give the absolute path to the retry executor as a second pointer, alongside the task
+  file, and reuse the exact `worktree_path`.** Do not have the verifier fix it, and do not
+  restate its finding in the dispatch — the record is the payload, your dispatch carries
+  the pointer.
 - `unverified` → not a soft pass. `reason: artifact` goes to `pending` with the worktree
   kept and a fresh executor; it must publish one clean immutable range. `reason: evidence`
   or `acceptance` is usually a defect in the task — send it back to decomposition.
@@ -391,7 +410,7 @@ Per `ai-ledger`:
   it now is. Do not patch task files one at a time; patched specs accumulate
   contradictions with their own amendments until nobody can tell what is still true.
 
-Then report, and **re-check `.agent/PAUSED` before dispatching the next batch.** The user
+Then report, and **re-check `<main_root>/.agent/PAUSED` before dispatching the next batch.** The user
 can pause at any point; the check belongs at the top of every loop iteration, not only at
 entry. If the flag appeared mid-run, finish and merge what is in flight, then stop — the
 same drain `pause` would have done.
