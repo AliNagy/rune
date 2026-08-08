@@ -352,9 +352,18 @@ possible judge of its own work.
 
 - `pass` → hand it to `ai-land`. It is not `done` until that returns `landed` — passing in
   a worktree and surviving the merge are two different claims.
-- `fail` → back to `pending` with the finding attached. Do not have the verifier fix it.
+- `fail` → back to `pending`. The verifier wrote its finding to
+  `.agent/notes/T-nnn.verify.md` and returned that path on its `detail` line. **Give the
+  path to the retry executor as a second pointer, alongside the task file.** Do not have
+  the verifier fix it, and do not restate its finding in the dispatch — the record is the
+  payload, your dispatch carries the pointer.
 - `unverified` → not a soft pass. Usually a defect in the task (an acceptance criterion
   that is not actually checkable) — send it back to decomposition.
+
+**The verifier counts the attempts, not you.** It returns `attempt: n`, read off the blocks
+in the record. A second `fail` on the same task is a stop condition below — act on the
+number it hands you rather than trying to remember across a context that may have been
+compacted since the first one.
 
 ## 6. Reconcile
 

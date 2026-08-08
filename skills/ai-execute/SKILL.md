@@ -15,11 +15,22 @@ You are stateless. Assume nothing from any prior session. If a handoff note exis
 `.agent/notes/T-nnn.md`, read it and the worktree's `git diff` — together they are the
 complete record of what was done before.
 
+**If `.agent/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
+been through verification before and came back. The last block is why the previous attempt
+was rejected; the blocks above it are what earlier attempts tried and had refused.
+**Answering the last block is the work.** Running the task's original steps again without
+reading it earns the same verdict a second time, which is how a task burns its two attempts
+and lands on the user's desk with nothing learned.
+
 **If `.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
 verified once and then failed to merge into the main tree. That file holds the exact
 failures, quoted, and whether they fell inside the task's declared change surface. Skipping
 it is how an attempt repeats the one before it move for move — the failure it names is the
 work, not the task's original steps over again.
+
+Both records can exist at once. They fail at different gates: the verify record means the
+change did not meet its own acceptance, the landing record means it did and then broke the
+main tree on merge. Read both, and treat the later one as the live problem.
 
 ## You are a subagent, and you have no special permissions
 

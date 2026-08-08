@@ -23,6 +23,7 @@ stranger with an empty context.
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # step ticks. single writer: the executor
+  notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
   notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
   decisions/open/T-nnn.md # a worker's question, awaiting a DEC-nnn from the parent
@@ -79,6 +80,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `tasks/T-nnn.md` | a worker on `ai-decompose` (creates), fixer (appends amendments only) |
 | `notes/T-nnn.progress` | the worker holding T-nnn |
 | `notes/T-nnn.md` | the worker holding T-nnn |
+| `notes/T-nnn.verify.md` | a worker on `ai-verify` |
 | `notes/T-nnn.landing.md` | a worker on `ai-land` |
 | `decisions/open/T-nnn.md` | the worker holding T-nnn |
 | `notes/init-commands.md` | a worker on `ai-oracle` |
@@ -280,6 +282,12 @@ must fail before the change   # mandatory - see Red-then-green
 ## Amendments
 <!-- fixers append here; never edit sections above -->
 ```
+
+**A verification finding is not an amendment.** When a verifier rejects a task, its finding
+goes to `notes/T-nnn.verify.md` and never into this file. The task file is the contract,
+and the contract did not change just because an attempt failed to meet it. Amendments are
+for the contract itself changing; findings are evidence about one attempt at it. Keeping
+them apart is what lets a task file stay readable after four attempts.
 
 ### Sizing
 
