@@ -14,8 +14,14 @@ The default without this skill is to discard and restart. That is safe but waste
 the work was nearly done. Recovery is worth attempting; blind trust in a torn tree is not.
 
 **Run as a subagent.** This reads diffs and code, and the parent must not. Return a verdict
-under 200 tokens; write the detail to `.agent/notes/T-nnn.md` as the handoff the dead
-executor never wrote.
+under 200 tokens; write the detail to `<main_root>/.agent/notes/T-nnn.md` as the handoff
+the dead executor never wrote.
+
+The dispatch must include absolute `main_root`, the ledger's exact absolute
+`worktree_path`, and absolute pointers to the task and progress files. Validate that the
+worktree belongs to the same repository and task branch as `main_root`. **Never create a
+fresh recovery worktree or inspect the harness's starting checkout instead.** A missing or
+mismatched supplied path is a discard/blocking finding, not permission to search.
 
 **One abandoned task per subagent.** A session that died mid-batch can leave three torn
 worktrees; that is three recovery dispatches. Each resume point has to be read off its own
@@ -38,12 +44,12 @@ So:
 
 1. **Read the task spec** — steps, change surface, acceptance, the stated test.
 2. **Read the progress file** — ticks, and whether red-then-green was recorded.
-3. **Read `git diff` in the worktree.** This is the authoritative record of what happened.
+3. **Read `git -C <worktree_path> diff`.** This is the authoritative record of what happened.
 4. **Map the diff onto the declared steps.** For each step, decide: applied, partly
    applied, or absent. Steps are written to be checkable precisely so this is possible.
 5. **Check containment.** Does every changed file appear in the declared change surface?
 6. **Decide.** Below.
-7. **Write the missing handoff** to `.agent/notes/T-nnn.md`, in the format
+7. **Write the missing handoff** to `<main_root>/.agent/notes/T-nnn.md`, in the format
    `ai-taskfmt` specifies, so the next executor gets what it should have had.
 
 ## Deciding
@@ -86,6 +92,7 @@ containment: clean            # or: touched src/api/routes.ts, outside surface
 red_evidence: missing         # forces a test reset
 resume_at: step 3 - wire rotate() into handle(), then redo the test red-first
 worktree: kept
+worktree_path: /workspace/acme/.agent/worktrees/T-016
 ```
 
 ## What not to do

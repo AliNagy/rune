@@ -8,6 +8,10 @@ description: Use when something that used to work no longer does, or a request i
 
 **Governing rule: no fix without a failing reproduction.**
 
+The dispatch includes absolute `main_root`. Inspect and run the reproduction against that
+checkout unless a task-bound dispatch also supplies an exact `worktree_path`; never infer
+the repository from the worker's starting directory.
+
 Not a description of the failure. Not a stack trace. An executable case that fails now
 and will pass after. Everything else in this protocol follows from that.
 

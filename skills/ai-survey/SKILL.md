@@ -6,17 +6,22 @@ description: Use when mapping an unfamiliar or in-progress codebase - stack, mod
 
 # Surveying a codebase
 
-Produces `.agent/map.md` plus Serena memories. Everything downstream depends on this, so
-that nobody else ever has to browse the repo to get oriented.
+The dispatch includes absolute `main_root` and absolute output pointers. Survey source at
+that checkout and write coordination there; never infer the repository from the worker's
+starting directory.
+
+Produces `<main_root>/.agent/map.md` plus Serena memories. Everything downstream depends
+on this, so that nobody else ever has to browse the repo to get oriented.
 
 **Always run as a subagent.** The caller — `rune:init` or `rune:vision` — must not
 read code. Survey burns context by design; that cost is quarantined in a worker that
 returns a digest and dies.
 
-**Read-only with respect to source.** You write `.agent/map.md` and Serena memories; you
-never touch the codebase. Nothing enforces that — you are an ordinary subagent with
-ordinary permissions — so it holds because you keep it. Surveying turns up plenty worth
-fixing, and every one of those is a finding for the map, not a change to make here.
+**Read-only with respect to source.** You write `<main_root>/.agent/map.md` and Serena
+memories; you never touch the codebase. Nothing enforces that — you are an ordinary
+subagent with ordinary permissions — so it holds because you keep it. Surveying turns up
+plenty worth fixing, and every one of those is a finding for the map, not a change to make
+here.
 
 ## Order of work
 
@@ -58,7 +63,7 @@ returns null and has no callers" is useful. "The auth is a mess" is not.
 
 ## Output
 
-Write `.agent/map.md`:
+Write `<main_root>/.agent/map.md`:
 
 ```markdown
 # Map — <project>

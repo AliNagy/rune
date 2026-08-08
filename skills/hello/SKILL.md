@@ -14,7 +14,8 @@ enough state to route correctly, route, and get out of the way.
 
 This list is exhaustive, and it is the shortest in Rune:
 
-- **Read** the `.agent/` files named in step 1. Nothing else.
+- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
+- **Read** the `<main_root>/.agent/` files named in step 1. Nothing else.
 - **Talk to the user** — one question if the route is genuinely ambiguous.
 - **Route** to another skill.
 
@@ -22,17 +23,21 @@ This list is exhaustive, and it is the shortest in Rune:
 something; you earn yours by handing over early and leaving it empty for whoever you hand
 to.
 
+Resolve `main_root` once from the harness workspace root or the bounded probe
+`git rev-parse --show-toplevel`, then resolve every `.agent/...` path below against that
+absolute root. Never route from a task worktree's relative `.agent/` directory.
+
 ## 1. Read the state
 
 Cheap reads only. Never source code.
 
 ```
-.agent/PAUSED       · is work stopped?
-.agent/rune.yml     · initialized?
-.agent/vision.md    · is there a plan?
-.agent/milestones.md· how far along?
-.agent/ledger.md    · anything in flight or waiting on the user?
-.agent/sessions/    · a recent session handoff?
+<main_root>/.agent/PAUSED        · is work stopped?
+<main_root>/.agent/rune.yml      · initialized?
+<main_root>/.agent/vision.md     · is there a plan?
+<main_root>/.agent/milestones.md · how far along?
+<main_root>/.agent/ledger.md     · anything in flight or waiting on the user?
+<main_root>/.agent/sessions/     · a recent session handoff?
 ```
 
 ## 2. Route
@@ -41,12 +46,12 @@ State beats intent. Some conditions answer the question regardless of what was a
 
 | State | Go to | Why |
 |---|---|---|
-| `.agent/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
+| `<main_root>/.agent/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
 | a decision is `open` | surface it | Nothing can proceed. Show it, get an answer. |
 | a task is `awaiting` | surface it | An executor asked something and is blocked on the reply. |
 | tasks `in_progress`, fresh session | `continue` | Reconcile before doing anything new. |
-| no `.agent/`, repo has code | `init` → `vision` | Nothing is known yet. |
-| no `.agent/`, empty directory | `vision` | New project; init comes after the stack exists. |
+| no `<main_root>/.agent/`, repo has code | `init` → `vision` | Nothing is known yet. |
+| no `<main_root>/.agent/`, empty directory | `vision` | New project; init comes after the stack exists. |
 
 Otherwise route on what they said:
 

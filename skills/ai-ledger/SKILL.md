@@ -31,7 +31,7 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 | id    | title                        | status      | blocked_by | worktree        |
 |-------|------------------------------|-------------|------------|-----------------|
 | T-011 | TokenStore interface         | done        | —          | merged          |
-| T-014 | Rotate refresh tokens        | in_progress | —          | .wt/T-014       |
+| T-014 | Rotate refresh tokens        | in_progress | —          | /workspace/acme/.agent/worktrees/T-014 |
 | T-015 | Refresh endpoint             | pending     | T-014      | —               |
 | T-016 | Session restart persistence  | drifted     | —          | discarded       |
 
@@ -48,6 +48,12 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 | verify      | ai-verify     | T-014 | pass @ 4a91c02     |
 | land        | ai-land       | T-014 | landed @ 4a91c02   |
 ```
+
+Every live task worktree value is an absolute path. The parent allocates
+`<main_root>/.agent/worktrees/T-nnn`, writes it into the row before dispatching the first
+executor, and keeps that value unchanged through retries, verification, recovery, and
+landing. `kept`, `discarded`, and `merged` may replace it only when the path no longer
+contains live task state.
 
 ## Log every dispatch
 
@@ -116,8 +122,8 @@ declares its surface, so compare the lists.
 
 - Cap concurrent executors at **3**. Beyond that, merge and cost overhead outweighs the
   wall-clock win.
-- Record every holder in its row. Two rows may be `in_progress` at once; each names its
-  own worktree.
+- Allocate and record every absolute `worktree_path` before dispatch. Two rows may be
+  `in_progress` at once; each names its own stable worktree.
 - If all eligible tasks overlap, run one. Serial is the fallback, not a failure.
 
 **The landing procedure lives in `work`; the merge itself lives in `ai-land`.** Here, only
@@ -149,6 +155,10 @@ A task marked `in_progress` with no live executor is a lie. Nobody is working on
 **The procedure lives in `continue`.** It dispatches `ai-recover` and hands you a verdict.
 You record it. **Never inspect a worktree diff yourself** — that is unbounded reading in
 the one context that must stay small, and it is why the recovery dispatch exists.
+
+Every reconciliation dispatch uses the absolute worktree path already recorded in the
+row. Never replace it with the current directory or ask the harness to create a fresh
+checkout; the uncommitted diff may exist only at the recorded path.
 
 Your job is the mapping:
 

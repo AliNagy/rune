@@ -13,8 +13,10 @@ interview. Re-runnable.
 **You establish ground truth and report it.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Read** `.agent/` coordination files, and manifests small enough to name a command from.
-- **Write** `.agent/rune.yml`, the `.agent/` scaffolding, and one line in `.gitignore`.
+- **Read** coordination files under `<main_root>/.agent/`, and manifests small enough to
+  name a command from.
+- **Write** `<main_root>/.agent/rune.yml`, the `<main_root>/.agent/` scaffolding, and one
+  line in `<main_root>/.gitignore`.
 - **Talk to the user** — the report at the end.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -28,6 +30,7 @@ The probes you may run, and nothing else:
 ```
 git status --porcelain | head -20
 git rev-parse HEAD
+git rev-parse --show-toplevel
 git worktree list
 ```
 
@@ -50,13 +53,17 @@ inspect until the stack is chosen. Vision knows this and orders it correctly.
 
 ### 1. Git baseline
 
+First set the absolute result of `git rev-parse --show-toplevel` as `main_root`. Keep it
+constant, resolve every coordination path against it, and include it in every dispatch.
+
 ```
 git status --porcelain | head -20   # clean, or the user must accept the dirt
 git rev-parse HEAD
+git rev-parse --show-toplevel       # stable main_root for dispatches and coordination
 git worktree list
 ```
 
-These three, and nothing else. The `head -20` is the bound: a repo with 500 dirty files is
+These four, and nothing else. The `head -20` is the bound: a repo with 500 dirty files is
 itself the finding, and you only need to know it is not clean.
 
 Rune isolates every executor in a worktree, so a repo that is not under git loses its
@@ -77,8 +84,8 @@ apply and the effective budget per task drops considerably.
 
 ### 3. Survey
 
-Dispatch a subagent that follows `ai-survey`. It writes `.agent/map.md` and Serena
-memories, and returns a ≤300 token digest.
+Dispatch a subagent that follows `ai-survey` with `main_root` and absolute output pointers.
+It writes `<main_root>/.agent/map.md` and Serena memories, and returns a ≤300 token digest.
 
 ### 4. Commands and the oracle
 
@@ -87,8 +94,9 @@ yourself.** Build and test output is unbounded — a failing suite is tens of th
 tokens — and this is the session every other route starts from, so it is the worst
 possible place to absorb them.
 
-Pass it the candidates you can name from the survey digest and manifests. It runs each one
-on a clean tree, writes the full output to `.agent/notes/init-commands.md`, and returns a
+Pass it `main_root`, absolute pointers, and the candidates you can name from the survey
+digest and manifests. It runs each one on that clean checkout, writes the full output to
+`<main_root>/.agent/notes/init-commands.md`, and returns a
 per-command verdict with durations plus the oracle result, in ≤200 tokens.
 
 The rule it enforces on your behalf, per `ai-oracle`: **run it, do not infer it.** Then
@@ -102,7 +110,7 @@ record what came back:
 A `none` or a red baseline is a real result. Do not re-run anything yourself to check —
 that is the leak this dispatch exists to close, and the evidence is already on disk.
 
-### 5. Write `.agent/rune.yml`
+### 5. Write `<main_root>/.agent/rune.yml`
 
 ```yaml
 initialized: 2026-08-04
@@ -129,10 +137,10 @@ confidence:
   oracle: high
 ```
 
-Scaffold the rest of `.agent/` per `ai-taskfmt`: `tasks/`, `notes/`, `drift/`, and
+Scaffold the rest of `<main_root>/.agent/` per `ai-taskfmt`: `tasks/`, `notes/`, `drift/`, and
 an empty `ledger.md`.
 
-Add `.agent/worktrees/` to `.gitignore` if worktrees will live inside the repo.
+Add `.agent/worktrees/` to `<main_root>/.gitignore` if worktrees will live inside the repo.
 
 ## Report
 

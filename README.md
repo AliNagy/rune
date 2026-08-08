@@ -44,8 +44,9 @@ node scripts/sync-opencode.mjs
 ```
 
 Skills become `/rune-init`, `/rune-vision`, and so on. See
-[docs/opencode.md](docs/opencode.md) for options and — importantly — the known gaps, mainly
-that OpenCode can't give subagents their own worktrees, so their work is less isolated.
+[docs/opencode.md](docs/opencode.md) for options and the remaining harness differences.
+Rune does not depend on an anonymous harness-created checkout: every task gets one stable
+absolute worktree path that all executors, verifiers, recoverers, and landers reuse.
 
 ## Use
 
@@ -169,6 +170,14 @@ ordering is also what makes a killed session recoverable rather than merely rese
 the diff can be matched against the task's steps to find where to resume. `/rune:pause`
 stops new work but lets what's running finish and land, so you're never left with a
 half-applied change, and the flag lives on disk so nothing clears it quietly.
+
+**Checkout identity is explicit.** Every worker receives the absolute orchestration
+checkout path. Task-bound workers also receive one absolute task-worktree path, allocated
+before execution and kept unchanged through retries, verification, recovery, and landing.
+Coordination files are always read and written through the orchestration path, so an
+uncommitted task file cannot disappear merely because a worker started in another
+worktree. A verifier must inspect the executor's exact kept worktree; a clean anonymous
+checkout is rejected rather than mistaken for the artifact.
 
 **Work is checked, not claimed.** A task's test must be seen *failing* before the change is
 made, with the evidence recorded — a test written after the fix and never seen failing

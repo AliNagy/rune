@@ -9,6 +9,10 @@ description: Use when turning a milestone or a triaged request into task files. 
 Turns one milestone into task files. Runs **immediately before that milestone executes**,
 never during vision.
 
+The dispatch includes absolute `main_root` and absolute coordination pointers. Resolve
+every `.agent/...` read or write against `main_root`; never use the worker's starting
+directory or a harness-created worktree as the coordination checkout.
+
 ## Why just-in-time
 
 A task must name real files and real symbols. For a milestone three steps out, those
@@ -26,7 +30,7 @@ Read the real code. This is the step that most repays care: a bad cut produces t
 are not actually independent, and then every executor blows its budget rediscovering
 shared context.
 
-1. Read `.agent/map.md` and the milestone's scope and acceptance.
+1. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance.
 2. Use `ai-serena` to look at the actual symbols the milestone touches. Overview
    and signatures — not bodies, unless a specific decision depends on one.
 3. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
@@ -36,13 +40,14 @@ shared context.
 You are dispatched for one of three, and never more than one at a time:
 
 **Milestone graph** (from `rune:vision`) — read `vision.md`, `decisions.md`, and where they
-exist `map.md` and the survey digest. Write `.agent/milestones.md` per `ai-taskfmt`.
+exist `map.md` and the survey digest. Write `<main_root>/.agent/milestones.md` per
+`ai-taskfmt`.
 Everything you need is on disk; the dispatcher's conversation is not available to you and
 is not supposed to be. If something the graph obviously needs is missing from those files,
 say so and stop rather than inventing it — a gap on disk is a real finding.
 
-**Task files** (from `rune:work`) — decompose one milestone into `.agent/tasks/T-nnn.md`
-against real code, per everything below.
+**Task files** (from `rune:work`) — decompose one milestone into
+`<main_root>/.agent/tasks/T-nnn.md` against real code, per everything below.
 
 **Reconcile** (from `rune:work`) — you are given two or three independent cuts of the same
 milestone. Pick the strongest, graft anything better from the others, then write the final

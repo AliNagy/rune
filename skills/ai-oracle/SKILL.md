@@ -13,10 +13,15 @@ It matters because Rune executors grade their own homework. They report their ow
 success, in a context nobody else can see, and models are optimistic. Without an
 independent check you get a ledger of green rows over a codebase that does not run.
 
+Every dispatch includes absolute `main_root`. Task verification also includes the exact
+absolute `worktree_path`. Run initialization and landing checks with
+`git -C <main_root>` semantics; run task checks at `worktree_path`. Resolve every
+coordination file against `main_root`, never the current directory.
+
 ## Two oracles
 
 **Project-global** — "did I break anything else." Established once by `rune:init`,
-recorded in `.agent/rune.yml`, run after every task.
+recorded in `<main_root>/.agent/rune.yml`, run after every task.
 
 **Task-local** — "did my specific thing work." Produced *by* the task, per
 `ai-taskfmt`. Every task leaves a check behind that did not exist before.
@@ -40,7 +45,7 @@ already do for free; running it is the entire reason this is a separate dispatch
    source: it states what the project itself believes verifies it.
 2. Execute the candidate on a clean tree.
 3. **Return** the outcome honestly. You do not write `rune.yml` — the parent does, from
-   what you hand back. You write only `.agent/notes/init-commands.md`. The canonical field
+   what you hand back. You write only `<main_root>/.agent/notes/init-commands.md`. The canonical field
    set lives in `init` §5; do not invent a second schema for it. What the parent records
    looks like:
 
@@ -73,7 +78,7 @@ dispatch, same discipline:
   anything you find; a failing build is a finding to report, not work to take on.
 - **Time each one.** Duration is what tells the dispatcher whether the oracle is usable
   after every task or only at milestone boundaries.
-- **Full output goes to `.agent/notes/init-commands.md`** — every command, its exit code,
+- **Full output goes to `<main_root>/.agent/notes/init-commands.md`** — every command, its exit code,
   and enough output to diagnose a failure later. Nobody should have to re-run a 30-second
   suite to find out what broke.
 - **Never summarise a failure you did not read.** The reason belongs in the note, quoted
@@ -89,7 +94,7 @@ typecheck: ok    11s
 run:       none found
 
 oracle: npm test — passing, verified on a clean tree
-detail: .agent/notes/init-commands.md
+detail: /workspace/acme/.agent/notes/init-commands.md
 ```
 
 The dispatcher acts on the verdict; the evidence stays on disk for whoever needs it.
@@ -111,7 +116,8 @@ single task rather than forgetting about it by task three.
 
 ## Running the oracle during verification
 
-Run it in the task's worktree, not the main tree.
+Run it at the exact supplied `worktree_path`, not the main tree and not a fresh verifier
+worktree.
 
 - Compare against the **known-red baseline**, not against zero failures.
 - A new failure anywhere is a regression, even if the task's own test passes.
@@ -128,7 +134,7 @@ into the main tree and runs the oracle there itself, as step 4 of its own sequen
 if the oracle fails, the same worker has to roll the merge back, and splitting those two
 across two agents leaves a window where the tree is red and nobody owns it.
 
-What this skill contributes there is unchanged: run it in the **main tree**, compare against
+What this skill contributes there is unchanged: run it at **`main_root`**, compare against
 the known-red baseline, and treat any new failure as a regression. `ai-land` owns what
 happens to the merge afterwards.
 

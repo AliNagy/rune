@@ -15,6 +15,9 @@ looked up, and attach a plausible-looking link it never opened. The answer is of
 roughly right, which is what makes it dangerous — it is wrong in the details that made
 the question worth asking, and nothing in the output distinguishes it from real research.
 
+The dispatch includes absolute `main_root` and absolute output pointers. Resolve every
+coordination write against it; never use the research worker's starting directory.
+
 Everything below is machinery for making that failure impossible to commit silently.
 
 ## 0. Capabilities, not tools
@@ -27,7 +30,7 @@ capabilities:
 |---|---|
 | **search** | Issue a query against a web index and get back candidate results |
 | **retrieve** | Fetch the actual content at a specific address |
-| **record** | Write files under `.agent/` |
+| **record** | Write files under `<main_root>/.agent/` |
 
 Use whatever your harness provides for the first two. If it provides neither, or they are
 blocked, **stop and report that** — see §9. Do not fall back to memory and do not
@@ -233,7 +236,7 @@ These are not guidelines and there is no case where they bend.
 
 ## 10. Output
 
-Write `.agent/notes/RES-nnn.md`, return **under 200 tokens** per `ai-report`. `RES-` is
+Write `<main_root>/.agent/notes/RES-nnn.md`, return **under 200 tokens** per `ai-report`. `RES-` is
 its own ID space and does not collide with task or drift IDs.
 
 ```markdown

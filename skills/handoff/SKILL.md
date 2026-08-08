@@ -25,10 +25,16 @@ rushed and lossy, which defeats the point.
 
 **You move what this conversation knows onto disk, then get out.** This list is exhaustive:
 
-- **Read** `.agent/` coordination files.
-- **Write** `vision.md`, `decisions.md`, and `sessions/<stamp>.md`.
+- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
+- **Read** `<main_root>/.agent/` coordination files.
+- **Write** `<main_root>/.agent/vision.md`, `decisions.md`, and `sessions/<stamp>.md`.
 - **Talk to the user** — the paste block at the end.
 - **Dispatch subagents**, naming the skill each one must follow.
+
+Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`. Resolve
+every coordination path against it and include it plus absolute pointers in every
+dispatch. If step 1 drains task work, reuse each ledger-recorded absolute `worktree_path`
+through verification and landing.
 
 **Anything not on that list is a dispatch**, including `map.md` and Serena memories. You
 are the most context-starved parent in the system by the time you run; this is the worst
@@ -54,8 +60,8 @@ twice.
 
 | What you found | Where it goes |
 |---|---|
-| a convention the user corrected you on | **dispatch `ai-survey`** — one convention → `map.md` |
-| a codebase gotcha you discovered | **dispatch `ai-survey`** — one gotcha → a Serena memory |
+| a convention the user corrected you on | **dispatch `ai-survey` with `main_root`** — one convention → `map.md` |
+| a codebase gotcha you discovered | **dispatch `ai-survey` with `main_root`** — one gotcha → a Serena memory |
 | a choice made verbally | you write it — `decisions.md`, `status: decided` |
 | a constraint on the project | you write it — `vision.md` |
 | something the user wants built later | you write it — `vision.md`, as a want |
@@ -77,7 +83,7 @@ on.
 
 ## 3. Write the doc
 
-`.agent/sessions/YYYY-MM-DD-HHMM.md`. Keep it short — a fresh session pays for every line.
+`<main_root>/.agent/sessions/YYYY-MM-DD-HHMM.md`. Keep it short — a fresh session pays for every line.
 
 ```markdown
 # Session handoff · 2026-08-05 14:22
@@ -114,7 +120,7 @@ including which project this is.
 ```
 Continuing work on <project> at <path>. The Rune plugin is installed.
 
-Read .agent/sessions/2026-08-05-1422.md first — it has context from the previous
+Read <path>/.agent/sessions/2026-08-05-1422.md first — it has context from the previous
 session that is not in the ledger. Then run /rune:continue.
 ```
 ````
