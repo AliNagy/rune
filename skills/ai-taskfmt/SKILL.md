@@ -20,6 +20,7 @@ stranger with an empty context.
   decisions.md           # decision records (DEC-nnn)
   milestones.md          # milestone graph (M-nn)
   ledger.md              # ALL mutable state. single writer: the parent
+  drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # step ticks, red evidence, commit publications. executor-owned
@@ -43,13 +44,14 @@ ledger parse. Not because pause is a second writer — it is the same parent.
 ## Where writes land
 
 Source code is only ever modified inside a git worktree — never the main checkout. But
-**`.agent/` always lives in the main tree**, including files an executor writes while
+**`.agent/` always lives in the main tree**, including files a worker writes while
 working in a worktree.
 
-| Written by an executor | Lands in |
+| Written by a worker | Lands in |
 |---|---|
 | source changes while incomplete | its worktree as an uncommitted diff |
 | source changes when complete | commits on its task branch |
+| planner drafts and reconciled task files | `.agent/` in the main tree |
 | `notes/T-nnn.progress`, handoff notes | `.agent/` in the main tree |
 | drift and decision records | `.agent/` in the main tree |
 
@@ -57,8 +59,11 @@ Coordination state has to be visible to the dispatcher, the verifier, and the ne
 *before* anything merges. Written inside a worktree it would appear only on merge — which
 is precisely when nobody needs it any more.
 
-ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-` drift,
-`INV-` investigation, `RES-` research.
+Global ID prefixes never collide: `M-` milestone, `T-` task, `DEC-` decision, `DRF-`
+drift, `INV-` investigation, `RES-` research. Planning drafts use a separate local
+namespace: `R-nnn` is a decomposition run under one milestone, `P-nn` is a planner slot
+assigned by the parent, and `D-nnn` identifies a proposed task only inside that planner's
+artifact. None of those local ids may appear as a final task id or ledger task row.
 
 ## Single-writer rule
 
@@ -78,7 +83,8 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `vision.md`, `decisions.md`, `milestones.md` | the parent |
 | `sessions/<stamp>.md` | the parent |
 | `map.md` | a worker on `ai-survey` |
-| `tasks/T-nnn.md` | a worker on `ai-decompose` (creates), fixer (appends amendments only) |
+| `drafts/M-nn/R-nnn/P-nn.md` | the planner assigned that exact run and slot |
+| `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` (creates), fixer (appends amendments only) |
 | `notes/T-nnn.progress` | the worker holding T-nnn |
 | `notes/T-nnn.md` | the worker holding T-nnn |
 | `notes/T-nnn.verify.md` | a worker on `ai-verify` |
@@ -90,22 +96,28 @@ what made `pause` and `handoff` look like second writers when they are the same 
 
 ## The concurrency rule that generates this table
 
-**Any file that two workers could write at the same time must be per-task.**
+**Any output that two workers could write at the same time must be split into a unique
+artifact for each writer.**
 
 Up to three executors run concurrently. A shared file they all append to is a race by
 construction — and worse, they race on *id allocation*: two executors both reach for
 `DEC-012`. Per-task files have no such problem, because the filename already contains the
-thing that makes each writer unique.
+thing that makes each executor unique. Planner drafts apply the same rule with an assigned
+run and planner slot because several planners are working on the same milestone and cannot
+use the task id to distinguish themselves yet.
 
-That rule is why `notes/T-nnn.progress` and `decisions/open/T-nnn.md` are shaped the way
-they are. Apply it to any new file before adding a row above.
+That rule is why `notes/T-nnn.progress`, `decisions/open/T-nnn.md`, and planner drafts are
+shaped the way they are. Parallel planners never share a destination: the parent assigns
+each one an exact `M-nn/R-nnn/P-nn.md` path before dispatch. Apply the rule to any new file
+before adding a row above.
 
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
 
-The parent writes coordination and planning state. Workers write everything that comes
-out of doing the work — maps, task files, progress, results. A parent about to write
-anything outside its rows has found a dispatch it skipped.
+The parent writes mutable coordination and user-owned planning state. Workers write the
+outputs that require delegated context — maps, planner drafts, reconciled task files,
+progress, and results. A parent about to write anything outside its rows has found a
+dispatch it skipped.
 
 `milestones.md` is the exception worth explaining: the parent owns the file, but it never
 composes it. A worker on `ai-decompose` writes the graph and the parent records it, for the
@@ -152,6 +164,23 @@ the job is.
 If a worker needs something not reachable from those pointers, that is a missing pointer,
 not a reason to paste text into the prompt.
 
+For decomposition, the one work id is hierarchical because the work has two phases. A
+planner gets one assigned slot such as `M-03/R-002/P-01`; the reconciler gets the enclosing
+run `M-03/R-002`. The exact output destination is still a pointer, not prompt payload:
+
+```
+follow:    ai-decompose
+task:      M-03/R-002/P-01
+pointers:
+  milestone: .agent/milestones.md#M-03
+  draft:     .agent/drafts/M-03/R-002/P-01.md
+```
+
+The parent chooses the next unused `R-nnn` beneath the milestone and assigns distinct
+`P-nn` slots before dispatch. A retry gets a new unused slot; it never reuses a path that a
+late worker could still write. The reconciler is dispatched only after the parent has the
+completed draft paths, and receives every one as a pointer.
+
 ### The return envelope — what a worker hands back
 
 Two lines are shared by every worker:
@@ -171,6 +200,7 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-recover` | `verdict: salvage \| discard \| partial` |
 | `ai-triage` | `type: bug \| feature \| refactor \| investigation` |
 | `ai-oracle` | `oracle: passing \| failing \| none` |
+| `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
 
 Then whatever else that skill defines.
 
@@ -185,6 +215,12 @@ so it gets no worktree line.
 
 What *is* shared: the id, one plain-words summary, an enumerated outcome, and a hard
 **≤200 tokens**. Anything longer goes to disk and the summary points at it.
+
+An `ai-decompose` planner returning `plan: drafted` also returns exactly one `artifact:`
+path, and it must equal its assigned draft pointer. A reconciler returning
+`plan: reconciled` returns `artifacts:` with the final `tasks/T-nnn.md` paths plus the
+one-line titles and dependency edges the parent needs to register. `plan: blocked`
+returns no invented paths and names the missing or contradictory pointer in `summary`.
 
 ### The published task artifact
 
@@ -255,6 +291,74 @@ one issue*.
 The consequence for a worker: if you find a second issue while working, **report it and
 stop**. Whether it becomes another dispatch belongs to whoever dispatched you. Taking it on
 yourself merges two contexts that the system spent a dispatch to keep apart.
+
+## Planner draft
+
+A planner draft is the durable, complete candidate cut passed to the reconciler. It is
+not a task file and it never reserves a `T-nnn` id.
+
+```markdown
+---
+run: M-03/R-002
+planner: P-01
+milestone: M-03
+---
+
+# Candidate cut
+
+## D-001 · Rotate refresh tokens inside session middleware
+type: feature
+blocked_by: []
+
+### Goal
+One paragraph describing the independently verifiable outcome.
+
+### Context contract
+read:
+  - serena: find_symbol SessionMiddleware/handle -> src/auth/session.ts
+forbidden:
+  - src/legacy/** # unrelated and scheduled for deletion
+
+### Change surface
+- src/auth/session.ts :: SessionMiddleware.handle
+
+### Steps
+- [ ] Add the check that demonstrates the missing behavior
+- [ ] Implement token rotation at the existing refresh seam
+
+### Test
+file: src/auth/__tests__/rotation.test.ts
+assert: refresh issues a new token and invalidates the prior one
+must fail before the change
+
+### Acceptance
+- [ ] The check above passes
+- [ ] Project oracle still passes
+
+## D-002 · Wire the refresh endpoint
+type: feature
+blocked_by: [D-001]
+...
+
+## Cut notes
+assumptions:
+  - rotation uses the existing configured expiry
+exclusions:
+  - device management remains in M-06
+seams:
+  - middleware and endpoint are separated because they share no change-surface files
+```
+
+Every `D-nnn` repeats the complete final task contract: title, type, local dependencies,
+goal, context contract, change surface, steps, test, and acceptance. `Cut notes` records
+the assumptions, exclusions, and disputed seams the user gate and reconciler need. A
+summary that omits those sections is not a draft artifact.
+
+The file becomes immutable when its planner returns. That planner writes only its exact
+assigned draft path: it does not create `tasks/T-nnn.md`, inspect or update `ledger.md`, or
+write another planner's slot. The reconciler maps the selected local dependencies to final
+`T-nnn` ids and writes new final task files; it never renames a draft into the final
+namespace because a draft may be grafted from more than one cut.
 
 ## Task file
 

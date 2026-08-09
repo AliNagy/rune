@@ -127,19 +127,38 @@ is cheap.
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
 
-**Dispatch a subagent that follows `ai-decompose`. You do not write task files.**
-Decomposition requires reading real code — the one thing you may not do — so it cannot
-happen in your context, and a task file written without reading code is fiction. The
-worker writes `.agent/tasks/T-nnn.md` and returns the task list in ≤200 tokens.
+**Dispatch workers that follow `ai-decompose`. You do not read source or write planning
+artifacts.** Decomposition requires real code — the one thing you may not read — so a task
+file composed in your context is fiction.
 
-**Dispatch two or three planners in parallel, then reconcile.** This is the one step in
-Rune that earns a fan-out, per *Judgment fans out, mechanics do not* below. Give each the
-same milestone and let them cut it independently; then dispatch one more to reconcile —
-to pick the best cut and write the final task files. Where they agree, the cut is probably sound.
-Where they disagree, that seam is exactly where a decomposition goes wrong, and you now
-have it named instead of discovered four tasks later.
+Use this exact two-phase protocol:
 
-Then register the tasks in the ledger — that part is yours, `ledger.md` is your file.
+1. Under `.agent/drafts/<milestone>/`, choose the next unused `R-nnn` directory. Never
+   reuse a run, including one left incomplete by a dead session. Assign `P-01` through
+   `P-03` before dispatch; the parent is the only allocator for both names.
+2. Dispatch two or three planners in parallel. Each gets one work id such as
+   `M-03/R-002/P-01`, the same milestone inputs, and one distinct output pointer such as
+   `.agent/drafts/M-03/R-002/P-01.md`. A planner writes only that complete draft, using
+   local `D-nnn` ids; it never writes a final task file or the ledger.
+3. Accept `plan: drafted` only when `artifact:` exactly matches the assigned pointer. If a
+   planner stops without a complete artifact, any retry gets a new unused `P-nn` slot so a
+   late original worker cannot collide with it. Wait until every planner in the run has
+   returned or is confirmed stopped; do not reconcile while one may still produce another
+   cut, and do not reconcile fewer than two complete cuts.
+4. Dispatch one fresh reconciler with work id `M-03/R-002` and pointers to every completed
+   draft artifact. It validates the paths and full schemas, compares the cuts, and is the
+   only worker allowed to allocate final `T-nnn` ids and write `.agent/tasks/T-nnn.md`.
+5. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
+   edges. Then register exactly those tasks in `ledger.md` in one parent update. Draft
+   planners and the reconciler never register tasks themselves.
+
+The draft files remain immutable after reconciliation. They are the evidence for what the
+planners agreed on, where they disagreed, and what the reconciler changed.
+
+This is the one step in Rune that earns a fan-out, per *Judgment fans out, mechanics do
+not* below. Where the independent artifacts agree, the cut is probably sound. Where they
+disagree, that seam is exactly where decomposition goes wrong, and it is now named instead
+of being discovered four tasks later.
 
 ## Judgment fans out, mechanics do not
 
