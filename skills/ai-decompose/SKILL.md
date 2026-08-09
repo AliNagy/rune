@@ -100,10 +100,25 @@ substitute for a complete draft artifact.
 
 ## Cutting rules
 
-**Vertical, not horizontal.** Cut through the layers, not across them. "Token rotation
+Choose the task type and its required verification mode before choosing the cut. The
+evidence contract determines what an independently checkable task looks like.
+
+**Behavior-changing work is vertical.** A `feature`, `bug`, or `chore` uses
+`verification: red_then_green`. Cut through the layers, not across them. "Token rotation
 end to end" is a task. "All the interfaces, then all the implementations, then all the
-tests" is three tasks of which none can be verified alone. Every task must be
-independently checkable the moment it lands.
+tests" is three tasks of which none can demonstrate the behavior change alone. Each task
+ends with one declared check observed failing before the change and passing afterward.
+
+**Refactors are horizontal.** A `refactor` uses `verification: green_baseline`. Cut one
+mechanical transformation per task: additive structure first, call-site migrations next,
+deletion last. Every intermediate task must compile and preserve the same existing check
+and oracle baseline. The check already exists; creating a new failing check would turn the
+task into a behavior change.
+
+**Characterization is a separate test-only task.** If a refactor has no adequate existing
+check, first create a `characterization` task with `verification: characterization`. Its
+change surface contains only tests and their fixtures, and its new check must pass against
+unchanged production code. The refactor tasks depend on it and keep those tests unchanged.
 
 **Size ceiling: 5 files, one subsystem, one verifiable outcome.** If it needs more, it is
 two tasks.
@@ -112,8 +127,9 @@ two tasks.
 beat one clever task that couples them. Redundancy costs tokens; coupling costs
 correctness.
 
-**Each task ends with a check that did not exist before.** If you cannot state what that
-check is, the task is not well-formed yet.
+**Each task names one check and its before/after contract.** New behavior gets a new
+red-then-green check. Refactors name the existing green check they preserve.
+Characterization adds a new check over behavior that already exists.
 
 ## Context contracts
 
@@ -172,7 +188,11 @@ Before writing files, check each task against:
 - Is there exactly one outcome, and is it checkable?
 - Does the change surface fit in five files?
 - Is there a `forbidden` list, and does it have reasons?
-- Does it state a test, and what "must fail before" looks like?
+- Do `type` and `verification` form one allowed pair from `ai-taskfmt`?
+- Does the check name an executable command, assertion, and mode-specific before/after result?
+- For `red_then_green`, does it say why the check fails before the change?
+- For `green_baseline`, are tests and fixtures absent from the change surface?
+- For `characterization`, is production source absent from the change surface?
 
 Then finish only the job you were assigned:
 

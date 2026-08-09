@@ -54,6 +54,8 @@ The system's internal terms are precise and mean nothing to a reader. Translate:
 |---|---|
 | the oracle passes | the tests pass |
 | red-then-green confirmed | the test failed before the fix, passes now |
+| green-baseline confirmed | the same tests passed before and after the refactor |
+| characterization confirmed | a new test pins the existing behavior without changing it |
 | drift / DRF-003 | the plan was wrong about X |
 | the ledger | progress / status |
 | task T-014 is in the verifying state | T-014 is being checked |

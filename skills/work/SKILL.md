@@ -183,8 +183,8 @@ Decomposition is the clearest case for fanning out — a bad cut poisons every t
 it and does not show up until executors start colliding. Triage classification is the
 second, when the evidence is genuinely ambiguous on an unfinished codebase.
 
-Running a command, writing a file from a settled spec, verifying red-before-green
-evidence: one agent. Fanning these out buys nothing and spends the budget twice.
+Running a command, writing a file from a settled spec, verifying the task's declared
+evidence chain: one agent. Fanning these out buys nothing and spends the budget twice.
 
 Each parallel agent still gets **one issue** — the rule above is unaffected. Three
 planners on one milestone is three agents on the same single issue, which is fan-out.
@@ -296,7 +296,7 @@ status: done | drifted | budget | blocked | question
 task: T-014
 worktree: kept | discarded        # done requires kept until ai-land cleans it
 worktree_path: /workspace/acme/.agent/worktrees/T-014
-summary: rotate() implemented and wired; red-then-green recorded
+summary: rotate() implemented and wired; required verification evidence recorded
 base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
 drift: DRF-003          # if any

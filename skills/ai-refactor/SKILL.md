@@ -1,7 +1,7 @@
 ---
 name: ai-refactor
 user-invocable: false
-description: Use when changing structure without changing behaviour - cleanup, restructure, extraction, or a library migration. Requires a characterization net first and forbids editing tests.
+description: Use when changing structure without changing behaviour - cleanup, restructure, extraction, or a library migration. Requires a characterization net first and forbids refactor tasks from editing tests.
 ---
 
 # Refactor protocol
@@ -28,6 +28,18 @@ system does today so you can prove you did not change it. If you find behaviour 
 looks like a bug, **pin it as-is** and file it separately. Fixing it during a refactor
 destroys the only signal you have.
 
+That safety-net task is classified explicitly as `type: characterization` with
+`verification: characterization`. Its change surface contains only tests and their
+fixtures. The new check passes against unchanged production source; red-before-green does
+not apply because the behavior already exists. The verifier instead proves that production
+code did not change and that the check meaningfully exercises it.
+
+Every actual restructuring task is `type: refactor` with
+`verification: green_baseline`. Before its first production edit, the executor records the
+declared existing check and project oracle passing. Afterward it records those same commands
+passing unchanged. A refactor with `verification: red_then_green` is misclassified and must
+return to decomposition.
+
 Refuse to proceed without the net. This is the one protocol where blocking is correct —
 an unverifiable refactor is indistinguishable from silent breakage, and it will be marked
 `done`.
@@ -39,6 +51,7 @@ checks pass, unmodified**.
 
 ```
 - [ ] Project oracle passes — identical results to baseline
+- [ ] Declared existing check passes before and after the refactor
 - [ ] No test file appears in `git diff <base_commit>..<artifact_commit>`
 - [ ] Public API surface unchanged (or: changed exactly as declared)
 ```
@@ -76,6 +89,9 @@ T-2  extract TokenStore interface, no call site changes   (additive)
 T-3  migrate call sites to the interface                  (mechanical)
 T-4  delete the old concrete dependency                   (subtractive)
 ```
+
+T-1 is `type: characterization`; T-2 through T-4 are `type: refactor`. The latter depend
+on the former and name its checks as their `green_baseline` evidence.
 
 Additive first, mechanical middle, subtractive last. Every intermediate state compiles
 and passes. **Never leave the tree broken between tasks** — a half-migrated codebase where
