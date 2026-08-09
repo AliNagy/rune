@@ -13,6 +13,26 @@ The dispatch includes absolute `main_root` and absolute coordination pointers. R
 every `.agent/...` read or write against `main_root`; never use the worker's starting
 directory or a harness-created worktree as the coordination checkout.
 
+## Bind the selected protocol
+
+A planner or reconciler receives an absolute pointer to the run's
+`<main_root>/.agent/drafts/M-nn/R-nnn/protocol.md`. Read it before source or draft work,
+confirm its `run` matches the assigned work id, and accept only these pairs:
+
+| type | protocol to load |
+|---|---|
+| `bug` | `ai-bug` |
+| `feature` | `ai-feature` |
+| `refactor` | `ai-refactor` |
+
+Load that skill and follow it alongside this one. The record, not the request wording or
+the milestone title, decides the protocol. A missing, relative, out-of-run, malformed, or
+mismatched pointer is `plan: blocked` before any file is written. An investigation never
+reaches this skill for task decomposition.
+
+Milestone-graph work from `rune:vision` is the only job here without a protocol pointer;
+it creates milestones rather than executable tasks.
+
 ## Why just-in-time
 
 A task must name real files and real symbols. For a milestone three steps out, those
@@ -30,10 +50,11 @@ Read the real code. This is the step that most repays care: a bad cut produces t
 are not actually independent, and then every executor blows its budget rediscovering
 shared context.
 
-1. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance.
-2. Use `ai-serena` to look at the actual symbols the milestone touches. Overview
+1. For planner or reconcile work, bind and load the protocol above.
+2. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance.
+3. Use `ai-serena` to look at the actual symbols the milestone touches. Overview
    and signatures — not bodies, unless a specific decision depends on one.
-3. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
+4. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
 
 ## Which job you were given
 
@@ -50,22 +71,26 @@ say so and stop rather than inventing it — a gap on disk is a real finding. Re
 
 **Planner draft** (from `rune:work`) — the work id names one assigned slot such as
 `M-03/R-002/P-01`, and a pointer names the exact
-`<main_root>/.agent/drafts/M-03/R-002/P-01.md` destination. Decompose the milestone
-against real code and write one complete candidate cut there per `ai-taskfmt`. Use only
-local `D-nnn` ids. Do not create a final `T-nnn`, write under
+`<main_root>/.agent/drafts/M-03/R-002/P-01.md` destination. A second pointer names that
+run's `protocol.md`. Decompose the milestone against real code and the loaded protocol,
+then write one complete candidate cut there per `ai-taskfmt`. Repeat the protocol `type`
+and skill in the draft frontmatter and use only local `D-nnn` ids. Do not create a final
+`T-nnn`, write under
 `<main_root>/.agent/tasks/`, inspect or update `<main_root>/.agent/ledger.md`, or write any
 path other than the assigned draft. If the assigned path already exists, return
 `plan: blocked`; never overwrite an artifact whose writer may still be alive.
 
 **Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
-are given pointers to two or three completed draft artifacts from distinct planner slots
-under that exact run. First fail closed if a pointer is missing, duplicated, outside the
-run, or lacks any part of the planner-draft schema. Then pick the strongest cut, graft
-anything better from the others, allocate the next unused final `T-nnn` ids, translate all
-local dependency edges, and write the final task files. Say which cut you took as the base
-and what you moved. Where the cuts disagreed, that seam is the part of the milestone that
-is genuinely hard to divide; treat it as the thing to get right, not a tie to break
-quickly. You are the only worker in the run allowed to write
+are given the run's protocol pointer plus pointers to two or three completed draft
+artifacts from distinct planner slots under that exact run. First fail closed if a pointer
+is missing, duplicated, outside the run, lacks any part of the planner-draft schema, or
+declares a different type or protocol. Then pick the strongest cut, graft anything better
+from the others, run the protocol-specific sanity pass again on the proposed final cut,
+allocate the next unused final `T-nnn` ids, translate all local dependency edges, and write
+the final task files. Say which cut you took as the base and what you moved. Where the cuts
+disagreed, that seam is the part of the milestone that is genuinely hard to divide; treat
+it as the thing to get right, not a tie to break quickly. You are the only worker in the
+run allowed to write
 `<main_root>/.agent/tasks/`, and you still never write `<main_root>/.agent/ledger.md`.
 
 Every return is ≤200 tokens:
@@ -99,6 +124,11 @@ others, and writes the final task files. No planner return summary is accepted a
 substitute for a complete draft artifact.
 
 ## Cutting rules
+
+These are generic defaults. The loaded protocol is authoritative wherever it gives a more
+specific task shape. Never silently discard either instruction: if the protocol and a
+generic rule cannot both be satisfied, return `plan: blocked` and name the exact conflict
+instead of choosing whichever rule is more convenient.
 
 Choose the task type and its required verification mode before choosing the cut. The
 evidence contract determines what an independently checkable task looks like.
@@ -182,7 +212,7 @@ and tangled — the context ceiling is the constraint that matters, not wall-clo
 
 ## Sanity pass
 
-Before writing files, check each task against:
+Before writing files, check each task against the generic contract:
 
 - Could a stranger execute this with no knowledge of its siblings?
 - Is there exactly one outcome, and is it checkable?
@@ -193,6 +223,45 @@ Before writing files, check each task against:
 - For `red_then_green`, does it say why the check fails before the change?
 - For `green_baseline`, are tests and fixtures absent from the change surface?
 - For `characterization`, is production source absent from the change surface?
+
+Then run the loaded protocol's checks:
+
+- **Bug / `ai-bug`:** the task is grounded in the already-observed reproduction; the
+  reproduction becomes the regression test; boundary cases appear in acceptance; and a
+  mitigation is explicit and has a root-cause follow-up. No reproduction means no task.
+- **Feature / `ai-feature`:** the scope boundary and exclusions are present; every
+  user-visible decision is settled; tasks are vertical slices; and each task names its
+  integration point and failure behavior.
+- **Refactor / `ai-refactor`:** the characterization net exists or is established first;
+  tasks preserve behavior; the sequence is additive, then mechanical, then subtractive;
+  and test files are not edited by the restructuring tasks.
+
+The planner runs both passes before creating its draft. The reconciler runs both again on
+the combined final cut before creating any `T-nnn` file. A failed check returns
+`plan: blocked`; do not leave a partial draft or partial final task set behind.
+
+## Protocol-shaped examples
+
+These are shape checks, not substitutes for reading the protocol:
+
+```text
+bug + ai-bug
+  D-001 keep the reproduced login redirect failure as a regression test, fix its cause,
+        and assert the adjacent redirect cases from reproduction
+
+feature + ai-feature
+  D-001 store one profile field end to end through the existing API, including its error
+        path; later slices add read and edit behavior
+
+refactor + ai-refactor
+  D-001 add characterization coverage if the affected entry points are not pinned
+  D-002 add the new interface without moving callers
+  D-003 migrate callers mechanically
+  D-004 remove the old implementation last
+```
+
+A generic horizontal feature cut, an unreproduced bug task, or a refactor cut with changed
+behavior must fail the sanity pass even if it satisfies the five-file ceiling.
 
 Then finish only the job you were assigned:
 
