@@ -42,8 +42,9 @@ So:
 
 ## Procedure
 
-1. **Read the task spec** — steps, change surface, acceptance, the stated test.
-2. **Read the progress file** — ticks, and whether red-then-green was recorded.
+1. **Read the task spec** — type, verification mode, steps, change surface, acceptance,
+   and the stated check.
+2. **Read the progress file** — ticks and the mode-specific evidence recorded so far.
 3. **Read `git -C <worktree_path> diff`.** This is the authoritative record of what happened.
 4. **Map the diff onto the declared steps.** For each step, decide: applied, partly
    applied, or absent. Steps are written to be checkable precisely so this is possible.
@@ -62,7 +63,7 @@ So:
 | 2 | the diff contradicts itself, or you cannot say what it was trying to do | **discard** |
 | 3 | the task's premise looks false in light of the diff | **discard** + write a drift record |
 | 4 | fewer than 20 changed lines | **discard** |
-| 5 | a test file exists but the progress file has no red evidence | **partial** |
+| 5 | a `red_then_green` or `green_baseline` task has relevant edits but lacks its required pre-change evidence | **partial** |
 | 6 | any declared step is fully or partly applied | **salvage**, resume at the first unfinished step |
 | 7 | otherwise | **discard** |
 
@@ -77,10 +78,13 @@ reasoning about an abandoned edit. The exact number matters less than that it is
 for about 10k. Abandoned work of unknown provenance is worth less than the clean base it
 occupies.
 
-**What partial means.** Keep the worktree, keep the code, reset the test. The red-then-green
-chain is broken and cannot be reconstructed after the fact — `ai-verify` will correctly
-refuse to pass a test that was never seen failing. The resumed task must revert, observe
-the failure, and re-apply, or write a fresh test.
+**What partial means.** Keep the worktree, but restore the pre-change state before resuming
+the evidence chain. A `red_then_green` task must observe the declared failure before the
+implementation is reapplied. A `green_baseline` task must observe the existing check and
+oracle passing before the refactor is reapplied. `ai-verify` correctly refuses either mode
+when its pre-change observation is missing. A `characterization` task does not need this
+reset when production source is unchanged; its new check can still be run against that
+original behavior.
 
 ## Return
 
@@ -89,8 +93,9 @@ task: T-016
 verdict: salvage | discard | partial
 applied: steps 1-2 complete, step 3 partly (rotate() exists, not wired into handle())
 containment: clean            # or: touched src/api/routes.ts, outside surface
-red_evidence: missing         # forces a test reset
-resume_at: step 3 - wire rotate() into handle(), then redo the test red-first
+verification: red_then_green
+evidence: missing red         # forces the behavior change to be reset
+resume_at: step 3 - restore the base, observe red, then reapply rotate()
 worktree: kept
 worktree_path: /workspace/acme/.agent/worktrees/T-016
 ```

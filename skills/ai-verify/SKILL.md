@@ -1,7 +1,7 @@
 ---
 name: ai-verify
 user-invocable: false
-description: Use when confirming a completed task actually passed. Checks acceptance criteria, audits red-then-green evidence, and detects vacuous tests. Never used on work the same agent performed.
+description: Use when confirming a completed task actually passed. Checks acceptance criteria, audits the task's declared verification evidence, and detects vacuous checks. Never used on work the same agent performed.
 ---
 
 # Verification
@@ -24,8 +24,9 @@ Only these:
 
 - `main_root` — the absolute orchestration checkout; all coordination paths resolve here
 - `worktree_path` — the exact absolute task worktree used by the executor
-- `<main_root>/.agent/tasks/T-nnn.md` — the spec, including acceptance and the stated test
-- `<main_root>/.agent/notes/T-nnn.progress` — ticks, red-then-green evidence, and the latest
+- `<main_root>/.agent/tasks/T-nnn.md` — the spec, including type, verification mode,
+  acceptance, and the stated check
+- `<main_root>/.agent/notes/T-nnn.progress` — ticks, mode-specific evidence, and the latest
   `base_commit` / `artifact_commit` publication
 - the clean task worktree at `worktree_path` and `artifact_commit`
 - `<main_root>/.agent/rune.yml` — the project oracle and its known-red baseline
@@ -49,7 +50,9 @@ count and for what has already been rejected — then verify the task, not the f
 ## Procedure
 
 **1. Bind verification to the published artifact.** Read the last publication block from
-the progress file, then establish all of these mechanically:
+the progress file. Read `type` and `verification` from the task and require one allowed pair
+from `ai-taskfmt`; a missing or incompatible mode is `unverified` with `reason: evidence`.
+Then establish all of these mechanically:
 
 - `git -C <worktree_path> rev-parse HEAD` equals `artifact_commit`.
 - `git -C <worktree_path> status --porcelain` is empty.
@@ -68,20 +71,38 @@ Files touched outside the surface are a finding, not a detail — the tripwire i
 `ai-drift` exists precisely to prevent this, so a violation means either the rule
 was broken or the task was mis-scoped. Report either way.
 
-**3. Run the task-local test.** It must exist and pass.
+**3. Run the task-local check.** Its command must exist and its declared after-result must
+hold. A scripted or observable assertion is valid when a unit test does not fit.
 
-**4. Check red-then-green evidence.** The progress file must record the test observed
-failing before the change. If that evidence is absent, the result is **unverified**, not
-passed. A test written after a fix and never seen red proves nothing, and you cannot
-reconstruct that evidence after the fact.
+**4. Check the declared evidence mode.** The progress file must name the same
+`verification` value as the task and contain its complete evidence chain:
 
-**5. Hunt vacuous checks.** Read the test.
+- `red_then_green`: `red` shows the declared check failed for the expected reason before
+  the change, and `green` shows the same check passed afterward.
+- `green_baseline`: `baseline` shows the declared existing check and project oracle passed
+  before production edits, and `preserved` shows the same commands passed afterward. No
+  test or fixture file may appear in the artifact diff.
+- `characterization`: `characterized` shows the new check passing against unchanged
+  production code. The artifact diff may contain only the task's declared tests and
+  fixtures; any production-source change is a failure.
+
+If required evidence is absent, mismatched, or internally contradictory, the result is
+**unverified**, not passed. Do not substitute red evidence for a refactor or accept a
+manufactured failure as proof of behavior preservation.
+
+**5. Hunt vacuous checks using the mode.** Read the check in every mode.
 - Does it assert anything meaningful, or does it assert `true`?
 - Is the subject mocked so thoroughly that only the mock is exercised?
-- Would it still pass if the change were reverted? If you can answer that cheaply — by
-  using a disposable worktree without changing the published task worktree — do it. It is
-  the single most informative check available to you. If no disposable check is cheap,
-  record that the revert check was skipped; never mutate the artifact you are verifying.
+- For `red_then_green`, would it fail if the behavior change were reverted? If cheap,
+  answer in a disposable worktree without changing the published task worktree.
+- For `green_baseline`, does the same check pass at `base_commit` and `artifact_commit`, and
+  are its files unchanged?
+- For `characterization`, does the new check exercise existing production behavior? A
+  revert check is inapplicable because reverting removes the check; use a disposable
+  sensitivity probe only when cheap.
+
+If no disposable check is cheap, record that it was skipped. Never mutate the artifact you
+are verifying.
 
 **6. Run the project oracle.** In the worktree. Compare against the known-red baseline,
 not against zero failures. Any new failure is a regression, even if the task's own test
@@ -120,6 +141,7 @@ one rejected three times for the same reason, and only the history tells them ap
 ```markdown
 ## attempt 2 — 2026-08-08
 verdict: fail
+verification: red_then_green
 base_commit: a3f91c2
 artifact_commit: 4a91c02
 failing_criterion: "rotate() is called exactly once per refresh"
@@ -145,6 +167,7 @@ there is no finding to carry:
 ```markdown
 ## attempt 3 — 2026-08-08
 verdict: pass
+verification: red_then_green
 base_commit: a3f91c2
 artifact_commit: 62be8d1
 verified_commit: 62be8d1
@@ -174,9 +197,10 @@ base_commit: a3f91c2
 artifact_commit: 62be8d1
 verified_commit: 62be8d1              # required only for pass; exactly artifact_commit
 surface: clean                    # or: touched src/api/routes.ts, outside surface
-local_test: pass (rotation.test.ts)
-red_evidence: present
-revert_check: test fails when change reverted — test is real
+local_check: pass (rotation.test.ts)
+verification: red_then_green
+evidence: red and green present for rotation.test.ts
+sensitivity_check: test fails when change reverted — check is real
 oracle: pass (baseline: 3 known failures, unchanged)
 flaky: none                       # or: auth/session.test.ts disagreed with itself
 ticks: 3/3 match diff
@@ -192,15 +216,15 @@ detail: /workspace/acme/.agent/notes/T-014.verify.md
 count reliably across a context that may have been compacted. You are reading the number
 off disk, so you are the one who can.
 
-**pass** — every criterion met, evidence present, and `verified_commit` names the exact
-published artifact you checked.
+**pass** — every criterion met, the declared mode's evidence is complete, and
+`verified_commit` names the exact published artifact you checked.
 **fail** — a criterion is not met. Say which and what you observed — in the record, where
 the next executor will find it. The task returns to `pending` and a fresh executor is
 given your record; do not fix it yourself.
-**unverified** — you could not establish the truth. Missing red evidence, a flaky oracle,
-an acceptance criterion that is not actually checkable. This is not a soft pass. An
-unverifiable acceptance criterion is a defect in the *task*, and it should go back to
-decomposition.
+**unverified** — you could not establish the truth. Missing mode-specific evidence, a
+flaky oracle, or an acceptance criterion that is not actually checkable. This is not a
+soft pass. An unverifiable acceptance criterion is a defect in the *task*, and it should
+go back to decomposition.
 
 ## What you are not
 

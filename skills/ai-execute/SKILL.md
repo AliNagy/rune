@@ -1,7 +1,7 @@
 ---
 name: ai-execute
 user-invocable: false
-description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, red-before-green, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
+description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, task-specific verification evidence, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
 ---
 
 # Executing a task
@@ -10,6 +10,12 @@ description: Use when executing one Rune task from an explicitly identified main
 `worktree_path`, and absolute pointers. Read
 `<main_root>/.agent/tasks/T-nnn.md` yourself. Reject relative paths; your starting
 directory is not an identity.
+
+Read `type` and `verification` before touching source. They must form one allowed pair
+from `ai-taskfmt`: behavior-changing tasks use `red_then_green`, refactors use
+`green_baseline`, and characterization tasks use `characterization`. A missing or
+incompatible mode is a defective task contract: return `status: blocked` and do not invent
+the evidence rule yourself.
 
 Also load `ai-taskfmt`, `ai-serena`, and `ai-drift`.
 
@@ -101,9 +107,23 @@ rationalised away.
 **Honour the `forbidden` list.** If you genuinely need something on it, that is drift.
 Stop and report — do not quietly widen your reach.
 
-**Red before green.** Observe the test failing against the pre-change state and record
-the evidence in `notes/T-nnn.progress`. Nobody downstream can reconstruct this, and a
-verifier that cannot find it must mark you unverified.
+**Follow the declared verification contract.** Record its evidence in
+`notes/T-nnn.progress`; the verifier will reject a different or incomplete evidence chain.
+
+- `red_then_green`: before changing the implementation, run the declared check and confirm
+  it fails for the expected missing behavior. Record `verification`, `red`, then after the
+  change record `green` from the same check. A different failure is not useful red evidence.
+- `green_baseline`: before changing production code, run the declared existing check and
+  project oracle and record `verification` plus `baseline`. After the refactor, run the
+  exact same commands and record `preserved`. Do not edit tests or fixtures and do not
+  manufacture a failure.
+- `characterization`: change only the declared test and fixture surface. Run the new check
+  against otherwise unchanged production code and record `verification` plus
+  `characterized`. Any production-source edit violates this mode.
+
+Where the mode requires a pre-change observation, it happens after the task worktree is
+bound and before the first relevant edit. Nobody downstream can reliably reconstruct that
+moment, which is why the progress file is durable evidence rather than a summary.
 
 **Edit first, then tick.** Always this order. If you die between the two, a missing tick
 self-heals — the next executor finds the step already applied. The reverse order leaves a
@@ -145,7 +165,8 @@ Only a completed task is published. `budget`, `blocked`, `question`, and `drifte
 discard their dirty worktree exactly as their stopping rules say; do not commit partial
 work merely to make it durable.
 
-After the task-local check and project oracle pass:
+After the declared evidence chain is complete and the task-local check and project oracle
+pass:
 
 1. Stage only files in the declared change surface. Never use a broad add to sweep an
    unexplained file into the artifact.

@@ -142,12 +142,17 @@ The parent never merges and never reads a suite log. That split is the whole poi
 
 ## Vacuous checks
 
-The most common way verification silently fails is a test that cannot fail.
+The most common way verification silently fails is a check that cannot distinguish the
+claimed outcome.
 
 - A test asserting nothing, or asserting `true`.
 - A test whose subject is mocked so thoroughly it exercises only the mock.
-- A test added *after* the change and never observed red.
+- A behavior-change test added *after* the change and never observed red.
+- A refactor whose alleged baseline was never run before production edits.
+- A characterization test paired with production changes, so it no longer pins the
+  original behavior.
 
-The third is why `ai-taskfmt` requires red-then-green evidence in the progress
-file. A verifier that cannot find that evidence must treat the task as **unverified**,
-not as passed. Absence of proof is not proof.
+That is why `ai-taskfmt` requires the task's declared verification evidence in the progress
+file. A verifier that cannot find the complete `red_then_green`, `green_baseline`, or
+`characterization` chain must treat the task as **unverified**, not as passed. Absence of
+proof is not proof.

@@ -225,7 +225,7 @@ skills/
   ai-survey       looking around an unfamiliar codebase
   ai-triage       is it a bug, a feature, a refactor, or a question
   ai-decompose    milestone to tasks, and how big a task should be
-  ai-execute      doing one task: worktree, red before green, publishing its commit
+  ai-execute      doing one task: worktree, required evidence, publishing its commit
   ai-bug          reproduce before planning
   ai-feature      thin end-to-end slices, open questions decided first
   ai-refactor     cover behaviour with tests first, then leave them alone

@@ -1,7 +1,7 @@
 ---
 name: ai-taskfmt
 user-invocable: false
-description: Use when writing or amending any file under .agent/ - task files, milestones, decision records, handoff notes, or drift records. Defines the schemas, the encapsulated-task contract, checkable steps, red-then-green, and single-writer ownership.
+description: Use when writing or amending any file under .agent/ - task files, milestones, decision records, handoff notes, or drift records. Defines the schemas, the encapsulated-task contract, checkable steps, task-specific verification evidence, and single-writer ownership.
 ---
 
 # Rune file formats
@@ -24,7 +24,7 @@ stranger with an empty context.
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
-  notes/T-nnn.progress   # step ticks, red evidence, commit publications. executor-owned
+  notes/T-nnn.progress   # step ticks, verification evidence, commit publications. executor-owned
   notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
   notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
@@ -382,6 +382,7 @@ protocol: ai-feature
 
 ## D-001 · Rotate refresh tokens inside session middleware
 type: feature
+verification: red_then_green
 blocked_by: []
 
 ### Goal
@@ -400,10 +401,12 @@ forbidden:
 - [ ] Add the check that demonstrates the missing behavior
 - [ ] Implement token rotation at the existing refresh seam
 
-### Test
+### Check
 file: src/auth/__tests__/rotation.test.ts
+command: npm test -- rotation.test.ts
 assert: refresh issues a new token and invalidates the prior one
-must fail before the change
+before: must fail for the missing rotation behavior
+after: must pass
 
 ### Acceptance
 - [ ] The check above passes
@@ -411,6 +414,7 @@ must fail before the change
 
 ## D-002 · Wire the refresh endpoint
 type: feature
+verification: red_then_green
 blocked_by: [D-001]
 ...
 
@@ -424,10 +428,10 @@ seams:
 ```
 
 The draft's `type` and `protocol` must exactly match the run's `protocol.md`. Every
-`D-nnn` repeats the complete final task contract: title, type, local dependencies, goal,
-context contract, change surface, steps, test, and acceptance. `Cut notes` records the
-assumptions, exclusions, and disputed seams the user gate and reconciler need. A summary
-that omits those sections is not a draft artifact.
+`D-nnn` repeats the complete final task contract: title, type, verification mode, local
+dependencies, goal, context contract, change surface, steps, check, and acceptance. `Cut
+notes` records the assumptions, exclusions, and disputed seams the user gate and
+reconciler need. A summary that omits those sections is not a draft artifact.
 
 The file becomes immutable when its planner returns. That planner writes only its exact
 assigned draft path: it does not create `tasks/T-nnn.md`, inspect or update `ledger.md`, or
@@ -438,9 +442,9 @@ namespace because a draft may be grafted from more than one cut.
 ## Task file
 
 A task is **encapsulated**: it carries its own goal, change surface, acceptance, and
-test. It can be executed, retried, or reviewed with no knowledge of its siblings.
+check. It can be executed, retried, or reviewed with no knowledge of its siblings.
 
-Encapsulate the *contract*, reference the *context*. Goal, surface, acceptance and test
+Encapsulate the *contract*, reference the *context*. Goal, surface, acceptance and check
 belong in the task. Conventions and module layout are pointed at, never copied — copies
 drift apart from `map.md` and from each other.
 
@@ -449,7 +453,8 @@ drift apart from `map.md` and from each other.
 id: T-014
 title: Rotate refresh tokens inside session middleware
 milestone: M-03
-type: feature            # feature | bug | refactor | chore
+type: feature            # feature | bug | refactor | characterization | chore
+verification: red_then_green # red_then_green | green_baseline | characterization
 blocked_by: [T-011]
 ---
 
@@ -474,13 +479,15 @@ forbidden:
 - [ ] Implement rotation in the concrete store, reusing the existing issue path
 - [ ] Call it from handle() before the session is refreshed
 
-## Test
+## Check
 file: src/auth/__tests__/rotation.test.ts
+command: npm test -- rotation.test.ts
 assert: a refresh issues a new token and invalidates the prior one
-must fail before the change   # mandatory - see Red-then-green
+before: must fail for the missing rotation behavior
+after: must pass
 
 ## Acceptance
-- [ ] The test above passes
+- [ ] The check above passes
 - [ ] Project oracle still passes (no regression)
 - [ ] rotate() is called exactly once per refresh
 
@@ -515,8 +522,8 @@ Steps are coarse intent, not a script.
 
 ### Progress and the write-order rule
 
-Ticks, red evidence, and publication blocks live in `notes/T-nnn.progress`, owned by the
-executor.
+Ticks, verification evidence, and publication blocks live in `notes/T-nnn.progress`,
+owned by the executor.
 
 **Always make the edit first, then tick.** This is not stylistic. If the process dies
 between the two, the only reachable desync is a *missing* tick — and that self-heals,
@@ -531,22 +538,61 @@ the last `base_commit..artifact_commit` publication is authoritative and the wor
 be clean. That split preserves crash recovery for half-finished work while giving
 verification and landing one immutable artifact.
 
-### Red-then-green
+### Verification contracts
 
-A task's test must be **observed failing against the pre-change state** before the
-change is made. Record it in the progress file:
+Every task declares exactly one `verification` mode. The mode is part of the immutable
+contract: executors gather its evidence and verifiers reject a missing or incompatible
+mode instead of guessing from the diff.
 
-```
+| Task type | Required mode | Before the edit | After the edit |
+|---|---|---|---|
+| `feature`, `bug`, `chore` | `red_then_green` | the declared check fails for the behavior being changed | the same check passes |
+| `refactor` | `green_baseline` | the declared existing check and project oracle pass | the same unchanged check and oracle still pass |
+| `characterization` | `characterization` | the behavior exists but is not pinned by the new check | the new check passes against unchanged production code |
+
+`red_then_green` is Rune's TDD contract for behavior changes. Observe the check failing
+against the pre-change state, make the change, then observe the same check passing. Record
+both facts in the progress file:
+
+```yaml
+verification: red_then_green
 red: confirmed 2026-08-04 - rotation.test.ts fails (rotate is not a function)
+green: confirmed 2026-08-04 - rotation.test.ts passes
 ```
 
-A test written after the fix and never seen red proves nothing, and a clean-context
-verifier cannot tell it apart from a real one. Nobody downstream can reconstruct this
-evidence, so the executor must leave it.
+A check written after the change and never seen red proves nothing. Nobody downstream can
+reconstruct that evidence reliably, so the executor must leave it.
 
-Not every acceptance needs a unit test. Where a test does not fit (a config rename, a
-dependency bump), acceptance is a scripted or observable assertion instead. Mandating
-tests everywhere produces ceremonial ones.
+`green_baseline` is the behavior-preservation contract for refactors. Before changing
+production code, run the declared existing check and the project oracle and record the
+passing baseline. After the refactor, run the same commands and record that they still
+pass. Test and fixture files must not appear in the artifact diff:
+
+```yaml
+verification: green_baseline
+baseline: confirmed 2026-08-04 - session tests pass; oracle matches known baseline
+preserved: confirmed 2026-08-04 - same session tests pass; oracle unchanged
+```
+
+Do not manufacture a failing test for a behavior-preserving change. A forced red would
+either change behavior or weaken a valid check, violating the refactor contract.
+
+`characterization` is a separate, test-only task type used when a later refactor lacks a
+safety net. It may change tests and their fixtures, but not production source. Its evidence
+is the new check passing against the original production behavior:
+
+```yaml
+verification: characterization
+characterized: confirmed 2026-08-04 - new session-path check passes against unchanged source
+```
+
+The verifier still audits that the check is meaningful and exercises real production
+behavior. Passing by construction, asserting `true`, or mocking the subject away is a
+failure, not characterization.
+
+Not every check needs to be a unit test. A config rename or dependency bump can use a
+scripted or observable assertion that fails before the change and passes after it.
+Mandating unit tests everywhere produces ceremonial ones; mandating evidence does not.
 
 ## Milestone
 
