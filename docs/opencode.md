@@ -68,17 +68,19 @@ whole class of harness-specific breakage it existed to paper over.
 
 ## Known gaps
 
-**No harness-level worktree isolation — handled in the executor instead.** Claude Code's
-Agent tool takes an `isolation: "worktree"` flag; OpenCode's subagents have no equivalent.
+**No harness-level worktree isolation — handled by Rune's checkout identity contract.**
+OpenCode's subagents cannot ask the harness for an isolated worktree.
 
-This used to be the significant gap. It no longer is: executors verify they are in a
-worktree before touching source and run `git worktree add` themselves if not, so the
-guarantee holds on either harness. The flag is now a convenience rather than the
-mechanism.
+This is not an isolation downgrade. The parent assigns every task one absolute worktree
+path before its first executor. The executor creates that exact checkout if needed, and
+every retry, verifier, recoverer, and lander receives and validates the same path. All
+coordination reads and writes use the separately supplied absolute main-checkout path.
+Neither harness may substitute the worker's starting directory or a fresh anonymous
+checkout.
 
-What you lose is automatic cleanup. Claude Code removes an unchanged worktree on its own;
-under OpenCode, abandoned worktrees accumulate under `.agent/worktrees/`. `/rune-continue`
-prunes ones with no matching ledger row, but check occasionally:
+Rune now owns cleanup on both harnesses because it owns the stable path. A successful
+lander removes the worktree; abandoned paths remain under `.agent/worktrees/` until
+`/rune-continue` reconciles them. You can still inspect or prune stale registrations:
 
 ```bash
 git worktree list

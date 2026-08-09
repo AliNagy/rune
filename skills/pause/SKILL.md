@@ -30,18 +30,23 @@ before handing the repo to someone else.
 
 **You stop the loop and leave the tree safe to walk away from.** This list is exhaustive:
 
-- **Read** `.agent/` coordination files.
-- **Write** `.agent/PAUSED`, and `ledger.md` to settle the rows you drained.
+- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
+- **Read** `<main_root>/.agent/` coordination files.
+- **Write** `<main_root>/.agent/PAUSED`, and `ledger.md` to settle the rows you drained.
 - **Talk to the user** — the report, and the confirmation before `abandon`.
 - **Dispatch subagents**, naming the skill each one must follow.
+
+Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`. Resolve
+every coordination path against it. Verification and landing dispatches must carry that
+root, the task's exact absolute `worktree_path` from the ledger, and absolute pointers.
 
 **Anything not on that list is a dispatch** — including the verification and the checks in
 the drain below. You do not run them; you dispatch them and record what comes back.
 
 ## What it writes
 
-`.agent/PAUSED` is its own file rather than a ledger field so the flag can be set *before*
-the ledger is even read — step 1 below — and so `work`'s precondition is one
+`<main_root>/.agent/PAUSED` is its own file rather than a ledger field so the flag can be
+set *before* the ledger is even read — step 1 below — and so `work`'s precondition is one
 file-existence test rather than a ledger parse.
 
 **You also write `ledger.md`.** Single-writer means one *role*, and pause is the parent,
@@ -67,10 +72,11 @@ state, say so explicitly and say what is dangling.
 1. **Set the flag first**, before anything else. If this turn dies, the pause still holds.
 2. Read the ledger. Identify what is in flight.
 3. Apply the mode:
-   - **drain** — wait for each in-flight executor, **dispatch `ai-verify`** for each, then
-     **dispatch `ai-land`** one task at a time. Then stop. You neither merge nor run the
-     checks yourself. A task the lander could not land goes back to `pending` with its
-     worktree kept; a drain does not force work in on the way out.
+   - **drain** — wait for each in-flight executor, **dispatch `ai-verify`** for each against
+     its ledger-recorded `worktree_path`, then **dispatch `ai-land`** one task at a time
+     against that same path. Then stop. You neither merge nor run the checks yourself. A
+     task the lander could not land goes back to `pending` with its worktree kept; a drain
+     does not force work in on the way out.
    - **stop** — signal executors to write handoffs and stop. Set their tasks to `pending`
      with the handoff attached. Keep the worktrees.
    - **abandon** — discard in-flight worktrees, reset those tasks to `pending`.
@@ -121,8 +127,8 @@ Pause does not lift itself and no other skill lifts it silently.
 That last one makes this skill the status check too — running it twice is safe and tells
 you where things stand.
 
-When the pause lifts, delete `.agent/PAUSED`. Do not leave a stale flag behind with a note
-saying it is inactive; the next reader will believe it.
+When the pause lifts, delete `<main_root>/.agent/PAUSED`. Do not leave a stale flag behind
+with a note saying it is inactive; the next reader will believe it.
 
 ## What pause is not
 

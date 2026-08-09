@@ -44,16 +44,17 @@ ledger parse. Not because pause is a second writer — it is the same parent.
 ## Where writes land
 
 Source code is only ever modified inside a git worktree — never the main checkout. But
-**`.agent/` always lives in the main tree**, including files a worker writes while
-working in a worktree.
+**`.agent/` always lives at `<main_root>/.agent/`**, including files a worker writes
+while working in a task worktree. `main_root` is the absolute orchestration-checkout path
+from the dispatch envelope below; it is never inferred from a worker's current directory.
 
 | Written by a worker | Lands in |
 |---|---|
 | source changes while incomplete | its worktree as an uncommitted diff |
 | source changes when complete | commits on its task branch |
-| planner drafts and reconciled task files | `.agent/` in the main tree |
-| `notes/T-nnn.progress`, handoff notes | `.agent/` in the main tree |
-| drift and decision records | `.agent/` in the main tree |
+| planner drafts and reconciled task files | `<main_root>/.agent/` |
+| `notes/T-nnn.progress`, handoff notes | `<main_root>/.agent/` |
+| drift and decision records | `<main_root>/.agent/` |
 
 Coordination state has to be visible to the dispatcher, the verifier, and the next session
 *before* anything merges. Written inside a worktree it would appear only on merge — which
@@ -123,10 +124,43 @@ dispatch it skipped.
 composes it. A worker on `ai-decompose` writes the graph and the parent records it, for the
 same reason the parent does not read code.
 
+## Checkout identity contract
+
+Current working directory is not an identity. A harness may start a worker in the main
+checkout, an anonymous fresh worktree, or a directory inherited from an earlier tool
+call. No worker may use that directory to decide where coordination state or task source
+lives.
+
+Before its first read or dispatch, the parent resolves the root of the checkout it owns
+with the harness workspace root or the bounded probe `git rev-parse --show-toplevel`.
+That absolute path is `main_root` and stays constant for the run.
+
+Every dispatch carries `main_root`. Every `.agent/...` path named anywhere in Rune is a
+logical repo-relative name that must be resolved to `<main_root>/.agent/...` before it is
+read or written. Dispatch pointers are already-resolved absolute paths. A worker rejects a
+relative pointer rather than guessing what it is relative to.
+
+Task-bound work also carries `worktree_path`:
+
+- The parent chooses `<main_root>/.agent/worktrees/T-nnn` before the first executor,
+  records that absolute path in the ledger, and never changes it during the task.
+- The first executor creates that exact worktree if it does not exist. If it exists, the
+  executor validates and reuses it. It never substitutes the directory where the harness
+  happened to start it.
+- Retries, verifiers, recoverers, and landers receive the same `worktree_path`. They must
+  target it directly and must not request or create a fresh worktree.
+- Only a successful lander may remove it. Until then, the path is part of the task's
+  durable identity, alongside its id and branch.
+
+Harness worktree isolation may be used only when it can target this exact existing path.
+An isolation mode that silently creates a new worktree must be omitted: a clean anonymous
+checkout is not the task checkout.
+
 ## The dispatch table
 
 **There are no agent definitions in Rune.** Every worker is an ordinary subagent told
-which skill to follow. A dispatch names a job and a skill, and nothing else.
+which skill to follow. A dispatch names one job, one skill, stable checkout identities,
+and pointers — never file contents.
 
 | Job | The worker follows |
 |---|---|
@@ -147,14 +181,24 @@ selection is a separate concern that does not belong in these files.
 
 ### The dispatch envelope — what a worker is given
 
-Every dispatch hands over the same shape and nothing more:
+Every dispatch hands over the same shape. `main_root` is required for all workers;
+`worktree_path` is required only for task-bound work and is omitted otherwise:
 
 ```
-follow:    ai-execute                # the skill, from the table above
-task:      T-014                     # the one id. always exactly one
-isolation: worktree                  # where the harness offers it; otherwise omit
-pointers:  .agent/tasks/T-014.md     # paths only, never file contents
+follow:        ai-execute
+task:          T-014
+main_root:     /workspace/acme
+worktree_path: /workspace/acme/.agent/worktrees/T-014
+pointers:
+  - /workspace/acme/.agent/tasks/T-014.md
 ```
+
+The values sent in a real dispatch are absolute paths — never the literal
+`<main_root>` placeholder used in prose. Before doing any work, a task-bound worker
+confirms that `worktree_path` belongs to the same Git repository as `main_root`. A
+mismatch, a missing verifier/recovery path, or a wrong task branch is a blocked outcome,
+not permission to search for another checkout. A lander alone may accept a missing path
+after proving the exact verified commit is already in main, per its crash-recovery path.
 
 **Pointers, not payloads.** The parent names where things are; the worker reads them
 itself. Passing content down means the parent had to hold it first, which is the cost the
@@ -162,7 +206,8 @@ whole system exists to avoid — and it keeps every dispatch the same size no ma
 the job is.
 
 If a worker needs something not reachable from those pointers, that is a missing pointer,
-not a reason to paste text into the prompt.
+not a reason to paste text into the prompt or resolve a relative path from its current
+directory.
 
 For decomposition, the one work id is hierarchical because the work has two phases. A
 planner gets one assigned slot such as `M-03/R-002/P-01`; the reconciler gets the enclosing
@@ -171,15 +216,16 @@ run `M-03/R-002`. The exact output destination is still a pointer, not prompt pa
 ```
 follow:    ai-decompose
 task:      M-03/R-002/P-01
+main_root: /workspace/acme
 pointers:
-  milestone: .agent/milestones.md#M-03
-  draft:     .agent/drafts/M-03/R-002/P-01.md
+  milestone: /workspace/acme/.agent/milestones.md#M-03
+  draft:     /workspace/acme/.agent/drafts/M-03/R-002/P-01.md
 ```
 
 The parent chooses the next unused `R-nnn` beneath the milestone and assigns distinct
 `P-nn` slots before dispatch. A retry gets a new unused slot; it never reuses a path that a
 late worker could still write. The reconciler is dispatched only after the parent has the
-completed draft paths, and receives every one as a pointer.
+completed absolute draft paths, and receives every one as a pointer.
 
 ### The return envelope — what a worker hands back
 
@@ -233,9 +279,9 @@ verified_commit: 4a91c02   # added only by a passing verifier
 ```
 
 Only an executor returning `status: done` publishes an artifact. It commits the completed
-source change on the task branch, proves the worktree clean, and appends `base_commit` plus
-`artifact_commit` to `notes/T-nnn.progress`. Incomplete outcomes keep their uncommitted
-diff and do not invent an artifact.
+source change on the task branch, proves `worktree_path` clean, and appends `base_commit`
+plus `artifact_commit` to `<main_root>/.agent/notes/T-nnn.progress`. Incomplete outcomes
+keep their uncommitted diff in that same task worktree and do not invent an artifact.
 
 The verifier reads the latest publication and checks exactly
 `git diff <base_commit>..<artifact_commit>`. A pass writes the identical SHA as

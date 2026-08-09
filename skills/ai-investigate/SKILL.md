@@ -8,6 +8,10 @@ description: Use when the request is a question rather than a change - why somet
 
 **Governing rule: read-only, and it terminates in an answer.**
 
+The dispatch includes absolute `main_root` and absolute pointers. Investigate that
+checkout, not the worker's starting directory, and resolve every coordination write
+against `main_root`.
+
 This protocol exists because a system that only knows how to make plans will turn "why is
 this slow?" into an implementation plan. That is the failure mode it prevents.
 
@@ -58,7 +62,7 @@ No worktree. No diff. When you are done the tree is exactly as you found it.
 
 ## 4. The answer
 
-Write to `.agent/notes/INV-nnn.md` and return a short summary.
+Write to `<main_root>/.agent/notes/INV-nnn.md` and return a short summary.
 
 ```markdown
 # INV-004 · Why is dashboard load slow

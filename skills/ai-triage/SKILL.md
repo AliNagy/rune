@@ -6,6 +6,9 @@ description: Use when classifying one Rune request as bug, feature, refactor, or
 
 # Triage
 
+The dispatch includes absolute `main_root`. Inspect that checkout, never the worker's
+starting directory or an anonymous harness worktree.
+
 **Classify one request.** Read-only — you make no edits and create no files.
 
 You exist because classification needs evidence the dispatcher cannot gather: "is this a

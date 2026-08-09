@@ -33,14 +33,22 @@ because the situation seems to call for one.
 
 ## Inputs
 
-- the task id, its worktree path, and its task branch
-- `.agent/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
+- `main_root` — the absolute orchestration checkout where merging and coordination writes happen
+- `worktree_path` — the exact absolute task worktree used by execution and verification
+- the task id and its task branch
+- `<main_root>/.agent/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
   task's to answer for
-- `.agent/notes/T-nnn.progress` — the executor's latest `base_commit` and
+- `<main_root>/.agent/notes/T-nnn.progress` — the executor's latest `base_commit` and
   `artifact_commit`
-- `.agent/notes/T-nnn.verify.md` — the verifier's latest verdict and `verified_commit`
-- `.agent/rune.yml` — the oracle command and its known-red baseline
-- `.agent/notes/T-nnn.landing.md` — earlier landing attempts, if this is a retry
+- `<main_root>/.agent/notes/T-nnn.verify.md` — the verifier's latest verdict and `verified_commit`
+- `<main_root>/.agent/rune.yml` — the oracle command and its known-red baseline
+- `<main_root>/.agent/notes/T-nnn.landing.md` — earlier landing attempts, if this is a retry
+
+All paths must be absolute. When `worktree_path` exists, confirm it is the registered task
+worktree in the same repository as `main_root`; never discover a replacement by scanning
+nearby worktrees. A missing path is allowed only for step 2's already-landed recovery.
+Run every main-tree Git command with `git -C <main_root>` and every task-tree probe with
+`git -C <worktree_path>`. The harness's starting directory is irrelevant.
 
 **Read the landing record first when it exists.** You are stateless — every dispatch starts
 empty — so that file is the only thing that tells you which attempt this is and what the
@@ -51,7 +59,8 @@ the ceiling below.
 
 Fixed order. Do not reorder, do not skip.
 
-**1. Check the main tree is clean outside `.agent/`.** `git status --porcelain` — anything
+**1. Check the main tree is clean outside `.agent/`.** Run
+`git -C <main_root> status --porcelain` — anything
 modified beyond `.agent/` means someone left source changes in the main checkout, and a
 rollback could not tell them apart from the merge. Stop, record the attempt, return `stuck`,
 and say what is dirty.
@@ -68,7 +77,7 @@ verification blocks. Require all of these:
   publication block;
 - `verified_commit` equals `artifact_commit`;
 - `base_commit` is an ancestor of `verified_commit`, and
-  `git diff <base_commit>..<verified_commit>` is non-empty.
+  `git -C <worktree_path> diff <base_commit>..<verified_commit>` is non-empty.
 
 Any mismatch means the thing in the worktree is unpublished, changed since verification,
 or empty. Touch nothing in main, append the exact mismatch to the landing record, and
@@ -81,28 +90,28 @@ means `landed` and you skip to step 8 for cleanup; red means `stuck`, because th
 recorded rollback point that safely distinguishes this task from later history.
 
 Only when the artifact is not already in main, also require the task branch HEAD to equal
-the verified commit and `git status --porcelain` in its worktree to be empty. This ordering
+the verified commit and `git -C <worktree_path> status --porcelain` to be empty. This ordering
 is deliberate: a prior lander may have merged, removed the worktree and branch, then died
 before returning. The durable commit in main is enough to recover that case. Before the
 first merge, a missing branch, missing worktree, dirty worktree, or moved branch is
 `refused`.
 
-**3. Record the rollback point.** `git rev-parse HEAD` in the main tree. Every undo below
+**3. Record the rollback point.** `git -C <main_root> rev-parse HEAD`. Every undo below
 depends on this one line. Capture it before you touch anything.
 
 **4. Merge the exact verified commit** into the main tree:
 
 ```bash
-git merge <verified_commit>
+git -C <main_root> merge <verified_commit>
 ```
 
 Do not merge the branch name. The branch is checked only to prove it still names the
 artifact; the SHA is what passed verification and is the only thing authorised to land.
 
-Conflict → `git merge --abort`, record the attempt, return `conflict`. Nothing landed and
-the tree is untouched, so there is nothing to roll back — you skip step 6's rollback and
-write the record alone. What this needs is not a code fix: the worktree has fallen behind
-main and has to catch up before it can land.
+Conflict → `git -C <main_root> merge --abort`, record the attempt, return `conflict`.
+Nothing landed and the tree is untouched, so there is nothing to roll back — you skip
+step 6's rollback and write the record alone. What this needs is not a code fix: the
+worktree has fallen behind main and has to catch up before it can land.
 
 After git reports success, require `verified_commit` to be an ancestor of main `HEAD`.
 Otherwise roll back: a successful command that did not make the authorised artifact
@@ -129,12 +138,12 @@ Reset the main tree to the commit from step 2, **preserving uncommitted `.agent/
 it holds the ledger and this task's own notes, and losing it costs more than the merge did:
 
 ```bash
-git reset <sha>                        # move HEAD back; worktree untouched
-git checkout -- ':(exclude).agent'     # source files back to <sha>
-git clean -fd -- ':(exclude).agent'    # drop files the merge added
+git -C <main_root> reset <sha>                        # move HEAD back; worktree untouched
+git -C <main_root> checkout -- ':(exclude).agent'     # source files back to <sha>
+git -C <main_root> clean -fd -- ':(exclude).agent'    # drop files the merge added
 ```
 
-**Do not undo the merge with `git revert -m 1`.** It leaves the merge in history, and git
+**Do not undo the merge with `git -C <main_root> revert -m 1`.** It leaves the merge in history, and git
 then treats the branch as already merged — so the fixed worktree would land as an empty
 diff on the next attempt. Re-landing the same branch is the entire point of this loop, and
 that one command quietly breaks it.
@@ -158,8 +167,8 @@ Then remove the clean task worktree, and delete its merged task branch when they
 exist:
 
 ```bash
-git worktree remove <worktree_path>
-git branch -d <task_branch>
+git -C <main_root> worktree remove <worktree_path>
+git -C <main_root> branch -d <task_branch>
 ```
 
 Cleanup is after the oracle because the worktree is the recovery asset for every earlier
@@ -170,13 +179,13 @@ record what remains; `continue` can remove the orphan later. Otherwise return
 
 ## The landing record
 
-`.agent/notes/T-nnn.landing.md` — your state file, and the counterpart to the executor's
+`<main_root>/.agent/notes/T-nnn.landing.md` — your state file, and the counterpart to the executor's
 `notes/T-nnn.progress`. Sole writer: the lander holding T-nnn.
 
 Three things fix it in that spot. It is **per-task**, so it satisfies the concurrency rule
 in `ai-taskfmt` without anyone having to think about it. It is **separate from the
 executor's two files** because it has a different sole writer, and merging writers is the
-one thing that rule exists to prevent. And it lives under `.agent/` in the **main tree**,
+one thing that rule exists to prevent. And it lives under `<main_root>/.agent/`,
 which is what carries it across the rollback at step 5 — a record written into the task's
 worktree would be invisible to the parent until merge, which is precisely the moment it
 stops mattering.
@@ -245,11 +254,12 @@ making a decision — the parent decides what happens next, it just cannot see w
 task: T-014
 landing: landed | refused | conflict | reverted | stuck
 main: green | red
+worktree_path: /workspace/acme/.agent/worktrees/T-014
 verified_commit: 4a91c02
 attempt: 2 of 5
 summary: rotation drops the device id the api layer reads back
 escalate: no             # or: yes (rule 3) — session.test.ts failed on attempt 1 too
-detail: .agent/notes/T-014.landing.md
+detail: /workspace/acme/.agent/notes/T-014.landing.md
 cleanup: complete | pending   # only for landed
 ```
 

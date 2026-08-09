@@ -9,6 +9,10 @@ description: Use when turning a milestone or a triaged request into independent 
 Turns one milestone into independent draft cuts and then reconciled task files. Runs
 **immediately before that milestone executes**, never during vision.
 
+The dispatch includes absolute `main_root` and absolute coordination pointers. Resolve
+every `.agent/...` read or write against `main_root`; never use the worker's starting
+directory or a harness-created worktree as the coordination checkout.
+
 ## Why just-in-time
 
 A task must name real files and real symbols. For a milestone three steps out, those
@@ -26,7 +30,7 @@ Read the real code. This is the step that most repays care: a bad cut produces t
 are not actually independent, and then every executor blows its budget rediscovering
 shared context.
 
-1. Read `.agent/map.md` and the milestone's scope and acceptance.
+1. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance.
 2. Use `ai-serena` to look at the actual symbols the milestone touches. Overview
    and signatures — not bodies, unless a specific decision depends on one.
 3. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
@@ -37,19 +41,21 @@ You are dispatched for one of three jobs, and never more than one at a time. The
 work id and pointers say which job it is; conversation context is never an input.
 
 **Milestone graph** (from `rune:vision`) — read `vision.md`, `decisions.md`, and where they
-exist `map.md` and the survey digest. Write `.agent/milestones.md` per `ai-taskfmt`.
+exist `map.md` and the survey digest. Write `<main_root>/.agent/milestones.md` per
+`ai-taskfmt`.
 Everything you need is on disk; the dispatcher's conversation is not available to you and
 is not supposed to be. If something the graph obviously needs is missing from those files,
 say so and stop rather than inventing it — a gap on disk is a real finding. Return
-`plan: graph` and `artifact: .agent/milestones.md`.
+`plan: graph` and `artifact: <main_root>/.agent/milestones.md`.
 
 **Planner draft** (from `rune:work`) — the work id names one assigned slot such as
 `M-03/R-002/P-01`, and a pointer names the exact
-`.agent/drafts/M-03/R-002/P-01.md` destination. Decompose the milestone against real code
-and write one complete candidate cut there per `ai-taskfmt`. Use only local `D-nnn` ids.
-Do not create a final `T-nnn`, write under `.agent/tasks/`, inspect or update the ledger,
-or write any path other than the assigned draft. If the assigned path already exists,
-return `plan: blocked`; never overwrite an artifact whose writer may still be alive.
+`<main_root>/.agent/drafts/M-03/R-002/P-01.md` destination. Decompose the milestone
+against real code and write one complete candidate cut there per `ai-taskfmt`. Use only
+local `D-nnn` ids. Do not create a final `T-nnn`, write under
+`<main_root>/.agent/tasks/`, inspect or update `<main_root>/.agent/ledger.md`, or write any
+path other than the assigned draft. If the assigned path already exists, return
+`plan: blocked`; never overwrite an artifact whose writer may still be alive.
 
 **Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
 are given pointers to two or three completed draft artifacts from distinct planner slots
@@ -59,16 +65,16 @@ anything better from the others, allocate the next unused final `T-nnn` ids, tra
 local dependency edges, and write the final task files. Say which cut you took as the base
 and what you moved. Where the cuts disagreed, that seam is the part of the milestone that
 is genuinely hard to divide; treat it as the thing to get right, not a tie to break
-quickly. You are the only worker in the run allowed to write `.agent/tasks/`, and you still
-never write `ledger.md`.
+quickly. You are the only worker in the run allowed to write
+`<main_root>/.agent/tasks/`, and you still never write `<main_root>/.agent/ledger.md`.
 
 Every return is ≤200 tokens:
 
 ```
 plan: drafted | reconciled | blocked | graph
 task: M-03/R-002/P-01       # planner; M-03/R-002 for reconciler
-artifact: <assigned draft path | .agent/milestones.md> # drafted or graph: exactly one
-artifacts: .agent/tasks/T-021.md, .agent/tasks/T-022.md # reconciled only
+artifact: /workspace/acme/.agent/drafts/M-03/R-002/P-01.md # milestones.md for graph
+artifacts: <main_root>/.agent/tasks/T-021.md, <main_root>/.agent/tasks/T-022.md
 summary: ids, one-line titles, and dependency edges; or the blocking pointer
 ```
 
