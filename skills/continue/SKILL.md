@@ -95,9 +95,10 @@ Also check:
 - `verifying` rows whose verifier never returned → re-dispatch against the row's exact
   `worktree_path`; never create a fresh verifier checkout
 - drift records not yet reflected in the ledger's blocked list
-- planner draft runs with no registered tasks → keep the immutable artifacts, mark the
-  attempt interrupted in the dispatch log, and route back to `work`. It allocates a fresh
-  `R-nnn`; never resume into or reuse the interrupted run's paths.
+- decomposition runs with a protocol record or planner drafts but no registered tasks →
+  keep the immutable artifacts, mark the attempt interrupted in the dispatch log, and
+  route back to `work`. It allocates a fresh `R-nnn`; never resume into or reuse the
+  interrupted run's paths.
 - **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
   session died before it reached the user. Assign the `DEC-nnn`, move it into
   `decisions.md`, set the task `awaiting`, and surface it. This is the self-healing path
@@ -113,7 +114,7 @@ Also check:
 | `vision.md` partial | interview interrupted | `rune:vision` — from the last settled section |
 | vision done, decisions `open` | blocked on the user | present the open decisions |
 | decisions done, no milestones | vision unfinished | `rune:vision` — generate milestones |
-| planner drafts, no registered tasks | planning interrupted | `rune:work` — allocate a fresh draft run |
+| protocol record or planner drafts, no registered tasks | planning interrupted | `rune:work` — allocate a fresh draft run |
 | milestones, none decomposed | ready to work | `rune:work` — decompose M-01 |
 | tasks pending | mid-milestone | `rune:work` — next available task |
 | tasks `blocked` by drift | plan needs repair | `rune:work` — re-decompose remainder |

@@ -20,6 +20,7 @@ stranger with an empty context.
   decisions.md           # decision records (DEC-nnn)
   milestones.md          # milestone graph (M-nn)
   ledger.md              # ALL mutable state. single writer: the parent
+  drafts/M-nn/R-nnn/protocol.md # immutable type/protocol selection for one run
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
@@ -84,6 +85,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `vision.md`, `decisions.md`, `milestones.md` | the parent |
 | `sessions/<stamp>.md` | the parent |
 | `map.md` | a worker on `ai-survey` |
+| `drafts/M-nn/R-nnn/protocol.md` | the parent, once before that run is dispatched |
 | `drafts/M-nn/R-nnn/P-nn.md` | the planner assigned that exact run and slot |
 | `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` (creates), fixer (appends amendments only) |
 | `notes/T-nnn.progress` | the worker holding T-nnn |
@@ -109,8 +111,10 @@ use the task id to distinguish themselves yet.
 
 That rule is why `notes/T-nnn.progress`, `decisions/open/T-nnn.md`, and planner drafts are
 shaped the way they are. Parallel planners never share a destination: the parent assigns
-each one an exact `M-nn/R-nnn/P-nn.md` path before dispatch. Apply the rule to any new file
-before adding a row above.
+each one an exact `M-nn/R-nnn/P-nn.md` path before dispatch. The run's `protocol.md` is
+safe to share because the parent writes it once before any planner starts and every worker
+afterward is read-only with respect to it. Apply the rule to any new file before adding a
+row above.
 
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
@@ -219,13 +223,35 @@ task:      M-03/R-002/P-01
 main_root: /workspace/acme
 pointers:
   milestone: /workspace/acme/.agent/milestones.md#M-03
+  protocol:  /workspace/acme/.agent/drafts/M-03/R-002/protocol.md
   draft:     /workspace/acme/.agent/drafts/M-03/R-002/P-01.md
 ```
 
 The parent chooses the next unused `R-nnn` beneath the milestone and assigns distinct
-`P-nn` slots before dispatch. A retry gets a new unused slot; it never reuses a path that a
-late worker could still write. The reconciler is dispatched only after the parent has the
-completed absolute draft paths, and receives every one as a pointer.
+`P-nn` slots before dispatch. Before starting any planner, it writes the run's immutable
+`protocol.md` from the final triage result. A retry gets a new unused slot; it never reuses
+a path that a late worker could still write. The reconciler is dispatched only after the
+parent has the completed absolute draft paths, and receives the same protocol pointer plus
+every draft as a pointer.
+
+The protocol record is deliberately small:
+
+```markdown
+---
+run: M-03/R-002
+type: feature
+protocol: ai-feature
+---
+evidence: SessionMiddleware.handle exists, but profile storage does not.
+shape: thin end-to-end slice through the existing session boundary
+```
+
+Only these mappings are valid: `bug -> ai-bug`, `feature -> ai-feature`, and
+`refactor -> ai-refactor`. An investigation never reaches decomposition. The record is a
+durable routing input, not a planner opinion: planners and reconcilers load the named skill
+and may not infer another protocol from titles or source. If the selected type changes,
+the parent abandons that run and creates a fresh `R-nnn` plus protocol record; it never
+rewrites a record workers may already have read.
 
 ### The return envelope — what a worker hands back
 
@@ -348,6 +374,8 @@ not a task file and it never reserves a `T-nnn` id.
 run: M-03/R-002
 planner: P-01
 milestone: M-03
+type: feature
+protocol: ai-feature
 ---
 
 # Candidate cut
@@ -395,10 +423,11 @@ seams:
   - middleware and endpoint are separated because they share no change-surface files
 ```
 
-Every `D-nnn` repeats the complete final task contract: title, type, local dependencies,
-goal, context contract, change surface, steps, test, and acceptance. `Cut notes` records
-the assumptions, exclusions, and disputed seams the user gate and reconciler need. A
-summary that omits those sections is not a draft artifact.
+The draft's `type` and `protocol` must exactly match the run's `protocol.md`. Every
+`D-nnn` repeats the complete final task contract: title, type, local dependencies, goal,
+context contract, change surface, steps, test, and acceptance. `Cut notes` records the
+assumptions, exclusions, and disputed seams the user gate and reconciler need. A summary
+that omits those sections is not a draft artifact.
 
 The file becomes immutable when its planner returns. That planner writes only its exact
 assigned draft path: it does not create `tasks/T-nnn.md`, inspect or update `ledger.md`, or

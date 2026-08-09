@@ -138,8 +138,9 @@ confidence:
 ```
 
 Scaffold the rest of `<main_root>/.agent/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
-`drift/`, and an empty `ledger.md`. Planner-specific directories beneath `drafts/` are
-created only when `work` assigns a new decomposition run and distinct planner slots.
+`drift/`, and an empty `ledger.md`. Run and planner-specific directories beneath `drafts/`
+are created only when `work` assigns a new decomposition run, writes its protocol record,
+and assigns distinct planner slots.
 
 Add `.agent/worktrees/` to `<main_root>/.gitignore` if worktrees will live inside the repo.
 
