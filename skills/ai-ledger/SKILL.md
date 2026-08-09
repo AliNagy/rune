@@ -39,14 +39,16 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
 
 ## Dispatches
-| phase       | followed      | for   | outcome            |
-|-------------|---------------|-------|--------------------|
-| survey      | ai-survey     | —     | map.md written     |
-| commands    | ai-oracle     | —     | oracle: npm test   |
-| decompose   | ai-decompose ×3| M-03 | 4 tasks, cut agreed|
-| execute     | ai-execute    | T-014 | done @ 4a91c02     |
-| verify      | ai-verify     | T-014 | pass @ 4a91c02     |
-| land        | ai-land       | T-014 | landed @ 4a91c02   |
+| phase       | followed      | for               | outcome                         |
+|-------------|---------------|-------------------|---------------------------------|
+| survey      | ai-survey     | —                 | map.md written                  |
+| commands    | ai-oracle     | —                 | oracle: npm test                |
+| plan-draft  | ai-decompose  | M-03/R-002/P-01   | draft: P-01.md                  |
+| plan-draft  | ai-decompose  | M-03/R-002/P-02   | draft: P-02.md                  |
+| reconcile   | ai-decompose  | M-03/R-002        | T-014..T-017 written            |
+| execute     | ai-execute    | T-014             | done @ 4a91c02                  |
+| verify      | ai-verify     | T-014             | pass @ 4a91c02                  |
+| land        | ai-land       | T-014             | landed @ 4a91c02                |
 ```
 
 Every live task worktree value is an absolute path. The parent allocates
@@ -68,7 +70,8 @@ files all exist, the ledger looks healthy, and nothing anywhere says who wrote t
 
 Read it as a checklist with teeth:
 
-- `decompose` with no `ai-decompose` row → the parent wrote the task files.
+- reconciled task files with no `ai-decompose` planner and reconciler rows → the parent
+  skipped the durable fan-out or wrote the task files.
 - `commands` with no `ai-oracle` row → the parent ran the suite.
 - `survey` with no `ai-survey` row → the parent read the codebase.
 

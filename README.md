@@ -100,6 +100,7 @@ Everything worth keeping lives in `.agent/`:
   decisions.md           decisions made and still open — open ones block milestones
   milestones.md          the road to v1
   ledger.md              everything that changes as work runs. only the main session writes here
+  drafts/M-nn/R-nnn/     complete independent planner cuts, one file per planner
   tasks/T-nnn.md         task specs. never edited; changes are appended
   notes/T-nnn.md         handoff notes and long results
   drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
@@ -142,7 +143,9 @@ never assume" into something you can check.
 **3 · Build** — `/rune:work` sorts the request into bug / feature / refactor /
 investigation (each has its own approach), breaks the current milestone into tasks — only
 when it's time to build them, against real code — sends each task to its own agent, then
-checks each one in a separate, fresh context.
+checks each one in a separate, fresh context. Independent planners write to distinct draft
+artifacts first; one fresh reconciler compares those complete cuts and is the only worker
+that creates final task files, so parallel planning cannot race on task ids or files.
 
 **4 · Resume** — `/rune:continue` reads disk, sorts out state left behind by a dead
 session, and puts you back into whichever phase you were in.

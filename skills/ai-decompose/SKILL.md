@@ -1,13 +1,13 @@
 ---
 name: ai-decompose
 user-invocable: false
-description: Use when turning a milestone or a triaged request into task files. Covers sizing limits, context contracts, forbidden lists, and dependency ordering. Runs just-in-time against real code, never ahead of time.
+description: Use when turning a milestone or a triaged request into independent planner drafts and reconciled task files. Covers sizing limits, context contracts, forbidden lists, and dependency ordering. Runs just-in-time against real code, never ahead of time.
 ---
 
 # Decomposition
 
-Turns one milestone into task files. Runs **immediately before that milestone executes**,
-never during vision.
+Turns one milestone into independent draft cuts and then reconciled task files. Runs
+**immediately before that milestone executes**, never during vision.
 
 The dispatch includes absolute `main_root` and absolute coordination pointers. Resolve
 every `.agent/...` read or write against `main_root`; never use the worker's starting
@@ -37,26 +37,48 @@ shared context.
 
 ## Which job you were given
 
-You are dispatched for one of three, and never more than one at a time:
+You are dispatched for one of three jobs, and never more than one at a time. The assigned
+work id and pointers say which job it is; conversation context is never an input.
 
 **Milestone graph** (from `rune:vision`) — read `vision.md`, `decisions.md`, and where they
 exist `map.md` and the survey digest. Write `<main_root>/.agent/milestones.md` per
 `ai-taskfmt`.
 Everything you need is on disk; the dispatcher's conversation is not available to you and
 is not supposed to be. If something the graph obviously needs is missing from those files,
-say so and stop rather than inventing it — a gap on disk is a real finding.
+say so and stop rather than inventing it — a gap on disk is a real finding. Return
+`plan: graph` and `artifact: <main_root>/.agent/milestones.md`.
 
-**Task files** (from `rune:work`) — decompose one milestone into
-`<main_root>/.agent/tasks/T-nnn.md` against real code, per everything below.
+**Planner draft** (from `rune:work`) — the work id names one assigned slot such as
+`M-03/R-002/P-01`, and a pointer names the exact
+`<main_root>/.agent/drafts/M-03/R-002/P-01.md` destination. Decompose the milestone
+against real code and write one complete candidate cut there per `ai-taskfmt`. Use only
+local `D-nnn` ids. Do not create a final `T-nnn`, write under
+`<main_root>/.agent/tasks/`, inspect or update `<main_root>/.agent/ledger.md`, or write any
+path other than the assigned draft. If the assigned path already exists, return
+`plan: blocked`; never overwrite an artifact whose writer may still be alive.
 
-**Reconcile** (from `rune:work`) — you are given two or three independent cuts of the same
-milestone. Pick the strongest, graft anything better from the others, then write the final
-task files. Say which cut you took as the base and what you moved. Where the cuts
-disagreed, that seam is the part of the milestone that is genuinely hard to divide; treat
-it as the thing to get right, not a tie to break quickly.
+**Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
+are given pointers to two or three completed draft artifacts from distinct planner slots
+under that exact run. First fail closed if a pointer is missing, duplicated, outside the
+run, or lacks any part of the planner-draft schema. Then pick the strongest cut, graft
+anything better from the others, allocate the next unused final `T-nnn` ids, translate all
+local dependency edges, and write the final task files. Say which cut you took as the base
+and what you moved. Where the cuts disagreed, that seam is the part of the milestone that
+is genuinely hard to divide; treat it as the thing to get right, not a tie to break
+quickly. You are the only worker in the run allowed to write
+`<main_root>/.agent/tasks/`, and you still never write `<main_root>/.agent/ledger.md`.
 
-Return ≤200 tokens: ids, one-line titles, dependency edges. Nothing longer — the files are
-on disk.
+Every return is ≤200 tokens:
+
+```
+plan: drafted | reconciled | blocked | graph
+task: M-03/R-002/P-01       # planner; M-03/R-002 for reconciler
+artifact: /workspace/acme/.agent/drafts/M-03/R-002/P-01.md # milestones.md for graph
+artifacts: <main_root>/.agent/tasks/T-021.md, <main_root>/.agent/tasks/T-022.md
+summary: ids, one-line titles, and dependency edges; or the blocking pointer
+```
+
+Nothing longer belongs in the return — the complete cuts and final contracts are on disk.
 
 ## You may be one of several
 
@@ -71,8 +93,10 @@ milestone divided cleanly; where they disagree, that seam is the genuinely hard 
 the disagreement is the only cheap signal anyone gets that it was hard. A planner that
 hedges erases exactly the information the fan-out was dispatched to buy.
 
-A reconciling planner then picks the strongest cut, grafts what is better from the others,
-and writes the final task files.
+Each planner writes only the path for its assigned slot. A reconciling planner then reads
+the returned artifact pointers, picks the strongest cut, grafts what is better from the
+others, and writes the final task files. No planner return summary is accepted as a
+substitute for a complete draft artifact.
 
 ## Cutting rules
 
@@ -117,8 +141,10 @@ Set `blocked_by` only for **hard** dependencies — task B literally cannot comp
 without task A. Do not encode preference or tidiness; every false dependency serialises
 work that could have run in parallel and lengthens the whole milestone.
 
-Number tasks in the order you would naturally do them. When several are eligible, the
-parent picks lowest id first, so numbering carries your intent without imposing it.
+Number proposed tasks in the order you would naturally do them. A planner uses local
+`D-nnn` ids; only the reconciler maps the chosen cut to final `T-nnn` ids. When several
+final tasks are eligible, the parent picks lowest id first, so numbering carries your
+intent without imposing it.
 
 ## Cutting for parallelism
 
@@ -148,8 +174,15 @@ Before writing files, check each task against:
 - Is there a `forbidden` list, and does it have reasons?
 - Does it state a test, and what "must fail before" looks like?
 
-Then write them per `ai-taskfmt` and register them in the ledger via
-`ai-ledger`.
+Then finish only the job you were assigned:
+
+- **Planner:** write one complete, immutable artifact at the exact assigned draft pointer
+  and return that path.
+- **Reconciler:** validate every draft pointer, write the reconciled final task files, and
+  return their paths, titles, and dependency edges.
+
+**Never register tasks in the ledger.** The parent is its sole writer and registers the
+reconciler's returned final tasks only after every file has been written successfully.
 
 ## Re-decomposition after drift
 
@@ -158,4 +191,5 @@ drift record, re-read the code as it now is, and re-cut the remainder of the mil
 Patched task files accumulate contradictions between their original spec and their
 amendments until nobody can tell which parts are still true.
 
-Keep completed tasks. Replace the rest.
+Run the same fan-out through a fresh, never-reused `R-nnn` directory. Keep completed tasks.
+Replace the rest.
