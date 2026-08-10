@@ -138,9 +138,35 @@ confidence:
 ```
 
 Scaffold the rest of `<main_root>/.agent/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
-`drift/`, and an empty `ledger.md`. Run and planner-specific directories beneath `drafts/`
-are created only when `work` assigns a new decomposition run, writes its protocol record,
-and assigns distinct planner slots.
+`drift/`, and, only when no ledger exists, this valid empty schema-1 ledger (fill the
+top-level values from the init result rather than leaving placeholders):
+
+```markdown
+# Ledger
+
+schema: 1
+vision: absent
+current_milestone: —
+oracle: npm test
+main: green
+
+## Tasks
+
+| id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+## Drift
+
+## Dispatches
+| phase | followed | for | outcome |
+|---|---|---|---|
+```
+
+Validate the complete candidate per `ai-ledger` before writing it. On a re-run, validate
+and preserve an existing schema-1 ledger; a legacy ledger routes through `continue` for
+migration, and init never resets task history. Run and
+planner-specific directories beneath `drafts/` are created only when `work` assigns a new
+decomposition run, writes its protocol record, and assigns distinct planner slots.
 
 Add `.agent/worktrees/` to `<main_root>/.gitignore` if worktrees will live inside the repo.
 

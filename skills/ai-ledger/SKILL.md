@@ -6,9 +6,10 @@ description: Use when reading or updating .agent/ledger.md, or resuming work who
 
 # Ledger operations
 
-`.agent/ledger.md` holds **all** mutable state. One writer: the parent — the same parent
-across every route, per `ai-taskfmt`. Workers never touch it; they report, the parent
-records.
+`.agent/ledger.md` holds **all authoritative mutable routing state**. Detailed worker
+evidence lives in sole-writer note files, but the counters and pointers that determine the
+next action live here. One writer: the parent — the same parent across every route, per
+`ai-taskfmt`. Workers never touch it; they report, the parent records.
 
 **This skill owns what the statuses mean and what the file looks like. The routes own the
 procedures.** Recovery belongs to `continue`, the landing loop to `work`, and the merge
@@ -21,20 +22,21 @@ and points at the owner.
 ```markdown
 # Ledger
 
-vision: complete            # absent | drafting | complete
+schema: 1
+vision: complete
 current_milestone: M-03
-oracle: npm test            # or: none (degraded)
-main: green                 # green | red — red halts all dispatch. only ai-land sets it
+oracle: npm test
+main: green
 
-## M-03 · Session lifecycle   [decomposed]
+## Tasks
 
-| id    | title                        | status      | blocked_by | worktree        |
-|-------|------------------------------|-------------|------------|-----------------|
-| T-011 | TokenStore interface         | done        | —          | merged          |
-| T-013 | Diagnose refresh regression  | diagnosing  | —          | /workspace/acme/.agent/worktrees/T-013 |
-| T-014 | Rotate refresh tokens        | in_progress | —          | /workspace/acme/.agent/worktrees/T-014 |
-| T-015 | Refresh endpoint             | pending     | T-014      | —               |
-| T-016 | Session restart persistence  | drifted     | —          | discarded       |
+| id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at |
+|---|---|---|---|---|---|---|---|---|---|---|
+| T-011 | M-03 | TokenStore interface | done | — | merged | d0/e1/v1/l1 | 0 | — | — | — |
+| T-013 | M-03 | Diagnose refresh regression | diagnosing | — | /workspace/acme/.agent/worktrees/T-013 | d1/e0/v0/l0 | 0 | — | — | plan:M-03/R-002 |
+| T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.agent/worktrees/T-014 | d0/e2/v1/l0 | 1 | .agent/notes/T-014.verify.md#attempt-1 | — | recover |
+| T-015 | M-03 | Refresh endpoint | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh |
+| T-016 | M-03 | Session restart persistence | blocked | — | discarded | d0/e1/v0/l0 | 0 | .agent/drift/DRF-003.md | drift:DRF-003 | replan |
 
 ## Drift
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
@@ -53,11 +55,83 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 | land        | ai-land       | T-014             | landed @ 4a91c02                |
 ```
 
+`schema: 1` is mandatory. A ledger with no schema marker is legacy schema 0; `continue`
+migrates it before any route dispatches work. An unknown schema is a hard stop, never a
+best-effort parse.
+
+There is one `## Tasks` table for the whole ledger. Milestone membership is a field rather
+than a heading so every task has one self-contained state record. The columns are exact and
+ordered; adding an ad-hoc column creates a new schema version rather than an optional fact
+that some readers ignore.
+
+### Task fields
+
+- `id`, `milestone`, `title`, `status`, and `blocked_by` identify the immutable task and
+  its dependency state. `blocked_by` is `—` or a comma-separated list of `T-nnn` ids.
+  Table values may not contain `|`; longer wording belongs in the task or note artifact.
+- `worktree` is `—`, an absolute path, `discarded`, or `merged`. A live worktree is always
+  recorded by path; `kept` is a worker return value, never a ledger value.
+- `attempts` is `dN/eN/vN/lN`: diagnosis, executor, verifier, and lander dispatches. The
+  parent increments the relevant counter in the same update that claims the phase, before
+  dispatch. A dead worker therefore still consumed an attempt and is visible after a crash.
+- `failures` counts verifier `fail` verdicts only. This is the durable input to the
+  two-failure stop rule; `unverified`, landing failures, and dead dispatches do not increase
+  it.
+- `latest_finding` is `—` or a coordination-relative pointer such as
+  `.agent/notes/T-014.verify.md#attempt-1`. The detail remains in its sole-writer artifact;
+  the ledger carries the pointer needed to find it without duplicating prose.
+- `blocker` is `—`, `decision:DEC-nnn`, `drift:DRF-nnn`, `external:<slug>`, or `main:red`.
+  Dependency ids stay in `blocked_by`; this field is only for a task's live non-dependency
+  blocker. An external blocker requires `latest_finding` to point at a handoff containing
+  both `blocker_reason` and `unblocks_when`.
+- `resume_at` is the next durable action: `—`, `diagnose`, `plan:M-nn/R-nnn`, `fresh`,
+  `recover`, `step:N`, `evidence:<mode>`, `publish`, `verify`, `land`, or `replan`.
+  Details belong in the artifact named by `latest_finding`; this field stays a stable token.
+
 Every live task worktree value is an absolute path. The parent allocates
 `<main_root>/.agent/worktrees/T-nnn`, writes it into the row before dispatching the first
 task-bound worker, and keeps that value unchanged through diagnosis, retries, verification,
-recovery, and landing. `kept`, `discarded`, and `merged` may replace it only when the path
-no longer contains live task state.
+recovery, and landing. `discarded` and `merged` may replace it only when the path no longer
+contains live task state.
+
+## Required fields by status
+
+| status | Required state |
+|---|---|
+| `diagnosing` | absolute worktree; `d >= 1`; resume is `diagnose` or the bound `plan:M-nn/R-nnn`; blocker is `—` or `external:*` |
+| `pending` | blocker `—`; resume is `fresh`, `step:N`, `evidence:<mode>`, or `publish`; a missing worktree is valid only with `fresh`; partial step/evidence resumes require a finding pointer |
+| `in_progress` | absolute worktree; `e >= 1`; blocker `—`; resume `recover` |
+| `verifying` | absolute worktree; `e >= 1`, `v >= 1`; blocker `—`; resume `verify` |
+| `landing` | absolute worktree; `v >= 1`, `l >= 1`; blocker `—`; resume `land` |
+| `done` | worktree `merged` or an absolute cleanup-pending path; blocker `—`; resume `—` |
+| `drifted` | blocker `drift:DRF-nnn`; finding points at that record; resume `replan` |
+| `awaiting` | absolute worktree; blocker `decision:DEC-nnn`; finding points at the decision; resume is a pending resume token |
+| `blocked` | a nonempty `external:*`, `drift:*`, or `main:red` blocker; finding points at its durable detail; an external block without a live worktree resumes `fresh` |
+
+Every task id is unique, every dependency names another task in the table, no task depends
+on itself, counters are non-negative, and `failures <= v`. These rules are data validity,
+not guidance: a route that reads an invalid ledger stops before dispatch and reports the
+first exact violation.
+
+## Atomic transition updates
+
+The parent is the only writer, but single-writer does not make a multi-step update safe.
+For every transition it follows this order:
+
+1. Re-read and validate the complete ledger at its declared schema.
+2. Produce one candidate replacement containing the new status, worktree, counters,
+   finding, blocker, resume token, and returned dispatch row together.
+3. Validate the candidate, then replace `ledger.md` in one write.
+4. Only after that write succeeds may the next worker be dispatched.
+
+Before a diagnosis, execution, verification, or landing dispatch, the same replacement
+claims the phase and increments `d`, `e`, `v`, or `l`. On return, one replacement consumes
+the outcome and records the dispatch. Never write `status` first and fill in its required
+fields later; a crash between those edits would create a state no fresh session can route.
+
+The shipped `scripts/validate-ledger.mjs` applies the structural rules to any ledger file.
+Runtime routes apply the same checklist before every read and candidate write; the CLI is
+also available to maintainers and migrations for a deterministic check.
 
 ## Log every dispatch
 
@@ -88,29 +162,34 @@ diagnosing ─reproduced + reconciled─> pending
      ├─reclassified─────────────────> reservation removed; id burned; fresh run
      └─blocked──────────────────────> diagnosing (blocker recorded)
 
-pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─landed─> done
+pending ─claim; e++─> in_progress ─done; v++─> verifying ─pass; l++─> landing ─landed─> done
                       │                    │                │
                       │                    │                └─refused───> pending
                       │                    │                  conflict     (worktree kept)
                       │                    │                  reverted
-                      │                    └─fail──────────> pending (attempt++)
+                      │                    └─fail──────────> pending (failures++)
                       ├─drift────────────> drifted
                       ├─budget───────────> pending (handoff written)
+                      ├─blocked──────────> blocked (handoff + unblock condition)
                       └─question─────────> awaiting (open decision recorded)
 ```
 
 - `diagnosing` — a bug id and worktree are reserved, but its immutable task spec does not
   exist yet. Only `ai-bug` may hold it; it is never executable.
-- `pending` — available, provided `blocked_by` is empty or all resolved
-- `in_progress` — an executor holds it. Records which, and its worktree path
-- `verifying` — executor published a commit; awaiting an independent check of that artifact
+- `pending` — available, provided `blocked_by` is empty or all resolved. `resume_at` tells
+  the next executor whether to start fresh or consume durable partial state
+- `in_progress` — an executor holds it. Its worktree is absolute and `resume_at: recover`
+  tells a dead-session reader not to invent progress from the row
+- `verifying` — executor published a commit; awaiting an independent check of that artifact.
+  The `v` counter already names the dispatched attempt
 - `landing` — the published commit was independently verified; a lander is merging that
   exact SHA into the main tree. Worktree kept
 - `done` — verified by a *different* agent **and** landed without breaking the main tree.
   Never self-declared, and never set straight off a `pass`
 - `drifted` — the plan was wrong; a drift record exists; downstream may be invalid
 - `awaiting` — blocked on a user decision. Names the `DEC-nnn`; worktree kept
-- `blocked` — cannot proceed for an external reason, stated in the row
+- `blocked` — cannot proceed for an external, drift, or main-tree reason. The row names the
+  kind, the finding points at detail, and an external detail states what clears it
 
 `landing` exists because passing verification and surviving the merge are two separate
 claims, and there was previously no state between them — so a task that had landed and
@@ -119,8 +198,15 @@ broken the build was indistinguishable from one that had never been tried.
 Only the parent writes these. A task is never `done` because the executor said so — it is
 done only after `ai-verify` names the published commit and `ai-land` lands that same SHA.
 
-`awaiting` returns to `pending` the moment its decision is marked `decided`. A fresh
-executor picks it up with the handoff, the worktree diff, and the resolved decision.
+`awaiting` returns to `pending` the moment its decision is marked `decided`. Clear
+`blocker`, preserve its `resume_at`, and increment `e` only when the fresh executor is
+actually claimed. It picks up with the handoff, the worktree diff, and the resolved
+decision.
+
+An externally `blocked` task returns to `pending` only after the parent can observe the
+handoff's `unblocks_when` condition. Clear `blocker`, preserve `latest_finding` as history
+and the compatible `resume_at`, validate, and persist. Do not poll or redispatch merely
+because time passed.
 
 `diagnosing` is deliberately earlier than `pending`. A reproduced bug remains there while
 its planners consume `diagnosis_commit`; only successful reconciliation creates the task
@@ -131,6 +217,10 @@ forever, so a late worker cannot attach its result to a different task.
 ## Claiming
 
 Pick the lowest-id `pending` task whose `blocked_by` are all `done`.
+
+Claiming is one atomic update: allocate or preserve the absolute worktree, set
+`in_progress`, increment `e`, set `resume_at: recover`, validate, and persist. Dispatch
+only afterward and pass the recorded `e` value as `attempt`.
 
 ### Claiming several at once
 
@@ -150,8 +240,9 @@ what a landing does to a row:
 | `ai-land` returned | Row |
 |---|---|
 | `landed` | `done`, worktree removed or cleanup `pending` as returned |
-| `refused`, `conflict`, or `reverted` | `pending`, worktree **kept**, attempt++ |
-| `stuck` | `blocked`, and set `main: red` at the top of the file |
+| `refused` | `pending`, worktree kept, finding points at the landing block, resume `publish` |
+| `conflict` or `reverted` | `pending`, worktree kept, finding points at the landing block, resume `fresh` |
+| `stuck` | `blocked`, blocker `main:red`, finding points at the landing block, and set `main: red` at the top of the file |
 
 Earlier landings that succeeded stay landed — one task that could not land is not a reason
 to unwind the ones that did. What does **not** stay is the merge that failed: `ai-land`
@@ -195,20 +286,22 @@ Your job is the mapping:
 
 | What comes back | Status | Worktree |
 |---|---|---|
-| valid complete publication, executor return missing | `verifying` | kept; dispatch `ai-verify` |
+| valid complete publication, executor return missing | `verifying`, increment `v`, resume `verify` | kept; persist, then dispatch that verifier attempt |
 | handoff note says `budget` | `pending` | kept |
 | handoff note says `drift` | `drifted` | per the note |
-| `ai-recover` → `salvage` | `pending`, resume point in the row | kept |
-| `ai-recover` → `partial` | `pending`, note that the test must be redone red-first | kept |
-| `ai-recover` → `discard` | `pending` | dropped |
-| empty diff, branch ahead, no publication | `pending` | kept; executor recovers the committed range |
-| empty diff, branch not ahead, no note | `pending` | dropped |
+| handoff note says `blocked` | `blocked`, blocker and finding from the note | kept as recorded |
+| `ai-recover` → `salvage` | `pending`, returned `step:N`, finding points at handoff | kept |
+| `ai-recover` → `partial` | `pending`, returned `evidence:<mode>`, finding points at handoff | kept |
+| `ai-recover` → `discard` | `pending`, resume `fresh`, finding points at handoff | dropped |
+| empty diff, branch ahead, no publication | `pending`, resume `publish` | kept; executor recovers the committed range |
+| empty diff, branch not ahead, no note | `pending`, resume `fresh` | dropped |
 
 **A row left at `landing` is the dangerous one.** A dead lander may have merged and never
 rolled back, so the main tree is in a state nobody recorded. Re-dispatch `ai-land` on that
 task rather than looking: it reads the durable `verified_commit`, detects whether that
 exact SHA is already an ancestor of main, and runs the oracle instead of creating an empty
-merge. That is the same artifact and the same gate the live case uses.
+merge. First increment `l`, persist the complete `landing` row, and pass that attempt. That
+is the same artifact and the same gate the live case uses.
 
 **No row may remain `in_progress` or `landing`** when reconciliation ends. A `diagnosing`
 row may remain only when its durable outcome is reproduced and planning is next, or when a
@@ -220,7 +313,8 @@ invariant this section guarantees.
 When a drift record lands, downstream tasks may now be wrong. The parent must:
 
 1. Record `DRF-nnn` in the ledger with the tasks it names as invalidated.
-2. Set those tasks to `blocked`, referencing the drift id.
+2. Set those tasks to `blocked`, `blocker: drift:DRF-nnn`, point `latest_finding` at the
+   drift record, and set `resume_at: replan`.
 3. Refuse to dispatch them until re-planned.
 
 Do not silently delete invalidated tasks. The drift record plus the tasks it killed is

@@ -54,6 +54,10 @@ exactly as `work` and `continue` are. There is no second agent here, only the sa
 agent in a later turn — and without that write, step 4's promise that no task is left
 `in_progress` would be impossible to keep.
 
+Validate schema 1 before draining and validate every complete replacement per `ai-ledger`.
+Settling a row includes its counters, finding, blocker, and resume token; never change only
+`status` and leave fields that describe the old phase.
+
 ```markdown
 paused: 2026-08-05T14:22Z
 mode: drain
@@ -74,15 +78,18 @@ state, say so explicitly and say what is dangling.
 3. Apply the mode:
    - **drain** — wait for each in-flight worker. A completed `ai-bug` diagnosis leaves its
      reservation `diagnosing`, clean worktree kept, and planning for the next session; do
-     not begin decomposition while pausing. For completed executors, **dispatch
-     `ai-verify`** against each ledger-recorded `worktree_path`, then **dispatch `ai-land`**
-     one task at a time against that same path. Then stop. You neither merge nor run the
-     checks yourself. A task the lander could not land goes back to `pending` with its
+     not begin decomposition while pausing. For completed executors, atomically set
+     `verifying`, increment `v`, and **dispatch `ai-verify`** against each ledger-recorded
+     `worktree_path`; after a pass, set `landing`, increment `l`, and **dispatch `ai-land`**
+     one task at a time against that same path. Pass each recorded attempt. Then stop. You
+     neither merge nor run the checks yourself. A task the lander could not land goes back to `pending` with its
      worktree kept; a drain does not force work in on the way out.
    - **stop** — signal active workers to write durable state and stop. Executors write
-     handoffs and return to `pending`; an `ai-bug` worker appends its partial diagnosis and
+     handoffs and return to `pending` with their finding pointers and resume tokens; an
+     `ai-bug` worker appends its partial diagnosis and
      leaves the reservation `diagnosing`. Keep the worktrees.
-   - **abandon** — discard in-flight worktrees, reset executable tasks to `pending`. For a
+   - **abandon** — discard in-flight worktrees, reset executable tasks to `pending` with
+     worktree `discarded`, blocker `—`, and resume `fresh`. For a
      `diagnosing` reservation, preserve its progress record, remove the provisional row,
      and burn the id.
 4. Confirm no worker is live and no task is left `in_progress` or `landing`. A completed

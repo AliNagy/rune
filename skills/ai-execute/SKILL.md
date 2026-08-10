@@ -6,8 +6,8 @@ description: Use when executing one Rune task from an explicitly identified main
 
 # Executing a task
 
-**You execute one task.** The dispatch gives you its id, absolute `main_root`, absolute
-`worktree_path`, and absolute pointers. Read
+**You execute one task.** The dispatch gives you its id, positive `attempt`, absolute
+`main_root`, absolute `worktree_path`, and absolute pointers. Read
 `<main_root>/.agent/tasks/T-nnn.md` yourself. Reject relative paths; your starting
 directory is not an identity.
 
@@ -39,8 +39,8 @@ diagnosis-only branch for a finished task. An empty dirty diff does not mean an 
 been through verification before and came back. The last block is why the previous attempt
 was rejected; the blocks above it are what earlier attempts tried and had refused.
 **Answering the last block is the work.** Running the task's original steps again without
-reading it earns the same verdict a second time, which is how a task burns its two attempts
-and lands on the user's desk with nothing learned.
+reading it earns the same verdict a second time, which is how a task reaches two verifier
+failures and lands on the user's desk with nothing learned.
 
 **If `<main_root>/.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
 verified once and then failed to merge into the main tree. That file holds the exact
@@ -164,6 +164,29 @@ Ask only for choices that change visible behaviour. Anything you could have dete
 from the spec or the surrounding code, determine — spending the user's attention on it is
 worse than deciding and noting it.
 
+## Durable early stops
+
+`budget`, `blocked`, and `question` all write `<main_root>/.agent/notes/T-nnn.md` before
+returning and name it on `detail`. Include a ledger-safe `resume_at` token: `fresh`,
+`step:N`, `evidence:<mode>`, or `publish`. The prose explaining that token stays in the
+handoff.
+
+A blocked return also includes a short lowercase `blocker` slug. Its handoff must contain:
+
+```markdown
+blocker_reason: the staging identity provider rejects this repository's credentials
+unblocks_when: repository access is granted and the same identity probe succeeds
+```
+
+Both lines are required even for a preflight block before source edits. "Retry later" is
+not an unblock condition. The parent stores `external:<slug>` plus the handoff pointer; it
+does not squeeze this prose into the ledger row.
+
+Keep a valid worktree whenever it contains diagnosis state, a source diff, or task commits.
+Return `worktree: discarded` only when no task source state exists or the supplied path is
+unusable; pair that with `resume_at: fresh`. A blocker is not permission to throw away
+recoverable partial work.
+
 ## Publish before reporting `done`
 
 `status: done` means **a commit exists**, not merely that the files look right in one
@@ -212,6 +235,7 @@ so the progress file is authoritative and the return repeats the ids for routing
 ```
 status: done | drifted | budget | blocked | question
 task: T-nnn
+attempt: 2
 worktree: kept | discarded        # done always means kept until ai-land cleans it
 worktree_path: /workspace/acme/.agent/worktrees/T-nnn
 summary: <one or two lines>
@@ -219,6 +243,9 @@ base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any
 decision: DEC-nnn     # if status is question
+blocker: service-down # required for blocked; lowercase slug
+resume_at: step:3     # required for budget, blocked, and question
+detail: /workspace/acme/.agent/notes/T-nnn.md  # early stops
 ```
 
 Anything longer goes to `<main_root>/.agent/notes/`. The dispatcher must not have to read your

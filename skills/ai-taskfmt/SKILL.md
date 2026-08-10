@@ -19,7 +19,7 @@ stranger with an empty context.
   vision.md              # the vision document
   decisions.md           # decision records (DEC-nnn)
   milestones.md          # milestone graph (M-nn)
-  ledger.md              # ALL mutable state. single writer: the parent
+  ledger.md              # versioned mutable task state. single writer: the parent
   drafts/M-nn/R-nnn/protocol.md # immutable type/protocol selection for one run
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   tasks/T-nnn.md         # immutable spec + appended amendments
@@ -125,6 +125,15 @@ row above.
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
 
+The canonical ledger schema is owned by `ai-ledger`. Schema 1 has one task row containing
+identity, status, dependencies, stable worktree, phase attempt counters, verifier-failure
+count, latest-finding pointer, live blocker, and resume token. The detailed finding remains
+in its per-task sole-writer file; the ledger pointer is the authoritative routing field.
+
+Every parent route validates the ledger before reading it as state and validates a complete
+candidate before replacing it. A transition is one replacement containing all changed
+fields and its returned dispatch row. No worker starts between partial edits.
+
 The parent writes mutable coordination and user-owned planning state. Workers write the
 outputs that require delegated context — maps, planner drafts, reconciled task files,
 progress, and results. A parent about to write anything outside its rows has found a
@@ -195,11 +204,14 @@ selection is a separate concern that does not belong in these files.
 ### The dispatch envelope — what a worker is given
 
 Every dispatch hands over the same shape. `main_root` is required for all workers;
-`worktree_path` is required only for task-bound work and is omitted otherwise:
+`worktree_path` is required only for task-bound work and is omitted otherwise. Diagnosis,
+execution, verification, and landing also receive `attempt`, copied from the counter the
+parent incremented and persisted before dispatch:
 
 ```
 follow:        ai-execute
 task:          T-014
+attempt:       2
 main_root:     /workspace/acme
 worktree_path: /workspace/acme/.agent/worktrees/T-014
 pointers:
@@ -211,6 +223,7 @@ Bug diagnosis uses the same task-bound envelope before the task-file pointer exi
 ```yaml
 follow:        ai-bug
 task:          T-014
+attempt:       1
 main_root:     /workspace/acme
 worktree_path: /workspace/acme/.agent/worktrees/T-014
 pointers:
@@ -218,8 +231,9 @@ pointers:
   progress: /workspace/acme/.agent/notes/T-014.progress
 ```
 
-The parent writes the protocol and `diagnosing` ledger row before this dispatch. The
-worker creates or validates the exact supplied worktree before any source write.
+The parent writes the protocol and complete `diagnosing` ledger row, including `d1`,
+before this dispatch. The worker creates or validates the exact supplied worktree before
+any source write.
 
 The values sent in a real dispatch are absolute paths — never the literal
 `<main_root>` placeholder used in prose. Before doing any work, a task-bound worker
@@ -733,11 +747,18 @@ Written when an executor stops early. Read by a stranger, always.
 # T-014 handoff
 stopped_at: step 2 of 3
 reason: drift | budget | blocked | question
+resume_at: fresh | step:N | evidence:<mode> | publish
 what_exists: TokenStore.rotate implemented and unit-tested; not yet wired into handle()
 what_surprised_me: handle() is called from two places, not one — see src/ws/upgrade.ts
 worktree: kept | discarded
 next: wire both call sites, or split the second into its own task
+blocker_reason: required only for blocked — state the external condition, not "cannot proceed"
+unblocks_when: required only for blocked — one observable condition the parent can re-check
 ```
 
 No pronouns pointing at a conversation. No "as discussed". No "the approach we agreed".
 The reader has none of that.
+
+`resume_at` is copied into the ledger; keep it to the schema-1 tokens. For a blocked
+handoff, the parent stores `external:<slug>` and points `latest_finding` here, while these
+two conditional lines preserve the full reason and unblock condition.
