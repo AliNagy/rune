@@ -12,23 +12,27 @@ The execution loop. Triage → diagnose bugs → plan → dispatch → verify �
 **You exist to tell the user what is happening.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
-- **Read** `<main_root>/.agent/` coordination files — enough to report status accurately.
-- **Write** `<main_root>/.agent/ledger.md`, and **append** the drain result to
-  `<main_root>/.agent/PAUSED` if the flag
+- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+  exception outside this route's ledger and protocol records.
+- **Read** `<main_root>/.rune/` coordination files — enough to report status accurately.
+- **Write** `<main_root>/.rune/ledger.md`, and **append** the drain result to
+  `<main_root>/.rune/PAUSED` if the flag
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
 - **Create** one immutable
-  `<main_root>/.agent/drafts/<milestone>/R-nnn/protocol.md` before dispatching that
+  `<main_root>/.rune/drafts/<milestone>/R-nnn/protocol.md` before dispatching that
   decomposition run. For a bug, create it before diagnosis and include the reserved task
   id. You never edit it after any worker can see it.
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
 
+## Coordination-root preflight
+
 Before any coordination read or dispatch, resolve `main_root` once with
-`git rev-parse --show-toplevel`. This bounded identity probe is the only command added by
-this contract. Resolve every `.agent/...` read against that absolute root and carry the
-same value in every dispatch.
+`git rev-parse --show-toplevel`, then follow `ai-root` with that absolute root and
+`mode: resolve`. Stop and report any failure it returns. Resolve every `.rune/...` read
+against the returned root and carry the same `main_root` in every dispatch.
 
 **Anything not on that list is a dispatch.** Writing any other file, running any command,
 reading any source file — each one is a subagent's job, without exception and without a
@@ -89,11 +93,11 @@ worker's.
 
 ## Preconditions
 
-- **`<main_root>/.agent/PAUSED` exists → stop.** Report that work is paused, when and why, and that
+- **`<main_root>/.rune/PAUSED` exists → stop.** Report that work is paused, when and why, and that
   `rune:pause` lifts it. Do not dispatch. Do not quietly resume because the user asked for
   something — they may have forgotten the pause is set, and silently overriding a
   deliberate stop makes it worthless.
-- No `<main_root>/.agent/rune.yml` → run `rune:init` first.
+- No `<main_root>/.rune/rune.yml` → run `rune:init` first.
 - No `milestones.md` and the request is broad ("continue the project") → route to
   `rune:vision`. Do not invent a plan; that is vision's job and it requires the user.
 - A specific request ("fix the login bug") with no vision → proceed. Not everything needs
@@ -143,11 +147,11 @@ check is both planning evidence and part of the eventual source change.
 After triage returns `bug`:
 
 1. Choose the next unused decomposition run and next globally unused `T-nnn`. An id is
-   used if it appears anywhere under `.agent/`, not only in `tasks/` or the ledger.
+   used if it appears anywhere under `.rune/`, not only in `tasks/` or the ledger.
 2. Write the run's immutable `protocol.md` with `type: bug`, `protocol: ai-bug`, triage
    evidence and shape, and `reserved_task: T-nnn`.
 3. In one validated ledger update add a provisional row with the milestone, title,
-   `status: diagnosing`, the absolute `<main_root>/.agent/worktrees/T-nnn` path,
+   `status: diagnosing`, the absolute `<main_root>/.rune/worktrees/T-nnn` path,
    `attempts: d1/e0/v0/l0`, zero failures, no finding or blocker, and
    `resume_at: diagnose`. This reserves identity and claims diagnosis; no task spec exists
    and the row is not executable.
@@ -180,12 +184,12 @@ user and stop. The gate is not negotiable.
 
 **Dispatch workers that follow `ai-decompose`. You do not read source or write planner
 drafts or task files.** Include `main_root` and absolute pointers under
-`<main_root>/.agent/`, per the canonical dispatch envelope. Decomposition requires real
+`<main_root>/.rune/`, per the canonical dispatch envelope. Decomposition requires real
 code — the one thing you may not read — so a task file composed in your context is fiction.
 
 Use this exact two-phase protocol:
 
-1. Under `<main_root>/.agent/drafts/<milestone>/`, choose the next unused `R-nnn`
+1. Under `<main_root>/.rune/drafts/<milestone>/`, choose the next unused `R-nnn`
    directory. Never reuse a run, including one left incomplete by a dead session. For a
    confirmed bug, reuse the exact run whose protocol and `reserved_task` produced the
    diagnosis; for every other type, create the run here. Write `protocol.md` using the
@@ -195,7 +199,7 @@ Use this exact two-phase protocol:
    allocator for the run, protocol record, bug reservation, and planner slots.
 2. Dispatch two or three planners in parallel. Each gets one work id such as
    `M-03/R-002/P-01`, the same `main_root` and absolute milestone inputs, and one distinct
-   output pointer such as `<main_root>/.agent/drafts/M-03/R-002/P-01.md`. Every dispatch
+   output pointer such as `<main_root>/.rune/drafts/M-03/R-002/P-01.md`. Every dispatch
    also gets the absolute pointer to that run's `protocol.md`. A planner loads the named
    protocol and writes only its complete draft, using local `D-nnn` ids; it never writes a
    final task file or the ledger. For a bug, also pass the reserved task's exact
@@ -215,7 +219,7 @@ Use this exact two-phase protocol:
    reconciler maps the selected `reservation: primary` task to the protocol's already-used
    `T-nnn`; it allocates ids only for any additional tasks.
 5. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
-   edges. Then register exactly those tasks in `<main_root>/.agent/ledger.md` in one
+   edges. Then register exactly those tasks in `<main_root>/.rune/ledger.md` in one
    validated parent update. New rows start `pending`, `d0/e0/v0/l0`, zero failures, no
    finding or blocker, `resume_at: fresh`, and no worktree. For a bug, update the existing
    reserved row's title and dependencies, move `diagnosing -> pending`, preserve `d1` and
@@ -338,7 +342,7 @@ No shared files. T-015 waits on T-014.
 - **`ai-execute` to follow**, which loads `ai-taskfmt`, `ai-serena` and `ai-drift` itself.
 - **`main_root`**, the same absolute orchestration checkout used by the parent.
 - **`worktree_path`**, preallocated as the absolute
-  `<main_root>/.agent/worktrees/T-nnn` and recorded in the ledger before dispatch.
+  `<main_root>/.rune/worktrees/T-nnn` and recorded in the ledger before dispatch.
 - **`attempt`**, the row's executor counter after it was incremented and persisted.
 - One task id and absolute pointers to its task file plus any handoff, verification, or
   landing record it must consume.
@@ -370,7 +374,7 @@ status: done | drifted | budget | blocked | question
 task: T-014
 attempt: 2
 worktree: kept | discarded        # done requires kept until ai-land cleans it
-worktree_path: /workspace/acme/.agent/worktrees/T-014
+worktree_path: /workspace/acme/.rune/worktrees/T-014
 summary: rotate() implemented and wired; required verification evidence recorded
 base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
@@ -378,7 +382,7 @@ drift: DRF-003          # if any
 decision: DEC-012       # if status is question
 blocker: service-down   # blocked only; parent stores external:service-down
 resume_at: step:3       # budget, blocked, or question
-detail: /workspace/acme/.agent/notes/T-014.md
+detail: /workspace/acme/.rune/notes/T-014.md
 ```
 
 Consume every outcome in one validated ledger update:
@@ -392,7 +396,7 @@ Consume every outcome in one validated ledger update:
 | `drifted` | set `drifted`, `drift:DRF-nnn`, the drift pointer, and `resume_at: replan` |
 
 For `done`, the commit ids are routing data, not the durable record — the executor wrote
-the same publication to `<main_root>/.agent/notes/T-nnn.progress`. Do not read the
+the same publication to `<main_root>/.rune/notes/T-nnn.progress`. Do not read the
 worktree or accept an uncommitted success claim. The update to `verifying` and `v++` must
 land before the verifier is dispatched.
 
@@ -463,7 +467,7 @@ before it can land. The landing record distinguishes publication failure, integr
 conflict, and a post-merge regression so the next executor works the right problem.
 
 So dispatch a fresh executor on `ai-execute` for the same task, and give it
-`<main_root>/.agent/notes/T-nnn.landing.md` as a second absolute pointer alongside its
+`<main_root>/.rune/notes/T-nnn.landing.md` as a second absolute pointer alongside its
 task file. Reuse the ledger's exact `worktree_path`; never ask the harness for a fresh
 checkout. That record and that kept worktree are the only things standing between the
 retry and repeating the last attempt move for move. Then re-verify, and land again.
@@ -500,7 +504,7 @@ invisible.
 `status: question` means the executor hit a choice it has no authority to make. It has
 written an open decision record and stopped.
 
-The record arrives in `<main_root>/.agent/decisions/open/T-nnn.md` with no id. **Assign the
+The record arrives in `<main_root>/.rune/decisions/open/T-nnn.md` with no id. **Assign the
 `DEC-nnn`, move it into `decisions.md`, and delete the open file.** That hop is yours
 because id allocation cannot be done safely by three concurrent workers.
 
@@ -526,7 +530,7 @@ possible judge of its own work.
   are three different claims tied together by the same commit.
 - `fail` → back to `pending`, increment `failures`, set `latest_finding` to the verifier's
   exact attempt anchor, and set `resume_at: fresh`. The verifier wrote its finding to
-  `<main_root>/.agent/notes/T-nnn.verify.md` and returned that path on its `detail` line.
+  `<main_root>/.rune/notes/T-nnn.verify.md` and returned that path on its `detail` line.
   **Give the absolute path to the retry executor as a second pointer, alongside the task
   file, and reuse the exact `worktree_path`.** Do not have the verifier fix it, and do not
   restate its finding in the dispatch — the record is the payload, your dispatch carries
@@ -556,7 +560,7 @@ Per `ai-ledger`:
   it now is. Do not patch task files one at a time; patched specs accumulate
   contradictions with their own amendments until nobody can tell what is still true.
 
-Then report, and **re-check `<main_root>/.agent/PAUSED` before dispatching the next batch.** The user
+Then report, and **re-check `<main_root>/.rune/PAUSED` before dispatching the next batch.** The user
 can pause at any point; the check belongs at the top of every loop iteration, not only at
 entry. If the flag appeared mid-run, finish and merge what is in flight, then stop — the
 same drain `pause` would have done.

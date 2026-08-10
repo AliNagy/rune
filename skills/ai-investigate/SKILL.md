@@ -62,7 +62,7 @@ No worktree. No diff. When you are done the tree is exactly as you found it.
 
 ## 4. The answer
 
-Write to `<main_root>/.agent/notes/INV-nnn.md` and return a short summary.
+Write to `<main_root>/.rune/notes/INV-nnn.md` and return a short summary.
 
 ```markdown
 # INV-004 · Why is dashboard load slow

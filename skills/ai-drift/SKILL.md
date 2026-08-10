@@ -42,7 +42,7 @@ adaptation is how plans rot while every row stays green.
 
 Three things, in this order.
 
-**1. Write the drift record** — `<main_root>/.agent/drift/DRF-nnn.md`:
+**1. Write the drift record** — `<main_root>/.rune/drift/DRF-nnn.md`:
 
 ```markdown
 # DRF-003
@@ -58,7 +58,7 @@ suggests: split the websocket path into its own task, or widen T-016's surface
 `invalidates` is the load-bearing field. You are the only agent who has seen this. Name
 every downstream task whose premise this breaks — the parent will block them.
 
-**2. Write the handoff note** — `<main_root>/.agent/notes/T-nnn.md`, per `ai-taskfmt`.
+**2. Write the handoff note** — `<main_root>/.rune/notes/T-nnn.md`, per `ai-taskfmt`.
 
 Written for a stranger with an empty context. No "as discussed", no pronouns aimed at a
 conversation that will not exist. State what exists on disk now, what surprised you, and
@@ -124,7 +124,7 @@ An agent that asks about things it could have determined is worse than one that 
 because it spends the user's attention, which is the scarcest thing in the system.
 
 When you do ask, write an open decision record rather than inventing a new artifact — the
-same gate already blocks on it. Write it to **`<main_root>/.agent/decisions/open/T-nnn.md`** and
+same gate already blocks on it. Write it to **`<main_root>/.rune/decisions/open/T-nnn.md`** and
 **do not assign an id**: three executors run at once, so a shared file races and two
 workers would both reach for `DEC-012`. The parent assigns the number and moves it into
 `decisions.md`.

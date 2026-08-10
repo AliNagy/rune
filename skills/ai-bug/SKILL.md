@@ -14,9 +14,9 @@ yet. The parent reserves the task identity first and dispatches all of these:
 - `task: T-nnn`
 - `attempt: N`, matching the diagnosis counter already persisted by the parent
 - absolute `main_root`
-- absolute `worktree_path` at `<main_root>/.agent/worktrees/T-nnn`
+- absolute `worktree_path` at `<main_root>/.rune/worktrees/T-nnn`
 - the run's absolute `protocol.md` pointer, whose `reserved_task` matches `task`
-- the absolute `<main_root>/.agent/notes/T-nnn.progress` pointer
+- the absolute `<main_root>/.rune/notes/T-nnn.progress` pointer
 
 Reject a missing, relative, or mismatched input. Never infer the repository from the
 worker's starting directory, read the ledger, allocate another id, or create an anonymous
@@ -166,8 +166,8 @@ diagnosis: reproduced | not_reproduced | reclassified | blocked
 task: T-nnn
 attempt: 1
 worktree: kept | discarded
-worktree_path: /workspace/acme/.agent/worktrees/T-nnn
-progress: /workspace/acme/.agent/notes/T-nnn.progress
+worktree_path: /workspace/acme/.rune/worktrees/T-nnn
+progress: /workspace/acme/.rune/notes/T-nnn.progress
 summary: failing check and root cause, missing reproduction input, reclassification, or blocker
 type: feature | refactor | investigation  # reclassified only
 blocker: repository-access                # blocked only

@@ -1,19 +1,19 @@
 ---
 name: ai-taskfmt
 user-invocable: false
-description: Use when writing or amending any file under .agent/ - task files, milestones, decision records, handoff notes, or drift records. Defines the schemas, the encapsulated-task contract, checkable steps, task-specific verification evidence, and single-writer ownership.
+description: Use when writing or amending any file under .rune/ - task files, milestones, decision records, handoff notes, or drift records. Defines the schemas, the encapsulated-task contract, checkable steps, task-specific verification evidence, and single-writer ownership.
 ---
 
 # Rune file formats
 
-The spine. Every durable fact lives on disk under `.agent/`. No agent may rely on
+The spine. Every durable fact lives on disk under `.rune/`. No agent may rely on
 conversation memory for anything another agent will need — assume every reader is a
 stranger with an empty context.
 
 ## Layout
 
 ```
-.agent/
+.rune/
   rune.yml              # init output: oracle, commands, baseline, staleness stamp
   map.md                 # module map, entry points, conventions, danger zones
   vision.md              # the vision document
@@ -45,7 +45,7 @@ ledger parse. Not because pause is a second writer — it is the same parent.
 ## Where writes land
 
 Source code is only ever modified inside a git worktree — never the main checkout. But
-**`.agent/` always lives at `<main_root>/.agent/`**, including files a worker writes
+**`.rune/` always lives at `<main_root>/.rune/`**, including files a worker writes
 while working in a task worktree. `main_root` is the absolute orchestration-checkout path
 from the dispatch envelope below; it is never inferred from a worker's current directory.
 
@@ -54,9 +54,9 @@ from the dispatch envelope below; it is never inferred from a worker's current d
 | source changes while incomplete | its worktree as an uncommitted diff |
 | confirmed bug reproduction | a diagnosis commit on its reserved task branch |
 | source changes when complete | commits on its task branch |
-| planner drafts and reconciled task files | `<main_root>/.agent/` |
-| `notes/T-nnn.progress`, handoff notes | `<main_root>/.agent/` |
-| drift and decision records | `<main_root>/.agent/` |
+| planner drafts and reconciled task files | `<main_root>/.rune/` |
+| `notes/T-nnn.progress`, handoff notes | `<main_root>/.rune/` |
+| drift and decision records | `<main_root>/.rune/` |
 
 Coordination state has to be visible to the dispatcher, the verifier, and the next session
 *before* anything merges. Written inside a worktree it would appear only on merge — which
@@ -154,14 +154,22 @@ Before its first read or dispatch, the parent resolves the root of the checkout 
 with the harness workspace root or the bounded probe `git rev-parse --show-toplevel`.
 That absolute path is `main_root` and stays constant for the run.
 
-Every dispatch carries `main_root`. Every `.agent/...` path named anywhere in Rune is a
-logical repo-relative name that must be resolved to `<main_root>/.agent/...` before it is
+The parent must then follow `ai-root` before reading state. `init`, `vision`, `pause`, and
+`handoff` use `mode: initialize`; `hello`, `work`, and `continue` use `mode: resolve`.
+That skill returns the absolute canonical root, performs or resumes the one supported
+legacy-directory migration, and refuses dual roots or registered task worktrees beneath
+the legacy root. Any failure is a stop condition whose full diagnostic is reported to the
+user. `ai-root` is the only skill allowed to interpret a legacy root; workers receive only
+canonical absolute pointers after this preflight.
+
+Every dispatch carries `main_root`. Every `.rune/...` path named anywhere in Rune is a
+logical repo-relative name that must be resolved to `<main_root>/.rune/...` before it is
 read or written. Dispatch pointers are already-resolved absolute paths. A worker rejects a
 relative pointer rather than guessing what it is relative to.
 
 Task-bound work also carries `worktree_path`:
 
-- The parent chooses `<main_root>/.agent/worktrees/T-nnn` before the first task-bound
+- The parent chooses `<main_root>/.rune/worktrees/T-nnn` before the first task-bound
   worker, records that absolute path in the ledger, and never changes it during the task.
 - For a bug, `ai-bug` creates that exact worktree during `diagnosing`, before it writes the
   reproduction check. For every other task, the first executor creates it. Either worker
@@ -213,9 +221,9 @@ follow:        ai-execute
 task:          T-014
 attempt:       2
 main_root:     /workspace/acme
-worktree_path: /workspace/acme/.agent/worktrees/T-014
+worktree_path: /workspace/acme/.rune/worktrees/T-014
 pointers:
-  - /workspace/acme/.agent/tasks/T-014.md
+  - /workspace/acme/.rune/tasks/T-014.md
 ```
 
 Bug diagnosis uses the same task-bound envelope before the task-file pointer exists:
@@ -225,10 +233,10 @@ follow:        ai-bug
 task:          T-014
 attempt:       1
 main_root:     /workspace/acme
-worktree_path: /workspace/acme/.agent/worktrees/T-014
+worktree_path: /workspace/acme/.rune/worktrees/T-014
 pointers:
-  protocol: /workspace/acme/.agent/drafts/M-03/R-002/protocol.md
-  progress: /workspace/acme/.agent/notes/T-014.progress
+  protocol: /workspace/acme/.rune/drafts/M-03/R-002/protocol.md
+  progress: /workspace/acme/.rune/notes/T-014.progress
 ```
 
 The parent writes the protocol and complete `diagnosing` ledger row, including `d1`,
@@ -263,13 +271,13 @@ follow:    ai-decompose
 task:      M-03/R-002/P-01
 main_root: /workspace/acme
 pointers:
-  milestone: /workspace/acme/.agent/milestones.md#M-03
-  protocol:  /workspace/acme/.agent/drafts/M-03/R-002/protocol.md
-  draft:     /workspace/acme/.agent/drafts/M-03/R-002/P-01.md
+  milestone: /workspace/acme/.rune/milestones.md#M-03
+  protocol:  /workspace/acme/.rune/drafts/M-03/R-002/protocol.md
+  draft:     /workspace/acme/.rune/drafts/M-03/R-002/P-01.md
 ```
 
 A bug planner or reconciler additionally receives the reserved task's
-`worktree_path` and `diagnosis: /workspace/acme/.agent/notes/T-014.progress`. Its assigned
+`worktree_path` and `diagnosis: /workspace/acme/.rune/notes/T-014.progress`. Its assigned
 work id remains the run or planner slot; it validates the task branch against
 `reserved_task` in the protocol. It may read that worktree but never write source there.
 
@@ -339,10 +347,10 @@ Then whatever else that skill defines.
 
 ```yaml
 worktree: kept
-worktree_path: /workspace/acme/.agent/worktrees/T-014
+worktree_path: /workspace/acme/.rune/worktrees/T-014
 blocker: registry-unreachable
 resume_at: step:2
-detail: /workspace/acme/.agent/notes/T-014.md
+detail: /workspace/acme/.rune/notes/T-014.md
 ```
 
 `blocker` is a short lowercase slug stored as `external:<slug>`; `detail` points at the
@@ -381,7 +389,7 @@ verified_commit: 4a91c02   # added only by a passing verifier
 
 Only an executor returning `status: done` publishes an artifact. It commits the completed
 source change on the task branch, proves `worktree_path` clean, and appends `base_commit`
-plus `artifact_commit` to `<main_root>/.agent/notes/T-nnn.progress`. Incomplete outcomes
+plus `artifact_commit` to `<main_root>/.rune/notes/T-nnn.progress`. Incomplete outcomes
 keep their uncommitted diff in that same task worktree and do not invent an artifact.
 A bug's earlier `diagnosis_commit` is an input inside the eventual publication range, not
 a publication by itself; its absence of `artifact_commit` is deliberate.
@@ -549,7 +557,7 @@ One paragraph, prose. What the world looks like when this is done.
 read:
   - serena: find_symbol SessionMiddleware/handle   -> src/auth/session.ts
   - serena: find_symbol TokenStore                 -> src/auth/store.ts
-  - file:   .agent/map.md (conventions section)
+  - file:   .rune/map.md (conventions section)
 forbidden:
   - src/api/**           # unrelated; ~40k tokens if opened
   - src/legacy/**         # scheduled for deletion in M-05
@@ -744,7 +752,7 @@ converts "make suggestions, never assumptions" from a personality instruction in
 checkable property. Recommendations are encouraged; silently adopting one is not.
 
 Workers use the same format to ask questions mid-task — but they write it to
-**`.agent/decisions/open/T-nnn.md`**, not to `decisions.md`, and they **do not assign an
+**`.rune/decisions/open/T-nnn.md`**, not to `decisions.md`, and they **do not assign an
 id**. They add `raised_by: T-nnn`, stop with `status: question`, and keep the worktree.
 
 The parent then assigns the `DEC-nnn`, moves the record into `decisions.md`, deletes the

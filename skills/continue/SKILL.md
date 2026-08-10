@@ -16,19 +16,25 @@ no longer true, and reporting them as status propagates the lie. Repair first.
 **You work out where things stand and say so.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
-- **Read** `<main_root>/.agent/` coordination files.
-- **Write** `<main_root>/.agent/ledger.md`, repairing the rows a dead session left behind.
-- **Delete** `<main_root>/.agent/PAUSED` when the user confirms a resume. You never create it — that
+- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+  exception outside this route's reconciliation records.
+- **Read** `<main_root>/.rune/` coordination files.
+- **Write** `<main_root>/.rune/ledger.md`, repairing the rows a dead session left behind.
+- **Delete** `<main_root>/.rune/PAUSED` when the user confirms a resume. You never create it — that
   is `pause`.
 - **Talk to the user** — the status report, and the question if one is owed.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
 
+## Coordination-root preflight
+
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel` before
-reading state. Resolve every `.agent/...` path against it. Every recovery, verification,
-or landing dispatch carries that `main_root`, the absolute `worktree_path` recorded in the
-task's ledger row, and absolute coordination pointers.
+reading state. Then follow `ai-root` with that absolute root and `mode: resolve`; it
+resumes an interrupted directory migration before ledger recovery. Stop and report any
+failure it returns. Resolve every `.rune/...` path against the returned root. Every
+recovery, verification, or landing dispatch carries `main_root`, the absolute
+`worktree_path` recorded in the task's ledger row, and absolute coordination pointers.
 
 **Anything not on that list is a dispatch** — above all reading a torn worktree's diff,
 which is the single most expensive thing you could do here and the reason `ai-recover`
@@ -38,15 +44,15 @@ the purpose of having resumed at all.
 ## 1. Read state
 
 ```
-<main_root>/.agent/PAUSED        · paused? when, why, was the tree left clean?
-<main_root>/.agent/sessions/     · newest session handoff — context the ledger does not carry
-<main_root>/.agent/rune.yml      · initialized? stale? oracle?
-<main_root>/.agent/vision.md     · exists? complete?
-<main_root>/.agent/decisions.md  · any status: open?
-<main_root>/.agent/milestones.md · exists? which is current?
-<main_root>/.agent/drafts/       · completed or interrupted decomposition runs?
-<main_root>/.agent/ledger.md     · task statuses, drift records
-<main_root>/.agent/notes/        · handoff notes
+<main_root>/.rune/PAUSED        · paused? when, why, was the tree left clean?
+<main_root>/.rune/sessions/     · newest session handoff — context the ledger does not carry
+<main_root>/.rune/rune.yml      · initialized? stale? oracle?
+<main_root>/.rune/vision.md     · exists? complete?
+<main_root>/.rune/decisions.md  · any status: open?
+<main_root>/.rune/milestones.md · exists? which is current?
+<main_root>/.rune/drafts/       · completed or interrupted decomposition runs?
+<main_root>/.rune/ledger.md     · task statuses, drift records
+<main_root>/.rune/notes/        · handoff notes
 ```
 
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
@@ -167,8 +173,8 @@ Also check:
 
 | State on disk | Phase | Resume with |
 |---|---|---|
-| `<main_root>/.agent/PAUSED` present | deliberately stopped | **ask first** — see below |
-| no `<main_root>/.agent/` | nothing started | `rune:init`, then `rune:vision` |
+| `<main_root>/.rune/PAUSED` present | deliberately stopped | **ask first** — see below |
+| no `<main_root>/.rune/` | nothing started | `rune:init`, then `rune:vision` |
 | `rune.yml` only | ground mapped, no plan | `rune:vision` |
 | `vision.md` partial | interview interrupted | `rune:vision` — from the last settled section |
 | vision done, decisions `open` | blocked on the user | present the open decisions |
@@ -195,7 +201,7 @@ TL;DR
 - 2 tasks still queued for M-03. Want me to pick them up?
 ```
 
-Resume only on a clear yes, and delete `<main_root>/.agent/PAUSED` when you do. If the pause file says
+Resume only on a clear yes, and delete `<main_root>/.rune/PAUSED` when you do. If the pause file says
 the tree was left dirty, say what is dangling before asking — the user may want to deal
 with it themselves rather than have an executor inherit it.
 

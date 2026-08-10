@@ -25,13 +25,13 @@ Only these:
 - `main_root` — the absolute orchestration checkout; all coordination paths resolve here
 - `worktree_path` — the exact absolute task worktree used by the executor
 - `attempt` — the positive verifier attempt already incremented in schema-1 ledger state
-- `<main_root>/.agent/tasks/T-nnn.md` — the spec, including type, verification mode,
+- `<main_root>/.rune/tasks/T-nnn.md` — the spec, including type, verification mode,
   acceptance, and the stated check
-- `<main_root>/.agent/notes/T-nnn.progress` — ticks, mode-specific evidence, and the latest
+- `<main_root>/.rune/notes/T-nnn.progress` — ticks, mode-specific evidence, and the latest
   `base_commit` / `artifact_commit` publication
 - the clean task worktree at `worktree_path` and `artifact_commit`
-- `<main_root>/.agent/rune.yml` — the project oracle and its known-red baseline
-- `<main_root>/.agent/notes/T-nnn.verify.md` — earlier verdicts on this task, if this is a retry
+- `<main_root>/.rune/rune.yml` — the project oracle and its known-red baseline
+- `<main_root>/.rune/notes/T-nnn.verify.md` — earlier verdicts on this task, if this is a retry
 
 Both roots and every pointer must be absolute. Confirm that `worktree_path` is a registered
 worktree of the same Git repository as `main_root` before reading the artifact. **Never
@@ -128,7 +128,7 @@ There is no partial credit and no "essentially done".
 
 ## The verification record
 
-`<main_root>/.agent/notes/T-nnn.verify.md` — where your finding goes. Sole writer: the verifier
+`<main_root>/.rune/notes/T-nnn.verify.md` — where your finding goes. Sole writer: the verifier
 holding T-nnn.
 
 **Write it before you return.** Your verdict block is a pointer; this file is the finding.
@@ -136,11 +136,11 @@ A `fail` that exists only in a return value dies in the parent's context, and th
 executor of this task reads the task file, the handoff, and the diff — none of which say
 why the last attempt was rejected. It would repeat that attempt move for move.
 
-This is the counterpart to `<main_root>/.agent/notes/T-nnn.landing.md`, and it sits where it does for
+This is the counterpart to `<main_root>/.rune/notes/T-nnn.landing.md`, and it sits where it does for
 the same three reasons. It is **per-task**, so it satisfies the concurrency rule in
 `ai-taskfmt` without anyone having to think about it. It has a **different sole writer**
 from the executor's two files, and merging writers is the one thing that rule exists to
-prevent. And it lives under `<main_root>/.agent/`, so it is visible to the parent
+prevent. And it lives under `<main_root>/.rune/`, so it is visible to the parent
 and the next executor immediately, rather than at merge — and it survives the worktree
 being discarded.
 
@@ -203,7 +203,7 @@ not harmless noise.
 ```
 verdict: pass | fail | unverified
 task: T-014
-worktree_path: /workspace/acme/.agent/worktrees/T-014
+worktree_path: /workspace/acme/.rune/worktrees/T-014
 reason: artifact | evidence | oracle | acceptance   # required for unverified
 base_commit: a3f91c2
 artifact_commit: 62be8d1
@@ -221,7 +221,7 @@ acceptance:
   - no regression ........ pass
   - rotate called once ... pass
 attempt: 2                        # exactly the attempt supplied by the parent
-detail: /workspace/acme/.agent/notes/T-014.verify.md
+detail: /workspace/acme/.rune/notes/T-014.verify.md
 ```
 
 `attempt` is not decoration. It binds the ledger's `v` counter, this record block, and the
@@ -244,10 +244,10 @@ You are not a reviewer. Do not comment on style, naming, or how you would have d
 Do not suggest improvements. Do not fix anything, however small — you have no worktree of
 your own and no acceptance criterion covering your change.
 
-**You write exactly one file: `<main_root>/.agent/notes/T-nnn.verify.md`.** That is not an exception to
+**You write exactly one file: `<main_root>/.rune/notes/T-nnn.verify.md`.** That is not an exception to
 the rule below and should not be read as one. It is coordination state, the same category
 as the executor's progress file and the lander's landing record — it records what you
-observed and changes nothing about the work. Everything else on disk, source and `<main_root>/.agent/`
+observed and changes nothing about the work. Everything else on disk, source and `<main_root>/.rune/`
 alike, you read only.
 
 **Nothing stops you from editing.** You are an ordinary subagent holding ordinary

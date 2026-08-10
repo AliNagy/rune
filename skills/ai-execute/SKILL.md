@@ -8,7 +8,7 @@ description: Use when executing one Rune task from an explicitly identified main
 
 **You execute one task.** The dispatch gives you its id, positive `attempt`, absolute
 `main_root`, absolute `worktree_path`, and absolute pointers. Read
-`<main_root>/.agent/tasks/T-nnn.md` yourself. Reject relative paths; your starting
+`<main_root>/.rune/tasks/T-nnn.md` yourself. Reject relative paths; your starting
 directory is not an identity.
 
 Read `type` and `verification` before touching source. They must form one allowed pair
@@ -26,8 +26,8 @@ means decomposition failed to preserve diagnosis: return `status: blocked` witho
 Also load `ai-taskfmt`, `ai-serena`, and `ai-drift`.
 
 You are stateless. Assume nothing from any prior session. If a handoff note exists at
-`<main_root>/.agent/notes/T-nnn.md`, read it and inspect both records of source state: the latest
-`base_commit..artifact_commit` publication in `<main_root>/.agent/notes/T-nnn.progress`, if one
+`<main_root>/.rune/notes/T-nnn.md`, read it and inspect both records of source state: the latest
+`base_commit..artifact_commit` publication in `<main_root>/.rune/notes/T-nnn.progress`, if one
 exists, and the worktree's uncommitted `git diff`. The committed range is what a prior
 attempt published; the dirty diff is what happened after it. If there is no publication
 but the task branch is ahead of its merge base with main, a prior executor died between
@@ -35,14 +35,14 @@ but the task branch is ahead of its merge base with main, a prior executor died 
 the bug's diagnosis commit. Inspect the committed range either way, but never mistake a
 diagnosis-only branch for a finished task. An empty dirty diff does not mean an empty task.
 
-**If `<main_root>/.agent/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
+**If `<main_root>/.rune/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
 been through verification before and came back. The last block is why the previous attempt
 was rejected; the blocks above it are what earlier attempts tried and had refused.
 **Answering the last block is the work.** Running the task's original steps again without
 reading it earns the same verdict a second time, which is how a task reaches two verifier
 failures and lands on the user's desk with nothing learned.
 
-**If `<main_root>/.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
+**If `<main_root>/.rune/notes/T-nnn.landing.md` exists, read it too.** This task has already been
 verified once and then failed to merge into the main tree. That file holds the exact
 failures, quoted, and whether they fell inside the task's declared change surface. Skipping
 it is how an attempt repeats the one before it move for move — the failure it names is the
@@ -96,14 +96,14 @@ the worktree instead of stranding the main tree in a state nobody can explain. A
 executors may be running right now on other tasks; without separate checkouts you would
 overwrite each other.
 
-**`.agent/` files are the exception — they go under `<main_root>/.agent/`, never under
-`<worktree_path>/.agent/`.** Your
+**`.rune/` files are the exception — they go under `<main_root>/.rune/`, never under
+`<worktree_path>/.rune/`.** Your
 progress file, handoff note, and any drift or decision record are coordination state that
 the dispatcher, the verifier, and the next session all need to see. Written inside your
 worktree they would be invisible until merge, which is exactly when they stop being useful.
 
 Source into `worktree_path` and, on completion, its task branch. Coordination into
-`<main_root>/.agent/`.
+`<main_root>/.rune/`.
 
 ## Rules
 
@@ -154,7 +154,7 @@ it.
 **You cannot talk to the user — the dispatcher can.** When you hit a choice the user would
 notice and might disagree with, and neither the task spec nor an existing convention
 settles it, write an open decision record with your recommendation to
-`<main_root>/.agent/decisions/open/T-nnn.md` — **no id; the parent assigns it** — and stop with
+`<main_root>/.rune/decisions/open/T-nnn.md` — **no id; the parent assigns it** — and stop with
 `status: question`. Keep the worktree; the work so far is blocked, not wrong.
 
 Write it to disk rather than only reporting it. Your worktree survives your death so the
@@ -166,7 +166,7 @@ worse than deciding and noting it.
 
 ## Durable early stops
 
-`budget`, `blocked`, and `question` all write `<main_root>/.agent/notes/T-nnn.md` before
+`budget`, `blocked`, and `question` all write `<main_root>/.rune/notes/T-nnn.md` before
 returning and name it on `detail`. Include a ledger-safe `resume_at` token: `fresh`,
 `step:N`, `evidence:<mode>`, or `publish`. The prose explaining that token stays in the
 handoff.
@@ -222,7 +222,7 @@ pass:
    `git diff <base_commit>..<artifact_commit>` is non-empty, and
    `git status --porcelain` in the task worktree is empty. Any failure means you cannot
    report `done`.
-6. Append the publication to `<main_root>/.agent/notes/T-nnn.progress` before returning:
+6. Append the publication to `<main_root>/.rune/notes/T-nnn.progress` before returning:
 
 ```yaml
 publication: 2
@@ -245,7 +245,7 @@ status: done | drifted | budget | blocked | question
 task: T-nnn
 attempt: 2
 worktree: kept | discarded        # done always means kept until ai-land cleans it
-worktree_path: /workspace/acme/.agent/worktrees/T-nnn
+worktree_path: /workspace/acme/.rune/worktrees/T-nnn
 summary: <one or two lines>
 base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
@@ -253,8 +253,8 @@ drift: DRF-nnn        # if any
 decision: DEC-nnn     # if status is question
 blocker: service-down # required for blocked; lowercase slug
 resume_at: step:3     # required for budget, blocked, and question
-detail: /workspace/acme/.agent/notes/T-nnn.md  # early stops
+detail: /workspace/acme/.rune/notes/T-nnn.md  # early stops
 ```
 
-Anything longer goes to `<main_root>/.agent/notes/`. The dispatcher must not have to read your
+Anything longer goes to `<main_root>/.rune/notes/`. The dispatcher must not have to read your
 reasoning.

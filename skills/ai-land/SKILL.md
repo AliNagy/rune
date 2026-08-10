@@ -37,13 +37,13 @@ because the situation seems to call for one.
 - `worktree_path` — the exact absolute task worktree used by execution and verification
 - `attempt` — the positive landing attempt already incremented in schema-1 ledger state
 - the task id and its task branch
-- `<main_root>/.agent/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
+- `<main_root>/.rune/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
   task's to answer for
-- `<main_root>/.agent/notes/T-nnn.progress` — the executor's latest `base_commit` and
+- `<main_root>/.rune/notes/T-nnn.progress` — the executor's latest `base_commit` and
   `artifact_commit`
-- `<main_root>/.agent/notes/T-nnn.verify.md` — the verifier's latest verdict and `verified_commit`
-- `<main_root>/.agent/rune.yml` — the oracle command and its known-red baseline
-- `<main_root>/.agent/notes/T-nnn.landing.md` — earlier landing attempts, if this is a retry
+- `<main_root>/.rune/notes/T-nnn.verify.md` — the verifier's latest verdict and `verified_commit`
+- `<main_root>/.rune/rune.yml` — the oracle command and its known-red baseline
+- `<main_root>/.rune/notes/T-nnn.landing.md` — earlier landing attempts, if this is a retry
 
 All paths must be absolute. When `worktree_path` exists, confirm it is the registered task
 worktree in the same repository as `main_root`; never discover a replacement by scanning
@@ -61,9 +61,9 @@ to invent another attempt.
 
 Fixed order. Do not reorder, do not skip.
 
-**1. Check the main tree is clean outside `.agent/`.** Run
+**1. Check the main tree is clean outside `.rune/`.** Run
 `git -C <main_root> status --porcelain` — anything
-modified beyond `.agent/` means someone left source changes in the main checkout, and a
+modified beyond `.rune/` means someone left source changes in the main checkout, and a
 rollback could not tell them apart from the merge. Stop, record the attempt, return `stuck`,
 and say what is dirty.
 
@@ -136,13 +136,13 @@ reason. If you die between the two, a missing record is recoverable and a record
 bad merge still in the tree is not. You are holding the oracle output in context; it
 survives the rollback.
 
-Reset the main tree to the commit from step 2, **preserving uncommitted `.agent/` state** —
+Reset the main tree to the commit from step 2, **preserving uncommitted `.rune/` state** —
 it holds the ledger and this task's own notes, and losing it costs more than the merge did:
 
 ```bash
 git -C <main_root> reset <sha>                        # move HEAD back; worktree untouched
-git -C <main_root> checkout -- ':(exclude).agent'     # source files back to <sha>
-git -C <main_root> clean -fd -- ':(exclude).agent'    # drop files the merge added
+git -C <main_root> checkout -- ':(exclude).rune'     # source files back to <sha>
+git -C <main_root> clean -fd -- ':(exclude).rune'    # drop files the merge added
 ```
 
 **Do not undo the merge with `git -C <main_root> revert -m 1`.** It leaves the merge in history, and git
@@ -181,13 +181,13 @@ record what remains; `continue` can remove the orphan later. Otherwise return
 
 ## The landing record
 
-`<main_root>/.agent/notes/T-nnn.landing.md` — your state file, and the counterpart to the executor's
+`<main_root>/.rune/notes/T-nnn.landing.md` — your state file, and the counterpart to the executor's
 `notes/T-nnn.progress`. Sole writer: the lander holding T-nnn.
 
 Three things fix it in that spot. It is **per-task**, so it satisfies the concurrency rule
 in `ai-taskfmt` without anyone having to think about it. It is **separate from the
 executor's two files** because it has a different sole writer, and merging writers is the
-one thing that rule exists to prevent. And it lives under `<main_root>/.agent/`,
+one thing that rule exists to prevent. And it lives under `<main_root>/.rune/`,
 which is what carries it across the rollback at step 5 — a record written into the task's
 worktree would be invisible to the parent until merge, which is precisely the moment it
 stops mattering.
@@ -258,12 +258,12 @@ making a decision — the parent decides what happens next, it just cannot see w
 task: T-014
 landing: landed | refused | conflict | reverted | stuck
 main: green | red
-worktree_path: /workspace/acme/.agent/worktrees/T-014
+worktree_path: /workspace/acme/.rune/worktrees/T-014
 verified_commit: 4a91c02
 attempt: 2 of 5              # exactly the attempt supplied by the parent
 summary: rotation drops the device id the api layer reads back
 escalate: no             # or: yes (rule 3) — session.test.ts failed on attempt 1 too
-detail: /workspace/acme/.agent/notes/T-014.landing.md
+detail: /workspace/acme/.rune/notes/T-014.landing.md
 cleanup: complete | pending   # only for landed
 ```
 

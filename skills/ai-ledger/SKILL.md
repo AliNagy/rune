@@ -1,12 +1,12 @@
 ---
 name: ai-ledger
 user-invocable: false
-description: Use when reading or updating .agent/ledger.md, or resuming work whose prior session ended unexpectedly. Covers status transitions, task claiming, drift-driven invalidation, and crash reconciliation.
+description: Use when reading or updating .rune/ledger.md, or resuming work whose prior session ended unexpectedly. Covers status transitions, task claiming, drift-driven invalidation, and crash reconciliation.
 ---
 
 # Ledger operations
 
-`.agent/ledger.md` holds **all authoritative mutable routing state**. Detailed worker
+`.rune/ledger.md` holds **all authoritative mutable routing state**. Detailed worker
 evidence lives in sole-writer note files, but the counters and pointers that determine the
 next action live here. One writer: the parent — the same parent across every route, per
 `ai-taskfmt`. Workers never touch it; they report, the parent records.
@@ -33,11 +33,11 @@ main: green
 | id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at |
 |---|---|---|---|---|---|---|---|---|---|---|
 | T-011 | M-03 | TokenStore interface | done | — | merged | d0/e1/v1/l1 | 0 | — | — | — |
-| T-013 | M-03 | Diagnose refresh regression | diagnosing | — | /workspace/acme/.agent/worktrees/T-013 | d1/e0/v0/l0 | 0 | — | — | plan:M-03/R-002 |
-| T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.agent/worktrees/T-014 | d0/e2/v1/l0 | 1 | .agent/notes/T-014.verify.md#attempt-1 | — | recover |
+| T-013 | M-03 | Diagnose refresh regression | diagnosing | — | /workspace/acme/.rune/worktrees/T-013 | d1/e0/v0/l0 | 0 | — | — | plan:M-03/R-002 |
+| T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.rune/worktrees/T-014 | d0/e2/v1/l0 | 1 | .rune/notes/T-014.verify.md#attempt-1 | — | recover |
 | T-015 | M-03 | Refresh endpoint | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh |
-| T-016 | M-03 | Session restart persistence | blocked | — | discarded | d0/e1/v0/l0 | 0 | .agent/drift/DRF-003.md | drift:DRF-003 | replan |
-| T-017 | M-03 | Expiry sweep | blocked | — | /workspace/acme/.agent/worktrees/T-017 | d0/e1/v0/l0 | 0 | .agent/notes/T-017.md | external:registry-unreachable | step:2 |
+| T-016 | M-03 | Session restart persistence | blocked | — | discarded | d0/e1/v0/l0 | 0 | .rune/drift/DRF-003.md | drift:DRF-003 | replan |
+| T-017 | M-03 | Expiry sweep | blocked | — | /workspace/acme/.rune/worktrees/T-017 | d0/e1/v0/l0 | 0 | .rune/notes/T-017.md | external:registry-unreachable | step:2 |
 
 ## Drift
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
@@ -79,7 +79,7 @@ that some readers ignore.
   two-failure stop rule; `unverified`, landing failures, and dead dispatches do not increase
   it.
 - `latest_finding` is `—` or a coordination-relative pointer such as
-  `.agent/notes/T-014.verify.md#attempt-1`. The detail remains in its sole-writer artifact;
+  `.rune/notes/T-014.verify.md#attempt-1`. The detail remains in its sole-writer artifact;
   the ledger carries the pointer needed to find it without duplicating prose.
 - `blocker` is `—`, `decision:DEC-nnn`, `drift:DRF-nnn`, `external:<slug>`, or `main:red`.
   Dependency ids stay in `blocked_by`; this field is only for a task's live non-dependency
@@ -90,7 +90,7 @@ that some readers ignore.
   Details belong in the artifact named by `latest_finding`; this field stays a stable token.
 
 Every live task worktree value is an absolute path. The parent allocates
-`<main_root>/.agent/worktrees/T-nnn`, writes it into the row before dispatching the first
+`<main_root>/.rune/worktrees/T-nnn`, writes it into the row before dispatching the first
 task-bound worker, and keeps that value unchanged through diagnosis, retries, verification,
 recovery, and landing. `discarded` and `merged` may replace it only when the path no longer
 contains live task state.
@@ -130,9 +130,9 @@ claims the phase and increments `d`, `e`, `v`, or `l`. On return, one replacemen
 the outcome and records the dispatch. Never write `status` first and fill in its required
 fields later; a crash between those edits would create a state no fresh session can route.
 
-The shipped `scripts/validate-ledger.mjs` applies the structural rules to any ledger file.
-Runtime routes apply the same checklist before every read and candidate write; the CLI is
-also available to maintainers and migrations for a deterministic check.
+Every route applies the structural checklist in this skill before each read and candidate
+write. Validation is an agent obligation at the `ai-ledger` interface; Rune does not ship
+an executable validator or a second implementation that could drift from these rules.
 
 ## Log every dispatch
 

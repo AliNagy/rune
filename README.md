@@ -37,17 +37,12 @@ Everything installs together — there is nothing to copy by hand.
 
 ### OpenCode
 
-Rune is written for Claude Code, but a script generates an OpenCode version:
-
-```bash
-node scripts/sync-opencode.mjs
-```
-
-Skills become `/rune-init`, `/rune-vision`, and so on. See
-[docs/opencode.md](docs/opencode.md) for options and the remaining harness differences.
-Rune does not depend on an anonymous harness-created checkout: every task gets one stable
-absolute worktree path that diagnosis workers, executors, verifiers, recoverers, and
-landers reuse.
+Rune ships only skills, with no generator or runtime package. OpenCode can use the same
+skill sources after applying its `rune-` naming convention during installation. See
+[docs/opencode.md](docs/opencode.md) for the small manual adaptation and the remaining
+harness differences. Rune does not depend on an anonymous harness-created checkout: every
+task gets one stable absolute worktree path that diagnosis workers, executors, verifiers,
+recoverers, and landers reuse.
 
 ## Use
 
@@ -71,7 +66,7 @@ The direct commands still exist if you prefer them:
 | Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-The eighteen `ai-*` skills load themselves when they're needed and stay out of your
+The nineteen `ai-*` skills load themselves when they're needed and stay out of your
 slash-command list.
 
 Typical first run on an existing project:
@@ -91,10 +86,10 @@ off.
 
 ## What Rune writes into your repo
 
-Everything worth keeping lives in `.agent/`:
+Everything worth keeping lives in `.rune/`:
 
 ```
-.agent/
+.rune/
   rune.yml               test command, build commands, git starting point, last-checked date
   map.md                 module map, entry points, conventions, risky areas
   vision.md              the vision document
@@ -109,22 +104,29 @@ Everything worth keeping lives in `.agent/`:
 
 **Commit it.** The vision, decisions, milestones, and ledger are project knowledge worth
 versioning and reviewing — they're written to be read by people, not just agents.
-Worktrees are the exception; add `.agent/worktrees/` to your `.gitignore`.
+Worktrees are the exception; add `.rune/worktrees/` to your `.gitignore`.
 
 Background that only agents need — how a subsystem works, where the sharp edges are — goes
-into Serena memories rather than `.agent/`, so the files people read stay readable.
+into Serena memories rather than `.rune/`, so the files people read stay readable.
+
+### Upgrading existing repositories
+
+Rune 0.11 changes the coordination-root storage format. Public commands migrate the old
+layout before reading state and fail closed if two roots or active legacy task worktrees
+make that unsafe. See [the migration guide](docs/migrating-from-agent.md) before upgrading
+a repository with work in flight.
 
 ## How it works
 
 You invoke one skill; it loads the others.
 
-Rune is 25 skills, but only seven can be called by name — `hello`, `init`, `vision`,
+Rune is 26 skills, but only seven can be called by name — `hello`, `init`, `vision`,
 `work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-eighteen are marked as not user-invocable. The agent loads them itself when the situation
+nineteen are marked as not user-invocable. The agent loads them itself when the situation
 calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
 sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
 
-The reason is the same one behind everything else here. Instructions for all 25 skills in
+The reason is the same one behind everything else here. Instructions for all 26 skills in
 one context window would crowd out your actual code, and most of them are irrelevant at any
 given moment. Loading them on demand means each agent carries only the rules for the job in
 front of it — and you only have to remember one command.
@@ -222,6 +224,7 @@ skills/
   init  vision  work                    or call these directly, as /rune:<name>
   pause  handoff  continue
 
+  ai-root         coordination-root identity and legacy migration
   ai-taskfmt      the file formats everything else depends on
   ai-report       when to talk to the user, and how
   ai-serena       reading code without spending much context
@@ -255,21 +258,22 @@ than assuming a wall is there.
 Tagged `vMAJOR.MINOR.PATCH`, matching `version` in `plugin.json`. Because that field is
 set, installed copies only update when it changes — so every release bumps it.
 
-Before 1.0, minor versions may break the `.agent/` file formats. `/rune:continue` will tell
+Before 1.0, minor versions may break the `.rune/` file formats. `/rune:continue` will tell
 you if it finds a layout it doesn't recognise rather than guessing.
 
 ## Status
 
-**Untested.** `v0.1.0` is a first cut: the skills are written and consistent with each
-other, and the plugin manifest validates, but this has not yet been run end to end on a
+**Not yet production-tested.** `v0.11.0` moves durable state to `.rune/` and defines its
+migration as an agent-followed skill protocol. Rune has not yet been run end to end on a
 real repository. Expect to adjust:
 
 - the 200-token limit on what subagents return (models go over it)
 - how worktrees behave on Windows paths
 - whether stopping for plan approval happens at the right times or just gets annoying
 
-Start with `/rune:init` on a low-stakes repo — it only reads, and it will tell you right
-away whether it can find the test command for your stack.
+Start with `/rune:init` on a low-stakes repo. It does not edit source code, but it writes
+`.rune/` coordination state, updates the worktree ignore entry, and may migrate recognized
+legacy Rune state before it looks for the test command for your stack.
 
 ## License
 
