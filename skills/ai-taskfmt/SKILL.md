@@ -19,7 +19,7 @@ stranger with an empty context.
   vision.md              # the vision document
   decisions.md           # decision records (DEC-nnn)
   milestones.md          # milestone graph (M-nn)
-  ledger.md              # ALL mutable state. single writer: the parent
+  ledger.md              # versioned mutable task state. single writer: the parent
   drafts/M-nn/R-nnn/protocol.md # immutable type/protocol selection for one run
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   tasks/T-nnn.md         # immutable spec + appended amendments
@@ -125,6 +125,15 @@ row above.
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
 
+The canonical ledger schema is owned by `ai-ledger`. Schema 1 has one task row containing
+identity, status, dependencies, stable worktree, phase attempt counters, verifier-failure
+count, latest-finding pointer, live blocker, and resume token. The detailed finding remains
+in its per-task sole-writer file; the ledger pointer is the authoritative routing field.
+
+Every parent route validates the ledger before reading it as state and validates a complete
+candidate before replacing it. A transition is one replacement containing all changed
+fields and its returned dispatch row. No worker starts between partial edits.
+
 The parent writes mutable coordination and user-owned planning state. Workers write the
 outputs that require delegated context — maps, planner drafts, reconciled task files,
 progress, and results. A parent about to write anything outside its rows has found a
@@ -195,11 +204,14 @@ selection is a separate concern that does not belong in these files.
 ### The dispatch envelope — what a worker is given
 
 Every dispatch hands over the same shape. `main_root` is required for all workers;
-`worktree_path` is required only for task-bound work and is omitted otherwise:
+`worktree_path` is required only for task-bound work and is omitted otherwise. Diagnosis,
+execution, verification, and landing also receive `attempt`, copied from the counter the
+parent incremented and persisted before dispatch:
 
 ```
 follow:        ai-execute
 task:          T-014
+attempt:       2
 main_root:     /workspace/acme
 worktree_path: /workspace/acme/.agent/worktrees/T-014
 pointers:
@@ -211,6 +223,7 @@ Bug diagnosis uses the same task-bound envelope before the task-file pointer exi
 ```yaml
 follow:        ai-bug
 task:          T-014
+attempt:       1
 main_root:     /workspace/acme
 worktree_path: /workspace/acme/.agent/worktrees/T-014
 pointers:
@@ -218,17 +231,18 @@ pointers:
   progress: /workspace/acme/.agent/notes/T-014.progress
 ```
 
-The parent writes the protocol and `diagnosing` ledger row before this dispatch. The
-worker creates or validates the exact supplied worktree before any source write.
+The parent writes the protocol and complete `diagnosing` ledger row, including `d1`,
+before this dispatch. The worker creates or validates the exact supplied worktree before
+any source write.
 
 The values sent in a real dispatch are absolute paths — never the literal
 `<main_root>` placeholder used in prose. Before doing any work, a task-bound worker
 confirms that `worktree_path` belongs to the same Git repository as `main_root`. A
 mismatch, a missing verifier/recovery path, or a wrong task branch is a blocked outcome,
 not permission to search for another checkout. An executor that blocks uses the durable
-blocked-return contract below: it preserves the recorded worktree identity, writes a task
-handoff, and names the objective condition that permits a retry. A lander alone may accept
-a missing path after proving the exact verified commit is already in main, per its
+blocked-return contract below: it records the worktree disposition, writes a task handoff,
+and names the objective condition that permits a retry. A lander alone may accept a
+missing path after proving the exact verified commit is already in main, per its
 crash-recovery path.
 
 **Pointers, not payloads.** The parent names where things are; the worker reads them
@@ -326,16 +340,16 @@ Then whatever else that skill defines.
 ```yaml
 worktree: kept
 worktree_path: /workspace/acme/.agent/worktrees/T-014
-blocker: package registry is unreachable from the task worktree
-unblock_when: the declared registry probe succeeds from this environment
-handoff: /workspace/acme/.agent/notes/T-014.md
+blocker: registry-unreachable
+resume_at: step:2
+detail: /workspace/acme/.agent/notes/T-014.md
 ```
 
-`blocker` says what is true now; `unblock_when` says what observable fact makes another
-attempt safe. Neither may be "retry later" or another restatement of `blocked`. The
-handoff is the durable detail, and the short return is the routing interface the parent
-records in the ledger. A blocked executor never discards or silently repoints the task's
-recorded worktree.
+`blocker` is a short lowercase slug stored as `external:<slug>`; `detail` points at the
+handoff whose `blocker_reason` says what is true now and whose `unblocks_when` says what
+observable fact makes another attempt safe. Neither may be "retry later" or another
+restatement of `blocked`. The executor also returns the worktree disposition and a
+schema-safe resume token rather than forcing the parent to infer them.
 
 **Do not force one vocabulary across all of them.** A verifier's outcome genuinely is not
 an executor's outcome, and `ai-execute`'s values are the ones the ledger's state machine
@@ -752,16 +766,20 @@ Written when an executor stops early. Read by a stranger, always.
 # T-014 handoff
 stopped_at: step 2 of 3
 reason: drift | budget | blocked | question
-blocker: package registry is unreachable from the task worktree
-unblock_when: the declared registry probe succeeds from this environment
+resume_at: fresh | step:N | evidence:<mode> | publish
 what_exists: TokenStore.rotate implemented and unit-tested; not yet wired into handle()
 what_surprised_me: handle() is called from two places, not one — see src/ws/upgrade.ts
 worktree: kept | discarded
 next: wire both call sites, or split the second into its own task
+blocker: service-down # required only for blocked; must match the short return
+blocker_reason: required only for blocked — state the external condition, not "cannot proceed"
+unblocks_when: required only for blocked — one observable condition the parent can re-check
 ```
 
-`blocker` and `unblock_when` are required when `reason: blocked` and omitted otherwise.
-Blocked handoffs always say `worktree: kept`; the next executor resumes from the ledger's
-same absolute path only after the unblock condition is proven. No pronouns pointing at a
-conversation. No "as discussed". No "the approach we agreed". The reader has none of
-that.
+No pronouns pointing at a conversation. No "as discussed". No "the approach we agreed".
+The reader has none of that.
+
+`resume_at` is copied into the ledger; keep it to the schema-1 tokens. For a blocked
+handoff, the parent stores `external:<slug>` and points `latest_finding` here, while these
+two conditional lines preserve the full reason and unblock condition. It must not
+redispatch merely because time passed; it first observes `unblocks_when`.

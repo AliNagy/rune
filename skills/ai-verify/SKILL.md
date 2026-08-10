@@ -24,6 +24,7 @@ Only these:
 
 - `main_root` — the absolute orchestration checkout; all coordination paths resolve here
 - `worktree_path` — the exact absolute task worktree used by the executor
+- `attempt` — the positive verifier attempt already incremented in schema-1 ledger state
 - `<main_root>/.agent/tasks/T-nnn.md` — the spec, including type, verification mode,
   acceptance, and the stated check
 - `<main_root>/.agent/notes/T-nnn.progress` — ticks, mode-specific evidence, and the latest
@@ -41,11 +42,14 @@ wrong repository or branch, or differs from the task path in the ledger, return
 Not the executor's summary. That is the claim under examination; reading it primes you to
 agree with it.
 
-**The record tells you which attempt this is. It does not tell you what to check.** Run all
-eight steps below whether this is attempt 1 or attempt 4. Narrowing to "did they fix the
+**The dispatch tells you which attempt this is; the record proves ordering.** Require
+every existing block number to be unique and lower than `attempt`. Gaps are allowed: they
+are dispatches that died before writing a verdict. A duplicate or later number is
+`unverified` with `reason: evidence`; do not invent another number. Run all eight steps
+below whether this is attempt 1 or attempt 4. Narrowing to "did they fix the
 last finding" is how the second defect in a task ships: the executor answered the finding,
 you confirmed the finding was answered, and nobody looked at the rest. Read it for the
-count and for what has already been rejected — then verify the task, not the finding.
+history of what has already been rejected — then verify the task, not the finding.
 
 ## Procedure
 
@@ -140,9 +144,10 @@ prevent. And it lives under `<main_root>/.agent/`, so it is visible to the paren
 and the next executor immediately, rather than at merge — and it survives the worktree
 being discarded.
 
-Append one block per attempt; never edit or delete an earlier one. The history is the
-point: a task rejected three times for three different reasons is a different problem from
-one rejected three times for the same reason, and only the history tells them apart.
+Append one block for the exact dispatched `attempt`; never edit or delete an earlier one.
+The history is the point: a task rejected three times for three different reasons is a
+different problem from one rejected three times for the same reason, and only the history
+tells them apart.
 
 ```markdown
 ## attempt 2 — 2026-08-08
@@ -188,9 +193,10 @@ finding is *superseded* when a later `fail` block replaces it — the new one is
 next executor must answer. It is *resolved* when a later block reads `pass`. Nothing is
 rewritten to mark either; position in the file already says it.
 
-If you die between writing the block and returning, the parent sees no verdict and
-dispatches a fresh verifier, which appends its own. A duplicate block is noise. A missing
-one sends the next executor in blind.
+If you die between writing the block and returning, the parent sees the durable block
+during reconciliation and consumes that verdict. If no block exists, it increments `v`
+again before dispatching a fresh verifier. Duplicate attempt numbers are invalid state,
+not harmless noise.
 
 ## Verdict
 
@@ -214,13 +220,13 @@ acceptance:
   - test passes .......... pass
   - no regression ........ pass
   - rotate called once ... pass
-attempt: 2                        # count the blocks in the record, including this one
+attempt: 2                        # exactly the attempt supplied by the parent
 detail: /workspace/acme/.agent/notes/T-014.verify.md
 ```
 
-`attempt` is not decoration. The parent stops a task that has failed twice, and it cannot
-count reliably across a context that may have been compacted. You are reading the number
-off disk, so you are the one who can.
+`attempt` is not decoration. It binds the ledger's `v` counter, this record block, and the
+short verdict. The parent separately increments the ledger's `failures` field only for a
+`fail` verdict; that durable counter drives the two-failure stop rule.
 
 **pass** — every criterion met, the declared mode's evidence is complete, and
 `verified_commit` names the exact published artifact you checked.

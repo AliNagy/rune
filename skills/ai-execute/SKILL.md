@@ -6,8 +6,8 @@ description: Use when executing one Rune task from an explicitly identified main
 
 # Executing a task
 
-**You execute one task.** The dispatch gives you its id, absolute `main_root`, absolute
-`worktree_path`, and absolute pointers. Read
+**You execute one task.** The dispatch gives you its id, positive `attempt`, absolute
+`main_root`, absolute `worktree_path`, and absolute pointers. Read
 `<main_root>/.agent/tasks/T-nnn.md` yourself. Reject relative paths; your starting
 directory is not an identity.
 
@@ -39,8 +39,8 @@ diagnosis-only branch for a finished task. An empty dirty diff does not mean an 
 been through verification before and came back. The last block is why the previous attempt
 was rejected; the blocks above it are what earlier attempts tried and had refused.
 **Answering the last block is the work.** Running the task's original steps again without
-reading it earns the same verdict a second time, which is how a task burns its two attempts
-and lands on the user's desk with nothing learned.
+reading it earns the same verdict a second time, which is how a task reaches two verifier
+failures and lands on the user's desk with nothing learned.
 
 **If `<main_root>/.agent/notes/T-nnn.landing.md` exists, read it too.** This task has already been
 verified once and then failed to merge into the main tree. That file holds the exact
@@ -143,29 +143,6 @@ worktree, return `status: budget`. Returning early with a good handoff is succes
 Running to exhaustion — truncated output, no handoff — forces the next attempt to start
 from nothing.
 
-**A blocker is a durable stop, not a retry request.** Use `status: blocked` only when an
-objective condition outside this executor's authority prevents progress: an invalid task
-contract, a missing dispatch input, a checkout-identity failure, or an unavailable external
-capability. A visible product choice is `question`; a false plan premise or required
-out-of-surface change is `drifted`; running long is `budget`.
-
-Before returning `blocked`:
-
-1. Stop without publishing or committing partial work.
-2. Leave the ledger-recorded worktree path untouched. Return `worktree: kept` even when
-   the blocker prevented its creation or validation; `kept` means the parent must preserve
-   that identity and must not discard anything at the supplied path.
-3. Write `<main_root>/.agent/notes/T-nnn.md` using the `ai-taskfmt` handoff schema with
-   `reason: blocked`, the exact `blocker`, an observable `unblock_when`, what exists, and
-   the next safe action.
-4. Return the same `blocker`, `unblock_when`, and absolute `handoff` pointer. Do not ask the
-   parent to infer them from the summary.
-
-A blocked task is re-dispatched only after the parent proves `unblock_when`. The next
-executor receives the handoff and the same absolute worktree path. Never loop on the
-failed operation yourself or downgrade the block to `budget` merely to put the task back
-in the queue.
-
 **Never mark yourself done.** A separate verification decides that, in a context that
 never saw your reasoning. Marking your own work done is the single failure the whole
 verification step exists to prevent, and you are the agent least able to judge it.
@@ -187,15 +164,46 @@ Ask only for choices that change visible behaviour. Anything you could have dete
 from the spec or the surrounding code, determine — spending the user's attention on it is
 worse than deciding and noting it.
 
+## Durable early stops
+
+`budget`, `blocked`, and `question` all write `<main_root>/.agent/notes/T-nnn.md` before
+returning and name it on `detail`. Include a ledger-safe `resume_at` token: `fresh`,
+`step:N`, `evidence:<mode>`, or `publish`. The prose explaining that token stays in the
+handoff.
+
+Use `status: blocked` only when an objective condition outside this executor's authority
+prevents progress: an invalid task contract, missing dispatch input, checkout-identity
+failure, or unavailable external capability. A visible product choice is `question`; a
+false plan premise or required out-of-surface change is `drifted`; running long is
+`budget`.
+
+A blocked return also includes a short lowercase `blocker` slug. Its handoff must contain:
+
+```markdown
+blocker: staging-access
+blocker_reason: the staging identity provider rejects this repository's credentials
+unblocks_when: repository access is granted and the same identity probe succeeds
+```
+
+All three lines are required even for a preflight block before source edits, and the slug
+must match the short return. "Retry later" is not an unblock condition. The parent stores
+`external:<slug>` plus the handoff pointer; it does not squeeze this prose into the ledger
+row. Do not loop on the failed operation or downgrade the block to `budget`; only the
+parent may re-dispatch after it observes the recorded condition.
+
+Keep a valid worktree whenever it contains diagnosis state, a source diff, or task commits.
+Return `worktree: discarded` only when no task source state exists or the supplied path is
+unusable; pair that with `resume_at: fresh`. A blocker is not permission to throw away
+recoverable partial work.
+
 ## Publish before reporting `done`
 
 `status: done` means **a commit exists**, not merely that the files look right in one
 worktree. Verification and landing run in fresh contexts; an uncommitted diff has no path
 through git into the main tree.
 
-Only a completed task is published. `blocked` always keeps the recorded worktree identity;
-`budget`, `question`, and `drifted` follow their own stopping rules. Do not commit partial
-work merely to make it durable.
+Only a completed task is published. Early stops follow the worktree policy above; drift
+follows `ai-drift`. Do not commit partial work merely to make it durable.
 
 After the declared evidence chain is complete and the task-local check and project oracle
 pass:
@@ -235,6 +243,7 @@ so the progress file is authoritative and the return repeats the ids for routing
 ```
 status: done | drifted | budget | blocked | question
 task: T-nnn
+attempt: 2
 worktree: kept | discarded        # done always means kept until ai-land cleans it
 worktree_path: /workspace/acme/.agent/worktrees/T-nnn
 summary: <one or two lines>
@@ -242,9 +251,9 @@ base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any
 decision: DEC-nnn     # if status is question
-blocker: package registry is unreachable       # required for status: blocked
-unblock_when: registry probe succeeds           # required for status: blocked
-handoff: /workspace/acme/.agent/notes/T-nnn.md # required for status: blocked
+blocker: service-down # required for blocked; lowercase slug
+resume_at: step:3     # required for budget, blocked, and question
+detail: /workspace/acme/.agent/notes/T-nnn.md  # early stops
 ```
 
 Anything longer goes to `<main_root>/.agent/notes/`. The dispatcher must not have to read your

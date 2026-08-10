@@ -52,6 +52,8 @@ Two consequences are load-bearing:
   if you must act on it.
 - You **re-read `ledger.md` from disk** between dispatches. Never carry ledger state in
   context — a stale in-memory copy is how you dispatch a task someone already finished.
+- Validate schema 1 on every read and every candidate replacement, per `ai-ledger`. An
+  invalid or unknown ledger is a stop condition, not permission to infer missing state.
 
 If either slips, the parent hits its ceiling around task 25 no matter how clean the
 workers are.
@@ -144,21 +146,25 @@ After triage returns `bug`:
    used if it appears anywhere under `.agent/`, not only in `tasks/` or the ledger.
 2. Write the run's immutable `protocol.md` with `type: bug`, `protocol: ai-bug`, triage
    evidence and shape, and `reserved_task: T-nnn`.
-3. Add one provisional ledger row with status `diagnosing` and the absolute
-   `<main_root>/.agent/worktrees/T-nnn` path. This reserves identity; no task spec exists
+3. In one validated ledger update add a provisional row with the milestone, title,
+   `status: diagnosing`, the absolute `<main_root>/.agent/worktrees/T-nnn` path,
+   `attempts: d1/e0/v0/l0`, zero failures, no finding or blocker, and
+   `resume_at: diagnose`. This reserves identity and claims diagnosis; no task spec exists
    and the row is not executable.
-4. Dispatch one `ai-bug` worker with that task id, `main_root`, `worktree_path`, and
+4. Dispatch one `ai-bug` worker with that task id, `attempt: 1`, `main_root`, `worktree_path`, and
    absolute protocol and `notes/T-nnn.progress` pointers. The worker creates or validates
    the exact worktree before writing the reproduction check.
 5. Act on its durable result:
    - `reproduced` — require a clean kept worktree, `diagnosis_base_commit`, and
-     `diagnosis_commit`; continue into decomposition using this same run and reservation.
+     `diagnosis_commit`; clear any blocker, set `resume_at: plan:<this run>`, and continue
+     into decomposition using this same run and reservation.
    - `not_reproduced` — remove the provisional row, keep the progress record, and ask for
      the missing input. The worker discarded the worktree and the id remains burned.
    - `reclassified` — remove the provisional row, preserve the old run and progress record,
      then route the returned type through a fresh run. Never recycle the id.
-   - `blocked` — keep the row `diagnosing`, record the blocker, and stop. Do not plan from
-     partial or inaccessible evidence.
+   - `blocked` — keep the row `diagnosing`, set `blocker: external:<slug>`, point
+     `latest_finding` at the progress block containing the reason and unblock condition,
+     and stop. Do not plan from partial or inaccessible evidence.
 
 The parent never reads the reproduction diff or test output. The progress pointer and two
 commit ids are the interface; planners consume the detail from disk.
@@ -209,10 +215,12 @@ Use this exact two-phase protocol:
    reconciler maps the selected `reservation: primary` task to the protocol's already-used
    `T-nnn`; it allocates ids only for any additional tasks.
 5. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
-   edges. Then register exactly those tasks in `<main_root>/.agent/ledger.md` in one parent
-   update. For a bug, update the existing reserved row's title and dependencies and move
-   `diagnosing -> pending`; add only the extra rows. Its worktree path never changes.
-   Draft planners and the reconciler never register tasks themselves.
+   edges. Then register exactly those tasks in `<main_root>/.agent/ledger.md` in one
+   validated parent update. New rows start `pending`, `d0/e0/v0/l0`, zero failures, no
+   finding or blocker, `resume_at: fresh`, and no worktree. For a bug, update the existing
+   reserved row's title and dependencies, move `diagnosing -> pending`, preserve `d1` and
+   its absolute worktree, clear the blocker, and set `resume_at: fresh`; add only the extra
+   rows. Draft planners and the reconciler never register tasks themselves.
 
 The draft files remain immutable after reconciliation. They are the evidence for what the
 planners agreed on, where they disagreed, and what the reconciler changed.
@@ -331,6 +339,7 @@ No shared files. T-015 waits on T-014.
 - **`main_root`**, the same absolute orchestration checkout used by the parent.
 - **`worktree_path`**, preallocated as the absolute
   `<main_root>/.agent/worktrees/T-nnn` and recorded in the ledger before dispatch.
+- **`attempt`**, the row's executor counter after it was incremented and persisted.
 - One task id and absolute pointers to its task file plus any handoff, verification, or
   landing record it must consume.
 
@@ -348,11 +357,18 @@ substitute.
 The rule exists twice over because it carries two loads: a dead executor's torn state is
 discarded with its worktree, and parallel executors cannot tread on each other.
 
+Claim each task before dispatch in one ledger replacement: allocate or preserve its exact
+absolute worktree, set `in_progress`, increment `e`, clear `blocker`, and set
+`resume_at: recover`. Validate and persist that complete row, then dispatch. If the
+dispatch never returns, `continue` can see both that an attempt happened and that recovery
+is required.
+
 Executors report ≤200 tokens:
 
 ```
 status: done | drifted | budget | blocked | question
 task: T-014
+attempt: 2
 worktree: kept | discarded        # done requires kept until ai-land cleans it
 worktree_path: /workspace/acme/.agent/worktrees/T-014
 summary: rotate() implemented and wired; required verification evidence recorded
@@ -360,47 +376,58 @@ base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
 drift: DRF-003          # if any
 decision: DEC-012       # if status is question
+blocker: service-down   # blocked only; parent stores external:service-down
+resume_at: step:3       # budget, blocked, or question
+detail: /workspace/acme/.agent/notes/T-014.md
 ```
 
-For `done`, require both commit ids. They are routing data, not the durable record — the
-executor wrote the same publication to
-`<main_root>/.agent/notes/T-nnn.progress`. Record the outcome and dispatch the verifier
-with the same `main_root`, the same exact `worktree_path`, and absolute pointers to the
-task and progress files. Do not read the worktree or accept an uncommitted success claim.
+Consume every outcome in one validated ledger update:
 
-Apply the authoritative executor-result mapping from `ai-ledger`. This route owns the
-actions that follow each transition; it does not redefine what the states mean.
+| Executor status | Complete row update |
+|---|---|
+| `done` | require both commit ids; set `verifying`, increment `v`, resume `verify`, then dispatch the verifier with that attempt |
+| `budget` | set `pending`, preserve the absolute worktree, point `latest_finding` at the handoff, set the returned pending resume token |
+| `blocked` | set `blocked`, keep the absolute worktree or mark it `discarded` exactly as returned, store `external:<slug>`, and point at the handoff containing `blocker_reason`, `unblocks_when`, and the compatible resume token |
+| `question` | after parent id allocation set `awaiting`, `decision:DEC-nnn`, the decision pointer, and the returned resume token |
+| `drifted` | set `drifted`, `drift:DRF-nnn`, the drift pointer, and `resume_at: replan` |
+
+For `done`, the commit ids are routing data, not the durable record — the executor wrote
+the same publication to `<main_root>/.agent/notes/T-nnn.progress`. Do not read the
+worktree or accept an uncommitted success claim. The update to `verifying` and `v++` must
+land before the verifier is dispatched.
+
+The status meanings and row validity rules remain owned by `ai-ledger`; the table above is
+this route's atomic action for each returned outcome.
 
 ### When an executor is blocked
 
 `status: blocked` ends that dispatch attempt. Validate that the return names the live task,
-the ledger's exact absolute `worktree_path`, `worktree: kept`, a concrete `blocker`, an
-observable `unblock_when`, and an absolute `<main_root>/.agent/notes/T-nnn.md` handoff.
-Then, in one ledger write:
+its recorded `attempt` and `worktree_path`, a valid kept/discarded disposition, lowercase
+`blocker` slug, schema-safe `resume_at`, and absolute `detail` handoff. The handoff must
+repeat the slug and contain `blocker_reason` plus observable `unblocks_when`. Consume it
+with the complete row update above; the executor attempt was already counted when claimed,
+so returning blocked does not increment `e` again.
 
-1. set the task from `in_progress` to `blocked` without incrementing its attempt;
-2. preserve the exact worktree path;
-3. add or replace its `## Blockers` row with source `executor`, the two returned fields,
-   and the handoff pointer; and
-4. log the execute dispatch as blocked.
-
-Do not verify, land, discard, or immediately retry it. If any required field is missing or
-mismatched, fail closed: keep the task blocked and the worktree path unchanged; record
-`incomplete blocked return: <fields>` as the blocker, `missing blocked fields recovered or
-task explicitly reset` as the canonical unblock condition, and `record: missing` when the
-handoff is absent. Never invent the executor's intended unblock condition.
+Do not verify, land, or immediately retry it. If any required field is missing or
+mismatched, fail closed without constructing an invalid schema-1 blocked row: preserve the
+already-valid claimed row and recorded worktree, append the incomplete dispatch outcome in
+one validated write, stop the normal loop, and enter `continue` reconciliation before
+reporting. Never invent missing blocker fields, discard source state, or leave the stale
+`in_progress` claim unreconciled.
 
 Keep unrelated tasks in the batch running. Report the blocker and the exact condition that
 would clear it. A later `work` or `continue` may move it back to `pending` only after that
 condition is proven through an allowed bounded probe, durable coordination state such as a
 reconciled replacement, or explicit user confirmation. If none can prove it, report and
-wait. Remove the blocker row in the same write, and give the retry executor the existing
-handoff plus the same worktree path.
+wait. Clear `blocker`, retain `latest_finding` as history, and preserve the compatible
+resume token and any live worktree in the same validated write.
 
 ### Landing a batch
 
 Verify each task independently first (step 5), then land them **one at a time, in the order
-they finished**. Each landing is a **dispatch to `ai-land`** carrying one task id and
+they finished**. Before each landing, atomically set `landing`, increment `l`, and set
+`resume_at: land`. Each landing is a **dispatch to `ai-land`** carrying one task id, that
+recorded attempt, and
 the same `main_root` and `worktree_path`, plus absolute pointers to its progress and
 verification records — never two at once, because two landers are two writers on the main
 tree.
@@ -417,11 +444,11 @@ Five outcomes:
 
 | `landing:` | What happened | What you record |
 |---|---|---|
-| `landed` | exact verified commit merged, oracle passed | `done`, cleanup result from lander |
-| `refused` | artifact missing, dirty, empty, or changed since verification | `pending`, **worktree kept** |
-| `conflict` | merge refused, nothing landed | `pending`, **worktree kept** — it has fallen behind main |
-| `reverted` | merged, oracle failed, rolled back | `pending`, **worktree kept** — the landing record says what broke |
-| `stuck` | the main tree needs a human — dirty on arrival, or a rollback that did not restore it | stop everything, below |
+| `landed` | exact verified commit merged, oracle passed | `done`, blocker `—`, resume `—`, worktree `merged` or cleanup-pending absolute path |
+| `refused` | artifact missing, dirty, empty, or changed since verification | `pending`, worktree kept, finding points at landing attempt, resume `publish` |
+| `conflict` | merge refused, nothing landed | `pending`, worktree kept, finding points at landing attempt, resume `fresh` |
+| `reverted` | merged, oracle failed, rolled back | `pending`, worktree kept, finding points at landing attempt, resume `fresh` |
+| `stuck` | the main tree needs a human — dirty on arrival, or a rollback that did not restore it | `blocked`, `main:red`, landing finding, resume `land`; stop everything |
 
 **Keep the worktree on anything but `landed` with `cleanup: complete`.** What is in it
 passed independent verification; what failed was publication or integration. Discarding
@@ -447,8 +474,11 @@ execute → verify → land ─┐
    └─────────────────────┘
 ```
 
-**The lander enforces the ceiling, not you.** It counts attempts in the landing record and
-stops at five. You do not track that — you act on the `escalate` line it returns.
+**The ceiling is five dispatched landing attempts.** Before claiming another landing,
+stop if the ledger already says `l5`; a dead fifth dispatch still consumed the attempt.
+The lander independently rejects a supplied attempt above five and evaluates the
+record-based escalation rules. Apart from that mechanical ceiling, act on the `escalate`
+line it returns rather than judging whether another loop seems worthwhile.
 
 - `escalate: no` → round the loop again.
 - `escalate: yes` → **stop and go to the user**, per `ai-report`. Give them the reason the
@@ -474,7 +504,9 @@ The record arrives in `<main_root>/.agent/decisions/open/T-nnn.md` with no id. *
 `DEC-nnn`, move it into `decisions.md`, and delete the open file.** That hop is yours
 because id allocation cannot be done safely by three concurrent workers.
 
-Do not answer it yourself. Surface it to the user per `ai-report` — question first,
+Do not answer it yourself. In the same update that moves the task to `awaiting`, store
+`decision:DEC-nnn`, point `latest_finding` at that record, and preserve the worker's
+`resume_at`. Surface it to the user per `ai-report` — question first,
 options, your recommendation — and keep the rest of the batch running while you wait. When
 the decision lands, re-dispatch the task; a fresh executor picks up the handoff, the
 worktree diff, and the now-resolved decision.
@@ -488,25 +520,29 @@ possible judge of its own work.
 - Before acting on the verdict, require its `artifact_commit` to match the executor's
   latest publication and require `verified_commit` to equal it on `pass`. A mismatch is
   `unverified`; never choose which SHA the verifier probably meant.
-- `pass` → hand the task id plus pointers to the progress and verification records to
-  `ai-land`, with the same `main_root` and exact `worktree_path`. It is not `done` until
-  that returns `landed` — publishing, passing in a worktree, and surviving the merge are
-  three different claims tied together by the same commit.
-- `fail` → back to `pending`. The verifier wrote its finding to
+- `pass` → keep the completed `v` counter, then atomically claim landing and increment `l`
+  before handing the task id, landing attempt, and pointers to `ai-land`. It is not `done`
+  until that returns `landed` — publishing, passing in a worktree, and surviving the merge
+  are three different claims tied together by the same commit.
+- `fail` → back to `pending`, increment `failures`, set `latest_finding` to the verifier's
+  exact attempt anchor, and set `resume_at: fresh`. The verifier wrote its finding to
   `<main_root>/.agent/notes/T-nnn.verify.md` and returned that path on its `detail` line.
   **Give the absolute path to the retry executor as a second pointer, alongside the task
   file, and reuse the exact `worktree_path`.** Do not have the verifier fix it, and do not
   restate its finding in the dispatch — the record is the payload, your dispatch carries
   the pointer.
-- `unverified` → not a soft pass. `reason: artifact` goes to `pending` with the worktree
-  kept and a fresh executor; it must publish one clean immutable range. `reason: evidence`
-  or `acceptance` is usually a defect in the task — send it back to decomposition.
-  `reason: oracle` stops the batch until the flaky or unavailable project check is resolved.
+- `unverified` → not a soft pass. Point `latest_finding` at its verdict block.
+  `reason: artifact` goes to `pending` with the worktree kept and `resume_at: publish`; a
+  fresh executor must publish one clean immutable range. `reason: evidence`
+  or `acceptance` is a task-contract finding: record it as drift, set `drifted` with the
+  drift blocker and `resume_at: replan`, then send it back to decomposition.
+  `reason: oracle` sets `blocked`, `external:oracle-unavailable`, the verifier finding, and
+  `resume_at: verify`; stop the batch until the check is available again.
 
-**The verifier counts the attempts, not you.** It returns `attempt: n`, read off the blocks
-in the record. A second `fail` on the same task is a stop condition below — act on the
-number it hands you rather than trying to remember across a context that may have been
-compacted since the first one.
+The verifier must echo the exact `attempt` already persisted in `v` and use the same number
+for its appended record block. Reject a mismatch. The two-failure stop rule reads the
+ledger's `failures` field after consuming the verdict; it never reconstructs that count
+from conversation memory or mistakes an `unverified` result for a failed criterion.
 
 ## 6. Reconcile
 
@@ -543,8 +579,8 @@ Everything you write opens with a TL;DR and uses plain words. Say "the tests pas
 
 Stop and return to the user when: the milestone is complete, an `open` decision blocks
 progress, an executor asked a question, drift invalidates a substantial part of the plan,
-an executor is blocked and nothing else is dispatchable, the same task fails twice, a
-lander returns `escalate: yes` or `stuck`, or nothing is dispatchable.
+an executor is blocked and nothing else is dispatchable, the ledger reaches `failures >= 2`
+for a task, a lander returns `escalate: yes` or `stuck`, or nothing is dispatchable.
 
 ```
 TL;DR

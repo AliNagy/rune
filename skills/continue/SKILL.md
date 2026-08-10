@@ -52,6 +52,27 @@ the purpose of having resumed at all.
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
 to act on one.
 
+### Validate or migrate the ledger first
+
+Before treating any row as state, apply `ai-ledger`'s schema validation. `schema: 1` must
+validate completely. An unknown schema stops here and is reported.
+
+A ledger with no schema marker is legacy schema 0. Migrate it once, before reconciliation:
+
+1. Read only coordination artifacts. Map each old milestone table row into the canonical
+   schema-1 Tasks table; the enclosing milestone heading supplies `milestone`.
+2. Derive `d/e/v/l` from durable dispatch rows and numbered diagnosis, verification, and
+   landing blocks. Gaps remain counted when a dispatch row exists. Count verifier `fail`
+   blocks into `failures`.
+3. Point `latest_finding` at the last live verifier, landing, drift, decision, or handoff
+   artifact. Derive `blocker` and `resume_at` from the old status plus that artifact.
+4. If any required value has two plausible answers, stop and name the row; do not choose.
+5. Validate the complete candidate and replace `ledger.md` once; never partially upgrade
+   in place.
+
+Only schema 0 has this path. Migration is idempotent because a successful replacement is
+schema 1 and later runs validate it instead of migrating again.
+
 ## 2. Reconcile
 
 Per `ai-ledger`. The critical step, and the one that is easy to skip because
@@ -69,8 +90,9 @@ so never send one to `ai-execute` or `ai-recover`.
 - `diagnosis: blocked` keeps the row and worktree. Report the recorded condition and
   re-dispatch only after it has cleared.
 - No terminal diagnosis block means the diagnosis worker died. Re-dispatch `ai-bug` with
-  the same task id, protocol, progress, `main_root`, and exact `worktree_path`. That skill
-  owns recovery before a task contract exists.
+  the same task id, protocol, progress, `main_root`, and exact `worktree_path`. First
+  increment `d`, set `resume_at: diagnose`, validate, and persist; pass the new attempt.
+  That skill owns recovery before a task contract exists.
 
 **Every `in_progress` row is a lie** — no executor is holding it; they died with the
 session. For each:
@@ -78,30 +100,34 @@ session. For each:
 1. **Valid complete publication present?** The executor committed the task and appended
    `base_commit` plus `artifact_commit` to its progress file, the task branch still points
    to that artifact, and its worktree is clean. It died after publication but before its
-   short return reached the parent. Set the row to `verifying` and dispatch `ai-verify`
-   with the row's exact `worktree_path`; its artifact preflight proves the remaining
-   invariants. Do not discard it because the uncommitted diff is empty — a completed
-   artifact should have an empty diff.
+   short return reached the parent. In one update set the row to `verifying`, increment
+   `v`, and set `resume_at: verify`; then dispatch `ai-verify` with that attempt and the
+   row's exact `worktree_path`. Its artifact preflight proves the remaining invariants. Do
+   not discard it because the uncommitted diff is empty — a completed artifact should have
+   an empty diff.
 2. **Handoff note present?** The executor stopped deliberately. Follow its
-   `worktree: kept|discarded` instruction and set the status it implies — `pending` for a
-   budget stop, `drifted` for drift, `awaiting` for a staged question, or `blocked` for a
-   blocker. A blocked handoff must name `blocker`, `unblock_when`, and `worktree: kept`;
-   create or repair its `## Blockers` row and preserve the exact path. Missing blocker
-   fields fail closed as `incomplete blocked handoff`, never as `pending`.
+   `worktree: kept|discarded` instruction and set the complete state it implies —
+   `pending` plus its resume token for budget; `drifted`, drift blocker, and `replan` for
+   drift; `blocked` plus its external blocker, finding pointer, and resume token for a
+   recorded external condition. A blocked handoff must include the lowercase `blocker`
+   slug, `blocker_reason`, observable `unblocks_when`, a schema-safe `resume_at`, and its
+   worktree disposition. If any are missing, treat the handoff as unusable and continue
+   through step 3; never write an invalid blocked row or optimistically set `pending`.
 3. **No handoff?** The session died mid-flight. At the ledger's exact absolute
    `worktree_path`, check only whether the worktree's diff is
    empty and whether the task branch is ahead of its merge base with main — both are
    bounded state probes, not source reads:
-   - empty diff, branch ahead → keep it and set `pending`. The executor may have died
+   - empty diff, branch ahead → keep it and set `pending`, `resume_at: publish`. The executor may have died
      between `git commit` and writing the publication block; a fresh executor inspects the
      committed range and either publishes that `HEAD` or resumes the task. For a diagnosed
      bug, `diagnosis_commit` alone is only the starting baseline and must never be published.
-   - empty diff, branch not ahead → discard, set `pending`. Nothing lost.
+   - empty diff, branch not ahead → discard, set `pending`, `resume_at: fresh`. Nothing lost.
    - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** with the same
      `main_root`, exact `worktree_path`, and absolute task/progress pointers.
      It maps the diff onto the task's declared steps, decides whether the work is
      salvageable, names the resume point, and writes the handoff the dead executor never
-     did. Apply its verdict — `salvage`, `discard`, or `partial` — and record it.
+     did. Apply its verdict — `salvage`, `discard`, or `partial` — copy its schema token to
+     `resume_at`, and point `latest_finding` at the handoff.
 
    Do not inspect the diff yourself. Reading it is exactly the code-reading the dispatcher
    is forbidden, and a torn worktree is expensive to read.
@@ -111,12 +137,21 @@ Also check:
 
 - orphaned worktrees with no ledger row → remove; if their task commit is already in main,
   delete the merged task branch too
-- `verifying` rows whose verifier never returned → re-dispatch against the row's exact
-  `worktree_path`; never create a fresh verifier checkout
+- `verifying` rows whose verifier never returned → first check for a durable block matching
+  the row's current `v`; consume it with the same complete mapping as `work` (including
+  `failures++` only for `fail`, the finding pointer, and the returned dispatch row) if
+  present. Otherwise increment `v`, persist, and
+  re-dispatch that attempt against the row's exact `worktree_path`; never create a fresh
+  verifier checkout
+- `landing` rows whose lander never returned → first consume a durable block matching the
+  current `l` with `work`'s complete outcome mapping when present. Otherwise, if `l` is
+  below five, increment it, persist, and
+  re-dispatch that attempt against the same verified artifact and exact worktree. At `l5`,
+  stop and surface the exhausted landing ceiling rather than creating attempt six
 - drift records not yet reflected in the ledger's blocked list
-- `blocked` rows without exactly one matching `## Blockers` row or durable record → keep
-  them blocked, repair what can be copied from the handoff, and report any missing field;
-  never infer that elapsed time cleared the condition
+- `blocked` rows whose finding is missing, unreadable, or lacks the blocker reason and
+  observable unblock condition → keep them blocked, report the damaged durable record,
+  and do not redispatch; never infer that elapsed time cleared the condition
 - decomposition runs with a protocol record or planner drafts but no registered tasks →
   keep the immutable artifacts, mark the attempt interrupted in the dispatch log, and
   route back to `work`. It allocates a fresh `R-nnn`; never resume into or reuse the
@@ -124,7 +159,8 @@ Also check:
   its protocol, diagnosis, and worktree are one bound input, so resume that same run.
 - **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
   session died before it reached the user. Assign the `DEC-nnn`, move it into
-  `decisions.md`, set the task `awaiting`, and surface it. This is the self-healing path
+  `decisions.md`, set the task `awaiting`, store `decision:DEC-nnn`, point at the decision
+  record, preserve the handoff's resume token, and surface it. This is the self-healing path
   and it is the whole reason those files exist.
 
 ## 3. Determine phase and route
@@ -177,10 +213,10 @@ Follow `ai-report`. Say what was **repaired**, not just what exists — silent r
 like nothing happened, and the user needs to know work was thrown away.
 
 A session restart never clears a blocker. If its objective condition is already proven by
-coordination state or the user explicitly confirms it, remove the blocker row and set the
-task to `pending` in the same ledger write; the next executor receives the existing
-handoff and exact worktree path. Otherwise report what is blocked, why, and the fact that
-would allow it to resume.
+coordination state or the user explicitly confirms it, clear the task's `blocker`, preserve
+its finding history plus compatible resume/worktree state, and set it to `pending` in one
+validated ledger write. Otherwise report what is blocked, why, and the fact that would
+allow it to resume.
 
 ```
 TL;DR

@@ -29,24 +29,33 @@ if (actualStatuses.join(',') !== expectedStatuses.join(',')) {
 }
 
 for (const status of expectedStatuses) {
-  if (!files.ledger.includes(`| \`${status}\` |`)) {
-    throw new Error(`ledger has no executor mapping for status: ${status}`)
+  if (!files.work.includes(`| \`${status}\` |`)) {
+    throw new Error(`work has no executor mapping for status: ${status}`)
   }
 }
 
-const requiredBlockedFields = ['blocker:', 'unblock_when:', 'handoff:']
-for (const field of requiredBlockedFields) {
+const blockedReturnFields = ['blocker:', 'resume_at:', 'detail:']
+for (const field of blockedReturnFields) {
   for (const [name, body] of Object.entries({ taskfmt: files.taskfmt, execute: files.execute })) {
-    if (!body.includes(field)) throw new Error(`${name} omits blocked field ${field}`)
+    if (!body.includes(field)) throw new Error(`${name} omits blocked return field ${field}`)
+  }
+}
+
+const blockedHandoffFields = ['blocker:', 'blocker_reason:', 'unblocks_when:']
+for (const field of blockedHandoffFields) {
+  for (const [name, body] of Object.entries({ taskfmt: files.taskfmt, execute: files.execute })) {
+    if (!body.includes(field)) throw new Error(`${name} omits blocked handoff field ${field}`)
   }
 }
 
 const lifecycleChecks = [
   ['ledger transition', files.ledger, '├─blocked──────────> blocked'],
-  ['ledger unblock transition', files.ledger, 'blocked ─unblock condition proven'],
-  ['ledger blocker storage', files.ledger, '## Blockers'],
-  ['dispatcher fail-closed rule', files.work, 'incomplete blocked return'],
-  ['recovery blocked mapping', files.resume, 'incomplete blocked handoff'],
+  ['ledger unblock transition', files.ledger, 'external block ─unblocks_when observed'],
+  ['ledger blocker storage', files.ledger, 'external:<slug>'],
+  ['ledger finding pointer', files.ledger, '`latest_finding`'],
+  ['blocked worktree policy', files.execute, 'Return `worktree: discarded` only when no task source state exists'],
+  ['dispatcher fail-closed rule', files.work, 'without constructing an invalid schema-1 blocked row'],
+  ['recovery blocked mapping', files.resume, 'treat the handoff as unusable'],
 ]
 
 for (const [name, body, required] of lifecycleChecks) {

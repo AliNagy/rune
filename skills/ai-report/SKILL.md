@@ -60,7 +60,7 @@ The system's internal terms are precise and mean nothing to a reader. Translate:
 | drift / DRF-003 | the plan was wrong about X |
 | the ledger | progress / status |
 | task T-014 is in the verifying state | T-014 is being checked |
-| task T-014 is blocked; unblock_when X | T-014 stopped because Y; it can resume when X |
+| task T-014 is blocked; `unblocks_when` X | T-014 stopped because Y; it can resume when X |
 | decomposed the milestone | split the work into 4 tasks |
 | context contract / forbidden list | which files this touches |
 | encapsulated task | self-contained task |
