@@ -36,6 +36,9 @@ in `diagnosis: reproduced`, its commit ids exist on `task/T-nnn`, and the worktr
 registered checkout of that branch. Read bug source and the reproduction from that
 worktree, not from `main_root`; do not modify it. A missing or mismatched reservation is
 `plan: blocked`, never permission to allocate a replacement id or worktree.
+For a drift replan, the reservation must be a fresh id outside the protocol's `retiring`
+set, and the diagnosis pointer and branch must belong to that fresh id. The old task's
+diagnosis is historical context only; reject any attempt to transfer it into a replacement.
 
 Milestone-graph work from `rune:vision` is the only job here without a protocol pointer;
 it creates milestones rather than executable tasks.
@@ -59,7 +62,9 @@ shared context.
 
 1. For planner or reconcile work, bind and load the protocol above.
 2. Read `<main_root>/.rune/map.md` and the milestone's scope and acceptance. For a bug,
-   also read the supplied diagnosis block and committed reproduction diff.
+   also read the supplied diagnosis block and committed reproduction diff. For a drift
+   replan, require the protocol's `drift` and `retiring` fields plus absolute pointers to
+   that drift record and every retiring task file; read them before cutting replacements.
 3. Use `ai-serena` to look at the actual symbols the milestone touches in the correct
    source checkout: the reserved worktree for a bug, `main_root` otherwise. Overview
    and signatures — not bodies, unless a specific decision depends on one.
@@ -90,6 +95,10 @@ path other than the assigned draft. If the assigned path already exists, return
 `plan: blocked`; never overwrite an artifact whose writer may still be alive.
 For a bug, mark exactly one proposed task `reservation: primary`; it must own the committed
 reproduction check and root-cause fix.
+For a drift replan, cover the current milestone outcome against the new code state rather
+than editing the old contracts. The retiring files are evidence about the failed cut, not
+templates. Use only local `D-nnn` ids and state in `Cut notes` which retiring outcomes each
+proposed task replaces, including any old outcome that now needs no task.
 
 **Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
 are given the run's protocol pointer plus pointers to two or three completed draft
@@ -98,7 +107,9 @@ is missing, duplicated, outside the run, lacks any part of the planner-draft sch
 declares a different type or protocol. Then pick the strongest cut, graft anything better
 from the others, run the protocol-specific sanity pass again on the proposed final cut,
 allocate the next unused final `T-nnn` ids, translate all local dependency edges, and write
-the final task files. For a bug, require exactly one `reservation: primary` in the final
+the final task files. An id is used if it appears anywhere under `.rune/`, including an
+unregistered task file left by an interrupted run; never overwrite or reuse it. For a bug,
+require exactly one `reservation: primary` in the final
 cut and map it to the protocol's existing `reserved_task`; allocate ids only for additional
 tasks. Confirm that primary task's check and change surface include the diagnosis commit's
 reproduction files. Say which cut you took as the base and what you moved. Where the cuts
@@ -106,6 +117,12 @@ disagreed, that seam is the part of the milestone that is genuinely hard to divi
 it as the thing to get right, not a tie to break quickly. You are the only worker in the
 run allowed to write
 `<main_root>/.rune/tasks/`, and you still never write `<main_root>/.rune/ledger.md`.
+For a drift replan, also write the exact assigned `replacements.md` artifact per
+`ai-taskfmt`. Map every protocol `retiring` id exactly once to `none` or one or more new
+ids, require every new id to appear in the map, and fail closed if any non-retired
+dependency would still name a retiring task. If every old task maps to `none`, return an
+empty task-artifact list only after checking the milestone acceptance against current
+code and recording that result in each disposition. Do not edit or delete an old task file.
 
 Every return is ≤200 tokens:
 
@@ -114,6 +131,7 @@ plan: drafted | reconciled | blocked | graph
 task: M-03/R-002/P-01       # planner; M-03/R-002 for reconciler
 artifact: /workspace/acme/.rune/drafts/M-03/R-002/P-01.md # milestones.md for graph
 artifacts: <main_root>/.rune/tasks/T-021.md, <main_root>/.rune/tasks/T-022.md
+replacement_artifact: <main_root>/.rune/drafts/M-03/R-004/replacements.md # replan only
 summary: ids, one-line titles, and dependency edges; or the blocking pointer
 ```
 
@@ -291,10 +309,21 @@ reconciler's returned final tasks only after every file has been written success
 
 ## Re-decomposition after drift
 
-When drift invalidates downstream tasks, do not patch them individually. Re-read the
-drift record, re-read the code as it now is, and re-cut the remainder of the milestone.
-Patched task files accumulate contradictions between their original spec and their
-amendments until nobody can tell which parts are still true.
+When drift invalidates unfinished tasks, do not patch or overwrite them. Re-read the drift
+record, the retiring task files, and the code as it now is, then re-cut the remainder of
+the milestone through a fresh, never-reused `R-nnn` directory. Completed tasks remain
+`done` and define the current code baseline.
 
-Run the same fan-out through a fresh, never-reused `R-nnn` directory. Keep completed tasks.
-Replace the rest.
+The parent writes `drift: DRF-nnn` and the complete transitive `retiring: [...]` set into
+the run's immutable protocol. Every planner gets absolute pointers to the same drift and
+old-task artifacts. The reconciler allocates globally unused ids for every replacement,
+writes only new task files, then writes `replacements.md`. It may map an old task to
+`none` only when the milestone no longer needs that outcome or current code already
+satisfies it; the disposition must say which.
+
+Return the replacement artifact pointer with the new task paths. The parent validates it
+and performs the one ledger transaction defined by `ai-ledger`: add the new rows and mark
+the old rows `retired` with their immediate `replaced_by` values together. Until that
+transaction succeeds, the old tasks remain drift-blocked and none of the new tasks is
+dispatchable. A crash leaves immutable unregistered files whose ids are burned; the next
+run starts fresh rather than guessing or overwriting them.

@@ -19,9 +19,9 @@ reading state, `ai-root` instructs the agent to:
 4. acquire the migration lock, write a durable migration marker, and rename `.agent/` to
    `.rune/` in one same-filesystem rename;
 5. rewrite known structured Rune pointers and the exact `.agent/worktrees/` ignore entry;
-6. validate a schema-1 ledger, or preserve a recognized schema-0 ledger for `continue` to
-   upgrade, and remove the marker and lock only after every rewrite succeeds. An unknown
-   schema stops the migration.
+6. validate a schema-2 ledger, or preserve a recognized schema-1/schema-0 ledger for
+   `continue` to upgrade, and remove the marker and lock only after every rewrite succeeds.
+   An unknown schema stops the migration.
 
 Re-running the protocol is safe. If the session stops, its lock remains so a concurrent
 agent cannot mistake partial state for an abandoned write. Confirm no Rune migration is
@@ -44,11 +44,11 @@ path. Resolve those paths manually before retrying. Contents inside a real, unre
 
 Rune does not claim every directory named `.agent/`. A recognizable legacy root must use
 Rune's documented layout and contain an independent ownership signal such as initialized
-configuration, a complete schema-1 Rune ledger, a recognizable schema-0 Rune ledger, an
-interrupted vision-and-decisions pair, a Rune map or session handoff, or a schema-valid
-Rune task artifact. Unknown top-level entries make ownership ambiguous and stop the
-migration. A recognized schema-0 ledger is preserved for `continue` to upgrade after root
-migration; it is not treated as schema 1.
+configuration, a complete schema-2 Rune ledger, a recognizable schema-1/schema-0 Rune
+ledger, an interrupted vision-and-decisions pair, a Rune map or session handoff, or a
+schema-valid Rune task artifact. Unknown top-level entries make ownership ambiguous and
+stop the migration. A recognized older ledger is preserved for `continue` to upgrade
+after root migration; it is not treated as schema 2.
 
 Only exact absolute paths under the legacy Rune root and enumerated structured pointer
 fields are rewritten. Free-form prose is preserved even when it mentions a similarly

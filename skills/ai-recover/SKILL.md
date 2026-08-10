@@ -53,7 +53,7 @@ So:
 6. **Decide.** Below.
 7. **Write the missing handoff** to `<main_root>/.rune/notes/T-nnn.md`, in the format
    `ai-taskfmt` specifies, so the next executor gets what it should have had. Its
-   `resume_at` is the exact schema-1 token returned below.
+   `resume_at` is the exact schema-2 token returned below.
 
 ## Deciding
 

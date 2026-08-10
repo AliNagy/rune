@@ -60,9 +60,10 @@ exactly as `work` and `continue` are. There is no second agent here, only the sa
 agent in a later turn — and without that write, step 4's promise that no task is left
 `in_progress` would be impossible to keep.
 
-Validate schema 1 before draining and validate every complete replacement per `ai-ledger`.
-Settling a row includes its counters, finding, blocker, and resume token; never change only
-`status` and leave fields that describe the old phase.
+Validate schema 2 before draining and validate every complete replacement per `ai-ledger`.
+Settling a row includes its counters, finding, blocker, resume token, and replacement
+lineage; never change only `status` and leave fields that describe the old phase. Pause
+never retires a task or populates `replaced_by`.
 
 ```markdown
 paused: 2026-08-05T14:22Z

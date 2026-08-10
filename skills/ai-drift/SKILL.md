@@ -1,7 +1,7 @@
 ---
 name: ai-drift
 user-invocable: false
-description: Use when reality contradicts a task spec, or when stopping work before completion for any reason. Covers the in-scope tripwire, drift records, handoff notes written for a stranger, and worktree keep-or-discard.
+description: Use when reality contradicts a task spec, or when stopping work before completion for any reason. Covers the in-scope tripwire, drift records, handoff notes written for a stranger, and safe worktree disposition.
 ---
 
 # When the plan is wrong
@@ -12,9 +12,38 @@ from a survey, and surveys are optimistic about what is finished.
 Drift handled well is information. Drift handled badly is a ledger that stops describing
 reality.
 
-This skill inherits absolute `main_root` and `worktree_path` from `ai-execute`. All
-coordination writes resolve against `main_root`; all source and diff checks target the
-exact supplied task worktree. Never infer either from the current directory.
+This skill always receives absolute `main_root`. Detect and quiesce also receive the
+ledger's exact `worktree_path`; record-only has no source checkout. All coordination
+writes resolve against `main_root`, and every source or diff check targets only the
+supplied task worktree. Never infer either root from the current directory.
+
+## Modes
+
+The ordinary mode is **detect**: the task worker discovered drift, writes the causal
+record and handoff below, and discards its own worktree.
+
+Two bounded modes reuse the same ownership rules without claiming to have discovered new
+source facts:
+
+- **record-only** receives a parent-assigned unused `DRF-nnn`, its exact absolute output
+  path, one or more immutable task pointers, and durable evidence pointers. It is used when an
+  `ai-verify` verdict says the task's evidence or acceptance contract is not checkable, or
+  when migration finds a nonempty legacy `## Amendments` section. Read only those
+  coordination artifacts and the ledger dependency graph, write exactly the assigned
+  drift record, and return it. The finding is the record's evidence; never rewrite the
+  verifier record or interpret legacy amendment prose into a new contract. Do not read or
+  change source, write a task handoff, or touch a worktree.
+- **quiesce** receives an existing causal drift pointer, task id, and the ledger's exact
+  absolute `worktree_path`. Wait until the task's prior worker is confirmed stopped, then
+  discard that worktree and task branch without copying or landing their source state.
+  Write no new drift record. Preserve every coordination artifact and return
+  `status: quiesced`, the task id, causal drift id, and `worktree: discarded`. If the task
+  commit is reachable from main, or cleanup cannot prove the source is unpublished, stop
+  and return `status: refused`; a `landing` task must be reconciled by `ai-land` instead.
+
+Each mode is one dispatch and one sole writer. A retry after a crash receives the same
+assigned path or the same registered worktree; it never allocates another drift id or
+guesses a nearby checkout.
 
 ## The tripwire
 
@@ -64,22 +93,17 @@ Written for a stranger with an empty context. No "as discussed", no pronouns aim
 conversation that will not exist. State what exists on disk now, what surprised you, and
 what you would do next.
 
-**3. Decide the worktree.**
+**3. Discard the worktree.**
 
-First matching rule wins:
+A drifted task's immutable contract will be retired and any replacement receives a new id,
+branch, worktree, and evidence chain. Source state must not cross that identity boundary.
+Discard the task worktree even when one step appears independently useful; name that step
+in the handoff so replanning can account for it, but require its replacement to implement
+and verify the outcome under the new contract. Keeping or transferring the old diff would
+make source written for T-016 appear under T-020 without a truthful publication history.
 
-1. Any change built on the false premise → **discard**.
-2. Any change outside the declared change surface → **discard**.
-3. A declared step is fully applied, passes on its own, and does not depend on the false
-   premise → **keep**, and name that step in the handoff.
-4. Otherwise → **discard**.
-
-Discard is the default because it is the safe direction, and rule 3 is deliberately narrow
-— "a step that is finished and independent" is checkable, where "substantial work" is
-not.
-
-You do not need to journal what you changed. `git diff` in the worktree is the record; it
-is atomic with the edit and cannot desync. Say whether to trust it, not what it contains.
+The task file, progress, handoff, and drift record remain under `<main_root>/.rune/` as
+historical evidence. Only task source state is discarded.
 
 Then return to the parent (≤200 tokens):
 

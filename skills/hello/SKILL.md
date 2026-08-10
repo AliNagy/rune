@@ -47,9 +47,10 @@ Cheap reads only. Never source code.
 <main_root>/.rune/sessions/     · a recent session handoff?
 ```
 
-If `ledger.md` exists, validate it per `ai-ledger` before routing from any task row. No
-schema marker routes to `continue` for the one-time legacy migration. An unknown schema or
-invalid schema-1 row is surfaced as a blocker; never route work from a partial parse.
+If `ledger.md` exists, validate it per `ai-ledger` before routing from any task row. A
+schema-1 ledger or one with no schema marker routes to `continue` for the one-time legacy
+migration. An unknown schema or invalid schema-2 row is surfaced as a blocker; never route
+work from a partial parse.
 
 ## 2. Route
 
@@ -58,7 +59,7 @@ State beats intent. Some conditions answer the question regardless of what was a
 | State | Go to | Why |
 |---|---|---|
 | `<main_root>/.rune/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
-| legacy ledger with no schema marker | `continue` | Migrate and validate durable state before any other route trusts it. |
+| schema-1 or schema-0 ledger | `continue` | Migrate and validate durable state before any other route trusts it. |
 | a decision is `open` | surface it | Nothing can proceed. Show it, get an answer. |
 | a task is `awaiting` | surface it | An executor asked something and is blocked on the reply. |
 | a task is `diagnosing`, fresh session | `continue` | Reconcile the reserved bug worktree before planning. |

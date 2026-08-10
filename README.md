@@ -96,8 +96,8 @@ Everything worth keeping lives in `.rune/`:
   decisions.md           decisions made and still open — open ones block milestones
   milestones.md          the road to v1
   ledger.md              versioned task state, attempts, blockers, and resume points; parent-written
-  drafts/M-nn/R-nnn/     selected work protocol plus one complete cut per planner
-  tasks/T-nnn.md         task specs. never edited; changes are appended
+  drafts/M-nn/R-nnn/     selected protocol, planner cuts, and drift replacement map
+  tasks/T-nnn.md         immutable task specs; never edited, overwritten, or deleted
   notes/T-nnn.md         handoff notes and long results
   drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
 ```
@@ -204,6 +204,13 @@ main tree is never left broken while the records claim otherwise. Milestones
 are planned in full, but tasks only when it's time to build them: a task has to name real
 files, and for a milestone three steps out those files don't exist yet.
 
+**A wrong plan stays legible.** Drift never patches or overwrites a task specification.
+The obsolete unfinished task becomes a terminal retired row, fresh replacement work gets
+new task ids and files, and the ledger records the immediate old-to-new relationship (or
+that no replacement is needed). Completed tasks remain completed history. A crash before
+the atomic ledger update leaves the old tasks blocked and the unregistered new ids burned,
+so recovery cannot mistake half a replan for live work.
+
 **You decide the things worth deciding.** Every run stops once before writing code to show
 you the plan, the assumptions it made on your behalf, and what it's deliberately leaving
 out — then asks what you'd like to add. There's no flag to skip it. An agent that hits a
@@ -263,9 +270,10 @@ you if it finds a layout it doesn't recognise rather than guessing.
 
 ## Status
 
-**Not yet production-tested.** `v0.11.0` moves durable state to `.rune/` and defines its
-migration as an agent-followed skill protocol. Rune has not yet been run end to end on a
-real repository. Expect to adjust:
+**Not yet production-tested.** `v0.12.0` keeps task specifications immutable when drift
+forces replanning: obsolete work is retired, replacement work gets new ids, and schema 2
+records the lineage. Rune has not yet been run end to end on a real repository. Expect to
+adjust:
 
 - the 200-token limit on what subagents return (models go over it)
 - how worktrees behave on Windows paths

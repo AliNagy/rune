@@ -22,7 +22,7 @@ and points at the owner.
 ```markdown
 # Ledger
 
-schema: 1
+schema: 2
 vision: complete
 current_milestone: M-03
 oracle: npm test
@@ -30,17 +30,19 @@ main: green
 
 ## Tasks
 
-| id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at |
-|---|---|---|---|---|---|---|---|---|---|---|
-| T-011 | M-03 | TokenStore interface | done | — | merged | d0/e1/v1/l1 | 0 | — | — | — |
-| T-013 | M-03 | Diagnose refresh regression | diagnosing | — | /workspace/acme/.rune/worktrees/T-013 | d1/e0/v0/l0 | 0 | — | — | plan:M-03/R-002 |
-| T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.rune/worktrees/T-014 | d0/e2/v1/l0 | 1 | .rune/notes/T-014.verify.md#attempt-1 | — | recover |
-| T-015 | M-03 | Refresh endpoint | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh |
-| T-016 | M-03 | Session restart persistence | blocked | — | discarded | d0/e1/v0/l0 | 0 | .rune/drift/DRF-003.md | drift:DRF-003 | replan |
-| T-017 | M-03 | Expiry sweep | blocked | — | /workspace/acme/.rune/worktrees/T-017 | d0/e1/v0/l0 | 0 | .rune/notes/T-017.md | external:registry-unreachable | step:2 |
+| id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at | replaced_by |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| T-011 | M-03 | TokenStore interface | done | — | merged | d0/e1/v1/l1 | 0 | — | — | — | — |
+| T-013 | M-03 | Diagnose refresh regression | diagnosing | — | /workspace/acme/.rune/worktrees/T-013 | d1/e0/v0/l0 | 0 | — | — | plan:M-03/R-002 | — |
+| T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.rune/worktrees/T-014 | d0/e2/v1/l0 | 1 | .rune/notes/T-014.verify.md#attempt-1 | — | recover | — |
+| T-015 | M-03 | Refresh endpoint | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh | — |
+| T-016 | M-03 | Session restart persistence | retired | — | discarded | d0/e1/v0/l0 | 0 | .rune/drift/DRF-003.md | — | — | T-020,T-021 |
+| T-017 | M-03 | Expiry sweep | blocked | — | /workspace/acme/.rune/worktrees/T-017 | d0/e1/v0/l0 | 0 | .rune/notes/T-017.md | external:registry-unreachable | step:2 | — |
+| T-020 | M-03 | Persist sessions through restart | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh | — |
+| T-021 | M-03 | Restore persisted sessions | pending | T-020 | — | d0/e0/v0/l0 | 0 | — | — | fresh | — |
 
 ## Drift
-- DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
+- DRF-003 (from T-016) retired: T-016 — replacements: T-020, T-021
 
 ## Dispatches
 | phase       | followed      | for               | outcome                         |
@@ -56,9 +58,21 @@ main: green
 | land        | ai-land       | T-014             | landed @ 4a91c02                |
 ```
 
-`schema: 1` is mandatory. A ledger with no schema marker is legacy schema 0; `continue`
-migrates it before any route dispatches work. An unknown schema is a hard stop, never a
-best-effort parse.
+`schema: 2` is mandatory. Schema 1 is the recognized predecessor without `replaced_by`;
+a ledger with no schema marker is legacy schema 0. `continue` migrates either one before
+any normal lifecycle dispatch. The sole exception is its assigned record-only worker when
+an amended legacy contract requires drift evidence for the migration candidate. An
+unknown schema is a hard stop, never a best-effort parse.
+
+Schema 1 has the same ordered columns through `resume_at`. Migration appends
+`replaced_by` to the header and `—` to every existing row, then changes the marker to 2 in
+the same validated replacement. Before that replacement, `continue` scans unfinished
+task files for a nonempty legacy `## Amendments` footer. If it finds one, the
+migration-specific record-only protocol below must create a causal drift record and the
+candidate drift-blocks the complete unfinished dependency closure; it never promotes the
+amended prose into a schema-2 contract. Existing drift-blocked rows remain blocked, and
+migration never guesses future replacement ids. Schema 0 is mapped directly to schema 2
+by `continue` using its durable artifacts and the same legacy-amendment preflight.
 
 There is one `## Tasks` table for the whole ledger. Milestone membership is a field rather
 than a heading so every task has one self-contained state record. The columns are exact and
@@ -70,6 +84,10 @@ that some readers ignore.
 - `id`, `milestone`, `title`, `status`, and `blocked_by` identify the immutable task and
   its dependency state. `blocked_by` is `—` or a comma-separated list of `T-nnn` ids.
   Table values may not contain `|`; longer wording belongs in the task or note artifact.
+- `replaced_by` is `—` for every live or completed task. A `retired` row lists one or more
+  comma-separated task ids that immediately replace its obsolete contract, or the literal
+  `none` when the replan proves no new work is required. These are lineage edges, not
+  dependencies: replacement tasks declare their real execution order in `blocked_by`.
 - `worktree` is `—`, an absolute path, `discarded`, or `merged`. A live worktree is always
   recorded by path; `kept` is a worker return value, never a ledger value.
 - `attempts` is `dN/eN/vN/lN`: diagnosis, executor, verifier, and lander dispatches. The
@@ -95,6 +113,15 @@ task-bound worker, and keeps that value unchanged through diagnosis, retries, ve
 recovery, and landing. `discarded` and `merged` may replace it only when the path no longer
 contains live task state.
 
+`## Drift` is also routing state. A live entry has the exact form
+`- DRF-nnn (from T-nnn) quiescing: T-nnn,...`; that frozen set suppresses every new
+task-bound dispatch even while an already-running row still has an active status. The set
+is the complete unfinished dependency closure and may shrink only when an in-flight
+lander proves its commit already reached green main, making that task `done`. The atomic
+replacement transaction changes the entry to `retired: ... — replacements: ...` only
+after every remaining frozen row is inactive and its worktree is `discarded`. A crash
+therefore cannot erase the fact that a late worker return must be quarantined.
+
 ## Required fields by status
 
 | status | Required state |
@@ -108,11 +135,16 @@ contains live task state.
 | `drifted` | blocker `drift:DRF-nnn`; finding points at that record; resume `replan` |
 | `awaiting` | absolute worktree; blocker `decision:DEC-nnn`; finding points at the decision; resume is a pending resume token |
 | `blocked` | a nonempty `external:*`, `drift:*`, or `main:red` blocker; finding points at its durable detail; an external block without a live worktree resumes `fresh` |
+| `retired` | worktree `discarded`; finding points at the causal drift record; blocker and resume `—`; `replaced_by` names immediate replacements or explicitly says `none` |
 
 Every task id is unique, every dependency names another task in the table, no task depends
-on itself, counters are non-negative, and `failures <= v`. These rules are data validity,
-not guidance: a route that reads an invalid ledger stops before dispatch and reports the
-first exact violation.
+on itself, counters are non-negative, and `failures <= v`. Only `retired` rows may have a
+`replaced_by` value other than `—`; every named replacement exists in the same milestone
+and has a higher, never-before-used task id. `none` is valid only for `retired`.
+Replacement edges are acyclic. No non-retired task may
+depend on a retired task: re-decomposition must retire that dependent contract too or give
+its replacement a valid dependency. These rules are data validity, not guidance: a route
+that reads an invalid ledger stops before dispatch and reports the first exact violation.
 
 ## Atomic transition updates
 
@@ -121,7 +153,7 @@ For every transition it follows this order:
 
 1. Re-read and validate the complete ledger at its declared schema.
 2. Produce one candidate replacement containing the new status, worktree, counters,
-   finding, blocker, resume token, and returned dispatch row together.
+   finding, blocker, resume token, replacement lineage, and returned dispatch row together.
 3. Validate the candidate, then replace `ledger.md` in one write.
 4. Only after that write succeeds may the next worker be dispatched.
 
@@ -129,6 +161,8 @@ Before a diagnosis, execution, verification, or landing dispatch, the same repla
 claims the phase and increments `d`, `e`, `v`, or `l`. On return, one replacement consumes
 the outcome and records the dispatch. Never write `status` first and fill in its required
 fields later; a crash between those edits would create a state no fresh session can route.
+Ordinary lifecycle transitions preserve `replaced_by: —`; only the completed drift-replan
+transaction may populate it while moving an old row to `retired`.
 
 Every route applies the structural checklist in this skill before each read and candidate
 write. Validation is an agent obligation at the `ai-ledger` interface; Rune does not ship
@@ -136,8 +170,12 @@ an executable validator or a second implementation that could drift from these r
 
 ## Log every dispatch
 
-**Every subagent you dispatch gets a row in `## Dispatches`.** One line, written when it
-returns.
+**Every subagent you dispatch gets a row in `## Dispatches`.** Ordinarily the line is
+written when it returns. A record-only drift dispatch is the deliberate exception: its
+line is written before dispatch with `outcome: pending DRF-nnn -> <absolute path>` because
+that assignment is what makes a crash retry reuse the same global id and sole-writer
+destination. Its return replaces only that outcome with `recorded: DRF-nnn`; it never
+appends a second assignment.
 
 The point is not the audit trail — it is that the absence becomes visible. Expensive work
 done in the parent leaves no dispatch row, so a phase that completed with no rows against
@@ -175,6 +213,8 @@ pending ─claim; e++─> in_progress ─done; v++─> verifying ─pass; l++─
                       └─question─────────> awaiting (open decision recorded)
 
 external block ─unblocks_when observed─> pending (preserve recorded resume/worktree state)
+
+drifted or drift-blocked ─atomic replan with new ids─> retired (terminal; replacements linked)
 ```
 
 - `diagnosing` — a bug id and worktree are reserved, but its immutable task spec does not
@@ -193,6 +233,9 @@ external block ─unblocks_when observed─> pending (preserve recorded resume/w
 - `awaiting` — blocked on a user decision. Names the `DEC-nnn`; worktree kept
 - `blocked` — cannot proceed for an external, drift, or main-tree reason. The row names the
   kind, the finding points at detail, and an external detail states what clears it
+- `retired` — the immutable task contract was invalidated before completion and removed
+  from the current plan. It is permanent history, never eligible, and names its immediate
+  replacement ids or explicitly says that no replacement was needed
 
 `landing` exists because passing verification and surviving the merge are two separate
 claims, and there was previously no state between them — so a task that had landed and
@@ -220,7 +263,7 @@ contain both `blocker_reason` and observable `unblocks_when`. In one validated r
 store `external:<slug>`, point `latest_finding` at that handoff, apply the worktree
 disposition, preserve the existing `e` counter, and append the dispatch row.
 
-A malformed blocked return cannot produce a schema-1 `blocked` row. Fail closed: preserve
+A malformed blocked return cannot produce a schema-2 `blocked` row. Fail closed: preserve
 the already-valid claimed row and recorded worktree, append the incomplete dispatch outcome,
 stop the normal route, and enter `continue` reconciliation before reporting. Do not invent
 missing fields, discard source state, or immediately redispatch the task; reconciliation
@@ -241,7 +284,9 @@ forever, so a late worker cannot attach its result to a different task.
 
 ## Claiming
 
-Pick the lowest-id `pending` task whose `blocked_by` are all `done`.
+Pick the lowest-id `pending` task whose `blocked_by` are all `done`. A `retired` task is
+terminal history, not resolved work, so validation rejects any live task that still names
+one as a dependency.
 
 Claiming is one atomic update: allocate or preserve the absolute worktree, set
 `in_progress`, increment `e`, set `resume_at: recover`, validate, and persist. Dispatch
@@ -268,6 +313,12 @@ what a landing does to a row:
 | `refused` | `pending`, worktree kept, finding points at the landing block, resume `publish` |
 | `conflict` or `reverted` | `pending`, worktree kept, finding points at the landing block, resume `fresh` |
 | `stuck` | `blocked`, blocker `main:red`, finding points at the landing block, and set `main: red` at the top of the file |
+
+`not_landed` is accepted only from `ai-land` `drift-observe` for a task already named in a
+`quiescing` drift entry. It never maps to `pending`: preserve the landing finding while an
+`ai-drift` quiesce dispatch discards the registered worktree, then move the row to the
+causal `drifted` state. A `landed` result for that frozen task still maps to `done` and
+removes the id from the retirement set before re-decomposition.
 
 Earlier landings that succeeded stay landed — one task that could not land is not a reason
 to unwind the ones that did. What does **not** stay is the merge that failed: `ai-land`
@@ -328,24 +379,74 @@ exact SHA is already an ancestor of main, and runs the oracle instead of creatin
 merge. First increment `l`, persist the complete `landing` row, and pass that attempt. That
 is the same artifact and the same gate the live case uses.
 
+If the task is named by a `quiescing` drift entry, that recovery dispatch must use
+`drift-observe`; it may recognize an already-landed artifact but may not start a merge.
+
 **No row may remain `in_progress` or `landing`** when reconciliation ends. A `blocked` row
 may remain only when its schema fields are complete and `latest_finding` points at the
 durable reason and unblock condition. A `diagnosing` row may remain only when its durable
 outcome is reproduced and planning is next, or when a recorded diagnosis blocker prevents
 re-dispatch. That is the invariant this section guarantees.
 
-## Drift invalidation
+## Drift invalidation and replacement
 
-When a drift record lands, downstream tasks may now be wrong. The parent must:
+When a drift record lands, the parent first freezes the affected contracts without
+pretending replacements exist:
 
-1. Record `DRF-nnn` in the ledger with the tasks it names as invalidated.
-2. Set those tasks to `blocked`, `blocker: drift:DRF-nnn`, point `latest_finding` at the
-   drift record, and set `resume_at: replan`.
-3. Refuse to dispatch them until re-planned.
+1. Record `DRF-nnn` in `## Drift`, including the originating task and every task it
+   invalidates, plus the full unfinished reverse-dependency closure. Write it as a
+   `quiescing` freeze before consuming another result. The originating task belongs in the
+   set. Stop every new dispatch for every frozen id, regardless of the row's current
+   status.
+2. In the same update, set inactive affected rows to `drifted` with
+   `blocker: drift:DRF-nnn`, point `latest_finding` at the drift record, and set
+   `resume_at: replan`. Normalize `worktree: —` to `discarded`. An absolute worktree stays
+   registered until an `ai-drift` quiesce dispatch proves it was discarded.
+3. Drain active rows without using their normal successor transitions. A returned
+   diagnosis, execution, or verification may add evidence but never starts planning,
+   verification, retry, or landing; quiesce its unpublished registered worktree and then
+   move it to the same complete `drifted` row. For `landing`, consume the live lander's
+   result. If that return was lost, `ai-land` in `drift-observe` mode may only recognize an
+   artifact already reachable from main; it must not merge a new one. Green already-landed
+   work becomes `done` and leaves the retirement set. A not-landed artifact is quiesced;
+   red or ambiguous main state stops all work. No `in_progress`, `verifying`, `landing`,
+   `diagnosing`, or live-worktree row can be retired.
 
-Do not silently delete invalidated tasks. The drift record plus the tasks it killed is
-the evidence that the milestone decomposition was wrong, and that evidence is what
-improves the next decomposition.
+Re-decomposition writes new immutable task files under globally unused `T-nnn` ids. It
+never overwrites, renames, deletes, or appends to an existing task file. Once every
+replacement file exists and every affected old row is inactive with `worktree: discarded`,
+the parent applies **one schema-2 ledger replacement** that:
+
+- appends the replacement rows as ordinary `pending` tasks with fresh counters and
+  `replaced_by: —`, or finalizes a fresh reproduced `diagnosing` bug reservation while
+  preserving its diagnosis counter, commit evidence, and new worktree;
+- changes each affected old row to `retired`, preserves its id, title, milestone,
+  dependencies, counters, and historical files, points `latest_finding` at the causal
+  drift, clears `blocker` and `resume_at`, and records its immediate successors in
+  `replaced_by` or records `none` when the replan demonstrates that its outcome is already
+  satisfied or deliberately removed from the milestone;
+- includes every non-done task that depended directly or transitively on a retired task,
+  so no live row keeps a dependency on historical work; and
+- validates the whole candidate, including replacement existence, same-milestone lineage,
+  increasing ids, and acyclicity, before replacing `ledger.md` once.
+
+A replacement may itself be retired later. Its row then points to the next immediate
+successors; readers follow the chain to the current leaves. `done` and `retired` rows are
+never rewritten into each other, and retired rows never count as completed milestone work.
+A milestone is complete only when every non-retired leaf task is `done`.
+
+Crash order is fail-closed. Task files and `replacements.md` are written first, then the
+one ledger transaction. If the parent dies before that transaction, the old rows remain
+drift-blocked and no replacement is executable. `continue` may finish the transaction only
+when the immutable replacement map is complete, every mapped new task file validates, and
+the old rows still match the exact frozen retirement set. Otherwise all unregistered ids
+stay burned and a fresh decomposition run uses new ones. If the ledger write succeeds, old
+and new rows become visible together. There is no state in which an old task is retired
+without an explicit replacement disposition.
+
+Do not silently delete invalidated tasks or their files. The drift record, immutable old
+contract, attempt history, terminal row, and replacement edges are the evidence that the
+milestone decomposition was wrong.
 
 ## Reporting
 

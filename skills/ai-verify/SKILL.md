@@ -24,7 +24,7 @@ Only these:
 
 - `main_root` — the absolute orchestration checkout; all coordination paths resolve here
 - `worktree_path` — the exact absolute task worktree used by the executor
-- `attempt` — the positive verifier attempt already incremented in schema-1 ledger state
+- `attempt` — the positive verifier attempt already incremented in schema-2 ledger state
 - `<main_root>/.rune/tasks/T-nnn.md` — the spec, including type, verification mode,
   acceptance, and the stated check
 - `<main_root>/.rune/notes/T-nnn.progress` — ticks, mode-specific evidence, and the latest

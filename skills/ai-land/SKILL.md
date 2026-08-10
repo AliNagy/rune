@@ -35,7 +35,9 @@ because the situation seems to call for one.
 
 - `main_root` — the absolute orchestration checkout where merging and coordination writes happen
 - `worktree_path` — the exact absolute task worktree used by execution and verification
-- `attempt` — the positive landing attempt already incremented in schema-1 ledger state
+- `attempt` — the positive landing attempt already incremented in schema-2 ledger state
+- optional `mode` — defaults to `land`; `drift-observe` is allowed only when the task is
+  in a ledger drift freeze and the parent supplies its causal `DRF-nnn` pointer
 - the task id and its task branch
 - `<main_root>/.rune/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
   task's to answer for
@@ -90,6 +92,14 @@ If `verified_commit` is already an ancestor of main, the artifact already landed
 prior lander returned. Do not create an empty merge. Run the oracle against main: green
 means `landed` and you skip to step 8 for cleanup; red means `stuck`, because there is no
 recorded rollback point that safely distinguishes this task from later history.
+
+In `drift-observe` mode, stop at this exact boundary when the verified commit is **not**
+an ancestor of main. Append `not_landed` with the causal drift id, touch nothing in main,
+keep the worktree, and return `landing: not_landed`, `main: green`. Never continue to step
+3 or start a merge in this mode. Its only purpose is to distinguish a merge that completed
+before its return was lost from an obsolete artifact that must be discarded by
+`ai-drift` quiesce. When the commit is already reachable, the ordinary oracle and cleanup
+rules above still apply and the result is `landed` or `stuck`.
 
 Only when the artifact is not already in main, also require the task branch HEAD to equal
 the verified commit and `git -C <worktree_path> status --porcelain` to be empty. This ordering
@@ -256,7 +266,7 @@ making a decision — the parent decides what happens next, it just cannot see w
 
 ```
 task: T-014
-landing: landed | refused | conflict | reverted | stuck
+landing: landed | refused | conflict | reverted | stuck | not_landed
 main: green | red
 worktree_path: /workspace/acme/.rune/worktrees/T-014
 verified_commit: 4a91c02
@@ -266,6 +276,9 @@ escalate: no             # or: yes (rule 3) — session.test.ts failed on attemp
 detail: /workspace/acme/.rune/notes/T-014.landing.md
 cleanup: complete | pending   # only for landed
 ```
+
+`not_landed` is valid only for `mode: drift-observe`; the record and return name the
+causal drift id. Normal landing never emits it.
 
 `main` is not decoration — it is the parent's dispatch gate. It must not send new work into
 a tree you have just told it is red.
