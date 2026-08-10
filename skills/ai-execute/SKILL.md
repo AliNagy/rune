@@ -1,7 +1,7 @@
 ---
 name: ai-execute
 user-invocable: false
-description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, task-specific verification evidence, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
+description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, task-specific verification evidence, publishing a completed task as a commit, durable budget or blocker stops, and the return format. Never used by the dispatcher on its own behalf.
 ---
 
 # Executing a task
@@ -171,16 +171,25 @@ returning and name it on `detail`. Include a ledger-safe `resume_at` token: `fre
 `step:N`, `evidence:<mode>`, or `publish`. The prose explaining that token stays in the
 handoff.
 
+Use `status: blocked` only when an objective condition outside this executor's authority
+prevents progress: an invalid task contract, missing dispatch input, checkout-identity
+failure, or unavailable external capability. A visible product choice is `question`; a
+false plan premise or required out-of-surface change is `drifted`; running long is
+`budget`.
+
 A blocked return also includes a short lowercase `blocker` slug. Its handoff must contain:
 
 ```markdown
+blocker: staging-access
 blocker_reason: the staging identity provider rejects this repository's credentials
 unblocks_when: repository access is granted and the same identity probe succeeds
 ```
 
-Both lines are required even for a preflight block before source edits. "Retry later" is
-not an unblock condition. The parent stores `external:<slug>` plus the handoff pointer; it
-does not squeeze this prose into the ledger row.
+All three lines are required even for a preflight block before source edits, and the slug
+must match the short return. "Retry later" is not an unblock condition. The parent stores
+`external:<slug>` plus the handoff pointer; it does not squeeze this prose into the ledger
+row. Do not loop on the failed operation or downgrade the block to `budget`; only the
+parent may re-dispatch after it observes the recorded condition.
 
 Keep a valid worktree whenever it contains diagnosis state, a source diff, or task commits.
 Return `worktree: discarded` only when no task source state exists or the supplied path is
@@ -193,9 +202,8 @@ recoverable partial work.
 worktree. Verification and landing run in fresh contexts; an uncommitted diff has no path
 through git into the main tree.
 
-Only a completed task is published. `budget`, `blocked`, `question`, and `drifted` keep or
-discard their dirty worktree exactly as their stopping rules say; do not commit partial
-work merely to make it durable.
+Only a completed task is published. Early stops follow the worktree policy above; drift
+follows `ai-drift`. Do not commit partial work merely to make it durable.
 
 After the declared evidence chain is complete and the task-local check and project oracle
 pass:

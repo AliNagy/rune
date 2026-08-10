@@ -37,6 +37,7 @@ main: green
 | T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.agent/worktrees/T-014 | d0/e2/v1/l0 | 1 | .agent/notes/T-014.verify.md#attempt-1 | — | recover |
 | T-015 | M-03 | Refresh endpoint | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh |
 | T-016 | M-03 | Session restart persistence | blocked | — | discarded | d0/e1/v0/l0 | 0 | .agent/drift/DRF-003.md | drift:DRF-003 | replan |
+| T-017 | M-03 | Expiry sweep | blocked | — | /workspace/acme/.agent/worktrees/T-017 | d0/e1/v0/l0 | 0 | .agent/notes/T-017.md | external:registry-unreachable | step:2 |
 
 ## Drift
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
@@ -170,8 +171,10 @@ pending ─claim; e++─> in_progress ─done; v++─> verifying ─pass; l++─
                       │                    └─fail──────────> pending (failures++)
                       ├─drift────────────> drifted
                       ├─budget───────────> pending (handoff written)
-                      ├─blocked──────────> blocked (handoff + unblock condition)
+                      ├─blocked──────────> blocked (handoff + unblock condition + worktree disposition)
                       └─question─────────> awaiting (open decision recorded)
+
+external block ─unblocks_when observed─> pending (preserve recorded resume/worktree state)
 ```
 
 - `diagnosing` — a bug id and worktree are reserved, but its immutable task spec does not
@@ -207,6 +210,28 @@ An externally `blocked` task returns to `pending` only after the parent can obse
 handoff's `unblocks_when` condition. Clear `blocker`, preserve `latest_finding` as history
 and the compatible `resume_at`, validate, and persist. Do not poll or redispatch merely
 because time passed.
+
+### Blocked executor returns
+
+An executor return maps `in_progress -> blocked` only when its `task` and `attempt` match
+the claimed row and it supplies a lowercase blocker slug, schema-safe `resume_at`, absolute
+handoff pointer, and valid `worktree: kept | discarded` disposition. The handoff must
+contain both `blocker_reason` and observable `unblocks_when`. In one validated replacement,
+store `external:<slug>`, point `latest_finding` at that handoff, apply the worktree
+disposition, preserve the existing `e` counter, and append the dispatch row.
+
+A malformed blocked return cannot produce a schema-1 `blocked` row. Fail closed: preserve
+the already-valid claimed row and recorded worktree, append the incomplete dispatch outcome,
+stop the normal route, and enter `continue` reconciliation before reporting. Do not invent
+missing fields, discard source state, or immediately redispatch the task; reconciliation
+must remove the now-stale `in_progress` claim.
+
+Unblocking is one validated ledger write after the parent observes `unblocks_when` through
+an already-permitted bounded probe, durable coordination state, or explicit user
+confirmation. Clear `blocker`, retain the finding as history, preserve compatible
+`resume_at` and any live worktree, and set `pending`. If none of those can prove the
+condition, report it and wait. A new session, elapsed time, or an optimistic retry is not
+proof. User decisions use `awaiting`, not this transition.
 
 `diagnosing` is deliberately earlier than `pending`. A reproduced bug remains there while
 its planners consume `diagnosis_commit`; only successful reconciliation creates the task
@@ -289,7 +314,7 @@ Your job is the mapping:
 | valid complete publication, executor return missing | `verifying`, increment `v`, resume `verify` | kept; persist, then dispatch that verifier attempt |
 | handoff note says `budget` | `pending` | kept |
 | handoff note says `drift` | `drifted` | per the note |
-| handoff note says `blocked` | `blocked`, blocker and finding from the note | kept as recorded |
+| handoff note says `blocked` and includes slug, `blocker_reason`, `unblocks_when`, and resume token | `blocked`, `external:<slug>`, finding pointer, and returned resume token | kept or dropped exactly as recorded |
 | `ai-recover` → `salvage` | `pending`, returned `step:N`, finding points at handoff | kept |
 | `ai-recover` → `partial` | `pending`, returned `evidence:<mode>`, finding points at handoff | kept |
 | `ai-recover` → `discard` | `pending`, resume `fresh`, finding points at handoff | dropped |
@@ -303,10 +328,11 @@ exact SHA is already an ancestor of main, and runs the oracle instead of creatin
 merge. First increment `l`, persist the complete `landing` row, and pass that attempt. That
 is the same artifact and the same gate the live case uses.
 
-**No row may remain `in_progress` or `landing`** when reconciliation ends. A `diagnosing`
-row may remain only when its durable outcome is reproduced and planning is next, or when a
-recorded blocker prevents re-dispatch. That is the one
-invariant this section guarantees.
+**No row may remain `in_progress` or `landing`** when reconciliation ends. A `blocked` row
+may remain only when its schema fields are complete and `latest_finding` points at the
+durable reason and unblock condition. A `diagnosing` row may remain only when its durable
+outcome is reproduced and planning is next, or when a recorded diagnosis blocker prevents
+re-dispatch. That is the invariant this section guarantees.
 
 ## Drift invalidation
 

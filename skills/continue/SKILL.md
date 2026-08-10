@@ -109,7 +109,10 @@ session. For each:
    `worktree: kept|discarded` instruction and set the complete state it implies —
    `pending` plus its resume token for budget; `drifted`, drift blocker, and `replan` for
    drift; `blocked` plus its external blocker, finding pointer, and resume token for a
-   recorded external condition.
+   recorded external condition. A blocked handoff must include the lowercase `blocker`
+   slug, `blocker_reason`, observable `unblocks_when`, a schema-safe `resume_at`, and its
+   worktree disposition. If any are missing, treat the handoff as unusable and continue
+   through step 3; never write an invalid blocked row or optimistically set `pending`.
 3. **No handoff?** The session died mid-flight. At the ledger's exact absolute
    `worktree_path`, check only whether the worktree's diff is
    empty and whether the task branch is ahead of its merge base with main — both are
@@ -146,6 +149,9 @@ Also check:
   re-dispatch that attempt against the same verified artifact and exact worktree. At `l5`,
   stop and surface the exhausted landing ceiling rather than creating attempt six
 - drift records not yet reflected in the ledger's blocked list
+- `blocked` rows whose finding is missing, unreadable, or lacks the blocker reason and
+  observable unblock condition → keep them blocked, report the damaged durable record,
+  and do not redispatch; never infer that elapsed time cleared the condition
 - decomposition runs with a protocol record or planner drafts but no registered tasks →
   keep the immutable artifacts, mark the attempt interrupted in the dispatch log, and
   route back to `work`. It allocates a fresh `R-nnn`; never resume into or reuse the
@@ -172,6 +178,7 @@ Also check:
 | milestones, none decomposed | ready to work | `rune:work` — decompose M-01 |
 | tasks pending | mid-milestone | `rune:work` — next available task |
 | tasks `blocked` by drift | plan needs repair | `rune:work` — re-decompose remainder |
+| task `blocked` by executor | executor condition unresolved | report the reason and exact unblock condition; route to `rune:work` only after it is proven cleared |
 | all milestones done | v1 reached | report; ask what is next |
 
 ### Resuming from a pause
@@ -204,6 +211,12 @@ Summarise what was settled in two or three lines so they can correct you, then c
 
 Follow `ai-report`. Say what was **repaired**, not just what exists — silent repair looks
 like nothing happened, and the user needs to know work was thrown away.
+
+A session restart never clears a blocker. If its objective condition is already proven by
+coordination state or the user explicitly confirms it, clear the task's `blocker`, preserve
+its finding history plus compatible resume/worktree state, and set it to `pending` in one
+validated ledger write. Otherwise report what is blocked, why, and the fact that would
+allow it to resume.
 
 ```
 TL;DR

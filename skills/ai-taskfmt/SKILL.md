@@ -239,8 +239,11 @@ The values sent in a real dispatch are absolute paths — never the literal
 `<main_root>` placeholder used in prose. Before doing any work, a task-bound worker
 confirms that `worktree_path` belongs to the same Git repository as `main_root`. A
 mismatch, a missing verifier/recovery path, or a wrong task branch is a blocked outcome,
-not permission to search for another checkout. A lander alone may accept a missing path
-after proving the exact verified commit is already in main, per its crash-recovery path.
+not permission to search for another checkout. An executor that blocks uses the durable
+blocked-return contract below: it records the worktree disposition, writes a task handoff,
+and names the objective condition that permits a retry. A lander alone may accept a
+missing path after proving the exact verified commit is already in main, per its
+crash-recovery path.
 
 **Pointers, not payloads.** The parent names where things are; the worker reads them
 itself. Passing content down means the parent had to hold it first, which is the cost the
@@ -331,6 +334,22 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
 
 Then whatever else that skill defines.
+
+`ai-execute` has one required conditional interface. `status: blocked` always adds:
+
+```yaml
+worktree: kept
+worktree_path: /workspace/acme/.agent/worktrees/T-014
+blocker: registry-unreachable
+resume_at: step:2
+detail: /workspace/acme/.agent/notes/T-014.md
+```
+
+`blocker` is a short lowercase slug stored as `external:<slug>`; `detail` points at the
+handoff whose `blocker_reason` says what is true now and whose `unblocks_when` says what
+observable fact makes another attempt safe. Neither may be "retry later" or another
+restatement of `blocked`. The executor also returns the worktree disposition and a
+schema-safe resume token rather than forcing the parent to infer them.
 
 **Do not force one vocabulary across all of them.** A verifier's outcome genuinely is not
 an executor's outcome, and `ai-execute`'s values are the ones the ledger's state machine
@@ -752,6 +771,7 @@ what_exists: TokenStore.rotate implemented and unit-tested; not yet wired into h
 what_surprised_me: handle() is called from two places, not one — see src/ws/upgrade.ts
 worktree: kept | discarded
 next: wire both call sites, or split the second into its own task
+blocker: service-down # required only for blocked; must match the short return
 blocker_reason: required only for blocked — state the external condition, not "cannot proceed"
 unblocks_when: required only for blocked — one observable condition the parent can re-check
 ```
@@ -761,4 +781,5 @@ The reader has none of that.
 
 `resume_at` is copied into the ledger; keep it to the schema-1 tokens. For a blocked
 handoff, the parent stores `external:<slug>` and points `latest_finding` here, while these
-two conditional lines preserve the full reason and unblock condition.
+two conditional lines preserve the full reason and unblock condition. It must not
+redispatch merely because time passed; it first observes `unblocks_when`.
