@@ -31,6 +31,7 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 | id    | title                        | status      | blocked_by | worktree        |
 |-------|------------------------------|-------------|------------|-----------------|
 | T-011 | TokenStore interface         | done        | —          | merged          |
+| T-013 | Diagnose refresh regression  | diagnosing  | —          | /workspace/acme/.agent/worktrees/T-013 |
 | T-014 | Rotate refresh tokens        | in_progress | —          | /workspace/acme/.agent/worktrees/T-014 |
 | T-015 | Refresh endpoint             | pending     | T-014      | —               |
 | T-016 | Session restart persistence  | drifted     | —          | discarded       |
@@ -43,6 +44,7 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 |-------------|---------------|-------------------|---------------------------------|
 | survey      | ai-survey     | —                 | map.md written                  |
 | commands    | ai-oracle     | —                 | oracle: npm test                |
+| diagnose    | ai-bug        | T-013             | reproduced @ b7a03d4           |
 | plan-draft  | ai-decompose  | M-03/R-002/P-01   | draft: P-01.md                  |
 | plan-draft  | ai-decompose  | M-03/R-002/P-02   | draft: P-02.md                  |
 | reconcile   | ai-decompose  | M-03/R-002        | T-014..T-017 written            |
@@ -53,9 +55,9 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 
 Every live task worktree value is an absolute path. The parent allocates
 `<main_root>/.agent/worktrees/T-nnn`, writes it into the row before dispatching the first
-executor, and keeps that value unchanged through retries, verification, recovery, and
-landing. `kept`, `discarded`, and `merged` may replace it only when the path no longer
-contains live task state.
+task-bound worker, and keeps that value unchanged through diagnosis, retries, verification,
+recovery, and landing. `kept`, `discarded`, and `merged` may replace it only when the path
+no longer contains live task state.
 
 ## Log every dispatch
 
@@ -81,6 +83,11 @@ detail belongs in the notes the subagents themselves write.
 ## Status transitions
 
 ```
+diagnosing ─reproduced + reconciled─> pending
+     ├─not reproduced───────────────> reservation removed; id burned
+     ├─reclassified─────────────────> reservation removed; id burned; fresh run
+     └─blocked──────────────────────> diagnosing (blocker recorded)
+
 pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─landed─> done
                       │                    │                │
                       │                    │                └─refused───> pending
@@ -92,6 +99,8 @@ pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─
                       └─question─────────> awaiting (open decision recorded)
 ```
 
+- `diagnosing` — a bug id and worktree are reserved, but its immutable task spec does not
+  exist yet. Only `ai-bug` may hold it; it is never executable.
 - `pending` — available, provided `blocked_by` is empty or all resolved
 - `in_progress` — an executor holds it. Records which, and its worktree path
 - `verifying` — executor published a commit; awaiting an independent check of that artifact
@@ -112,6 +121,12 @@ done only after `ai-verify` names the published commit and `ai-land` lands that 
 
 `awaiting` returns to `pending` the moment its decision is marked `decided`. A fresh
 executor picks it up with the handoff, the worktree diff, and the resolved decision.
+
+`diagnosing` is deliberately earlier than `pending`. A reproduced bug remains there while
+its planners consume `diagnosis_commit`; only successful reconciliation creates the task
+spec and moves the existing row to `pending`. If diagnosis fails or reclassifies, remove
+the provisional row but retain its protocol and progress artifacts. The id remains used
+forever, so a late worker cannot attach its result to a different task.
 
 ## Claiming
 
@@ -163,6 +178,19 @@ Every reconciliation dispatch uses the absolute worktree path already recorded i
 row. Never replace it with the current directory or ask the harness to create a fresh
 checkout; the uncommitted diff may exist only at the recorded path.
 
+A `diagnosing` row is reconciled separately because no task specification exists for
+`ai-recover` to read:
+
+| Durable diagnosis state | Parent action |
+|---|---|
+| `diagnosis: reproduced` with valid commit ids | keep row and worktree; resume the same decomposition run |
+| `diagnosis: not_reproduced` or `reclassified` | remove row; keep protocol/progress; id stays burned |
+| `diagnosis: blocked` | keep row and worktree; report the blocker; retry only after it clears |
+| no terminal diagnosis block | re-dispatch `ai-bug` with the same task, protocol, progress, and worktree pointers |
+
+Never send a diagnosing reservation to `ai-execute` or `ai-recover`. The former requires
+an immutable task contract; the latter cannot map a diff onto steps that do not exist yet.
+
 Your job is the mapping:
 
 | What comes back | Status | Worktree |
@@ -182,7 +210,9 @@ task rather than looking: it reads the durable `verified_commit`, detects whethe
 exact SHA is already an ancestor of main, and runs the oracle instead of creating an empty
 merge. That is the same artifact and the same gate the live case uses.
 
-**No row may remain `in_progress` or `landing`** when reconciliation ends. That is the one
+**No row may remain `in_progress` or `landing`** when reconciliation ends. A `diagnosing`
+row may remain only when its durable outcome is reproduced and planning is next, or when a
+recorded blocker prevents re-dispatch. That is the one
 invariant this section guarantees.
 
 ## Drift invalidation

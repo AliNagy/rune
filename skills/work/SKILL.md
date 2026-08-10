@@ -5,7 +5,7 @@ description: Use when building a feature, fixing a bug, refactoring, or advancin
 
 # rune:work
 
-The execution loop. Triage → plan → dispatch → verify → reconcile.
+The execution loop. Triage → diagnose bugs → plan → dispatch → verify → reconcile.
 
 ## What you may do
 
@@ -19,7 +19,8 @@ from that, and this list is exhaustive:
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
 - **Create** one immutable
   `<main_root>/.agent/drafts/<milestone>/R-nnn/protocol.md` before dispatching that
-  decomposition run. You never edit it after a planner can see it.
+  decomposition run. For a bug, create it before diagnosis and include the reserved task
+  id. You never edit it after any worker can see it.
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -121,7 +122,7 @@ Then load the matching protocol:
 
 | type | skill | first move |
 |---|---|---|
-| bug | `ai-bug` | reproduce before planning |
+| bug | `ai-bug` | reserve its task and reproduce in that worktree before planning |
 | feature | `ai-feature` | scope boundary, then decisions |
 | refactor | `ai-refactor` | confirm a characterization net exists |
 | investigation | `ai-investigate` | read-only, terminates in an answer |
@@ -131,6 +132,36 @@ Do not continue into planning — that gap is the entire point of the classifica
 
 Protocols may reclassify once they see real code. Accept it and reroute; correcting early
 is cheap.
+
+### Bug reservation and diagnosis
+
+A bug is the one type whose worktree must exist before decomposition, because its failing
+check is both planning evidence and part of the eventual source change.
+
+After triage returns `bug`:
+
+1. Choose the next unused decomposition run and next globally unused `T-nnn`. An id is
+   used if it appears anywhere under `.agent/`, not only in `tasks/` or the ledger.
+2. Write the run's immutable `protocol.md` with `type: bug`, `protocol: ai-bug`, triage
+   evidence and shape, and `reserved_task: T-nnn`.
+3. Add one provisional ledger row with status `diagnosing` and the absolute
+   `<main_root>/.agent/worktrees/T-nnn` path. This reserves identity; no task spec exists
+   and the row is not executable.
+4. Dispatch one `ai-bug` worker with that task id, `main_root`, `worktree_path`, and
+   absolute protocol and `notes/T-nnn.progress` pointers. The worker creates or validates
+   the exact worktree before writing the reproduction check.
+5. Act on its durable result:
+   - `reproduced` — require a clean kept worktree, `diagnosis_base_commit`, and
+     `diagnosis_commit`; continue into decomposition using this same run and reservation.
+   - `not_reproduced` — remove the provisional row, keep the progress record, and ask for
+     the missing input. The worker discarded the worktree and the id remains burned.
+   - `reclassified` — remove the provisional row, preserve the old run and progress record,
+     then route the returned type through a fresh run. Never recycle the id.
+   - `blocked` — keep the row `diagnosing`, record the blocker, and stop. Do not plan from
+     partial or inaccessible evidence.
+
+The parent never reads the reproduction diff or test output. The progress pointer and two
+commit ids are the interface; planners consume the detail from disk.
 
 The type that remains after this protocol step is the final classification for the next
 decomposition run. Do not leave it only in this context: the planners that need it start
@@ -149,18 +180,22 @@ code — the one thing you may not read — so a task file composed in your cont
 Use this exact two-phase protocol:
 
 1. Under `<main_root>/.agent/drafts/<milestone>/`, choose the next unused `R-nnn`
-   directory. Never reuse a run, including one left incomplete by a dead session. Write
-   its `protocol.md` using the canonical schema in `ai-taskfmt`: the final `type`, its
-   exact `protocol` skill, and the triage evidence and shape. The only valid mappings are
-   `bug -> ai-bug`, `feature -> ai-feature`, and `refactor -> ai-refactor`. Then assign
-   `P-01` through `P-03`; the parent is the only allocator for the run, protocol record,
-   and planner slots.
+   directory. Never reuse a run, including one left incomplete by a dead session. For a
+   confirmed bug, reuse the exact run whose protocol and `reserved_task` produced the
+   diagnosis; for every other type, create the run here. Write `protocol.md` using the
+   canonical schema in `ai-taskfmt`: the final `type`, exact protocol skill, and triage
+   evidence and shape. The only valid mappings are `bug -> ai-bug`, `feature -> ai-feature`,
+   and `refactor -> ai-refactor`. Then assign `P-01` through `P-03`; the parent is the only
+   allocator for the run, protocol record, bug reservation, and planner slots.
 2. Dispatch two or three planners in parallel. Each gets one work id such as
    `M-03/R-002/P-01`, the same `main_root` and absolute milestone inputs, and one distinct
    output pointer such as `<main_root>/.agent/drafts/M-03/R-002/P-01.md`. Every dispatch
    also gets the absolute pointer to that run's `protocol.md`. A planner loads the named
    protocol and writes only its complete draft, using local `D-nnn` ids; it never writes a
-   final task file or the ledger.
+   final task file or the ledger. For a bug, also pass the reserved task's exact
+   `worktree_path` plus the absolute diagnosis progress pointer. The planner reads the
+   committed reproduction there and marks exactly one proposed task
+   `reservation: primary`.
 3. Accept `plan: drafted` only when `artifact:` exactly matches the assigned pointer. If a
    planner stops without a complete artifact, any retry gets a new unused `P-nn` slot so a
    late original worker cannot collide with it. Wait until every planner in the run has
@@ -168,19 +203,24 @@ Use this exact two-phase protocol:
    cut, and do not reconcile fewer than two complete cuts.
 4. Dispatch one fresh reconciler with work id `M-03/R-002` and pointers to every completed
    draft artifact. Give it the same `main_root`, the same absolute protocol pointer, and
-   the absolute draft pointers. It validates that every draft used that protocol, repeats
-   the type-specific sanity pass, compares the cuts, and is the only worker allowed to
-   allocate final `T-nnn` ids and write `<main_root>/.agent/tasks/T-nnn.md`.
+   the absolute draft pointers. For a bug, give it the same diagnosis pointer and
+   `worktree_path`. It validates that every draft used that protocol, repeats the
+   type-specific sanity pass, compares the cuts, and writes the final task files. The
+   reconciler maps the selected `reservation: primary` task to the protocol's already-used
+   `T-nnn`; it allocates ids only for any additional tasks.
 5. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
    edges. Then register exactly those tasks in `<main_root>/.agent/ledger.md` in one parent
-   update. Draft planners and the reconciler never register tasks themselves.
+   update. For a bug, update the existing reserved row's title and dependencies and move
+   `diagnosing -> pending`; add only the extra rows. Its worktree path never changes.
+   Draft planners and the reconciler never register tasks themselves.
 
 The draft files remain immutable after reconciliation. They are the evidence for what the
 planners agreed on, where they disagreed, and what the reconciler changed.
 
-If the protocol reclassifies the work after a run has been created, abandon that run and
-start a fresh `R-nnn` with a new protocol record. Never rewrite the old record: a planner
-or late retry may already be using it.
+If a protocol reclassifies work after a run has been created, abandon that run and start a
+fresh `R-nnn` with a new protocol record. A bug reservation is also removed from the live
+ledger and burned as described above. Never rewrite an old record: a worker or late retry
+may already be using it.
 
 This is the one step in Rune that earns a fan-out, per *Judgment fans out, mechanics do
 not* below. Where the independent artifacts agree, the cut is probably sound. Where they
@@ -294,9 +334,11 @@ No shared files. T-015 waits on T-014.
 - One task id and absolute pointers to its task file plus any handoff, verification, or
   landing record it must consume.
 
-The first executor creates `worktree_path` if it is absent. Every later executor reuses
-that exact path. Do not request harness isolation that creates an anonymous worktree; use
-it only if the harness can target the supplied path exactly.
+For a confirmed bug, `ai-bug` already created `worktree_path` and committed the failing
+check there; the first executor validates and reuses it. For every other task, the first
+executor creates the path if absent. Every later worker reuses that exact path. Do not
+request harness isolation that creates an anonymous worktree; use it only if the harness
+can target the supplied path exactly.
 
 **No source code is ever modified outside `worktree_path`.** Executors validate the path
 against `main_root`'s Git repository before editing and create it at the supplied location

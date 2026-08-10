@@ -17,8 +17,8 @@ minute is almost always cheaper.
 
 | Mode | What happens to in-flight work | Use when |
 |---|---|---|
-| **drain** (default) | Finishes, verifies, merges. Then stops. | Almost always |
-| **stop** | Executors write handoffs and stop where they are. Worktrees kept. | You need the machine or your attention back now |
+| **drain** (default) | Finishes active diagnosis or execution; completed tasks verify and merge. Then stops. | Almost always |
+| **stop** | Active workers write durable state and stop where they are. Worktrees kept. | You need the machine or your attention back now |
 | **abandon** | In-flight worktrees discarded, tasks reset to queued. | The current batch is going somewhere wrong |
 
 `abandon` throws away real work. Say what will be lost and confirm before doing it.
@@ -72,16 +72,23 @@ state, say so explicitly and say what is dangling.
 1. **Set the flag first**, before anything else. If this turn dies, the pause still holds.
 2. Read the ledger. Identify what is in flight.
 3. Apply the mode:
-   - **drain** — wait for each in-flight executor, **dispatch `ai-verify`** for each against
-     its ledger-recorded `worktree_path`, then **dispatch `ai-land`** one task at a time
-     against that same path. Then stop. You neither merge nor run the checks yourself. A
-     task the lander could not land goes back to `pending` with its worktree kept; a drain
-     does not force work in on the way out.
-   - **stop** — signal executors to write handoffs and stop. Set their tasks to `pending`
-     with the handoff attached. Keep the worktrees.
-   - **abandon** — discard in-flight worktrees, reset those tasks to `pending`.
-4. Confirm no task is left `in_progress` or `landing`. A paused ledger with a task still
-   marked in progress is a lie about the state of the world, same as after a crash.
+   - **drain** — wait for each in-flight worker. A completed `ai-bug` diagnosis leaves its
+     reservation `diagnosing`, clean worktree kept, and planning for the next session; do
+     not begin decomposition while pausing. For completed executors, **dispatch
+     `ai-verify`** against each ledger-recorded `worktree_path`, then **dispatch `ai-land`**
+     one task at a time against that same path. Then stop. You neither merge nor run the
+     checks yourself. A task the lander could not land goes back to `pending` with its
+     worktree kept; a drain does not force work in on the way out.
+   - **stop** — signal active workers to write durable state and stop. Executors write
+     handoffs and return to `pending`; an `ai-bug` worker appends its partial diagnosis and
+     leaves the reservation `diagnosing`. Keep the worktrees.
+   - **abandon** — discard in-flight worktrees, reset executable tasks to `pending`. For a
+     `diagnosing` reservation, preserve its progress record, remove the provisional row,
+     and burn the id.
+4. Confirm no worker is live and no task is left `in_progress` or `landing`. A completed
+   reproduced reservation may remain `diagnosing` for planning after resume. A paused
+   ledger with a task still marked in progress is a lie about the state of the world, same
+   as after a crash.
 5. Report.
 
 ## Report

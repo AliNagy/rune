@@ -57,6 +57,21 @@ to act on one.
 Per `ai-ledger`. The critical step, and the one that is easy to skip because
 everything *looks* fine.
 
+**Reconcile `diagnosing` rows before executable tasks.** No immutable task file exists yet,
+so never send one to `ai-execute` or `ai-recover`.
+
+- A progress file ending in `diagnosis: reproduced` with valid diagnosis commit ids means
+  diagnosis finished and the parent died before planning. Keep the exact worktree and row;
+  route `work` back into the same decomposition run.
+- `diagnosis: not_reproduced` or `reclassified` means the worker finished but the parent
+  did not consume its result. Remove the provisional row, keep the protocol and progress
+  artifacts so the id stays burned, and report or reroute as recorded.
+- `diagnosis: blocked` keeps the row and worktree. Report the recorded condition and
+  re-dispatch only after it has cleared.
+- No terminal diagnosis block means the diagnosis worker died. Re-dispatch `ai-bug` with
+  the same task id, protocol, progress, `main_root`, and exact `worktree_path`. That skill
+  owns recovery before a task contract exists.
+
 **Every `in_progress` row is a lie** — no executor is holding it; they died with the
 session. For each:
 
@@ -76,7 +91,8 @@ session. For each:
    bounded state probes, not source reads:
    - empty diff, branch ahead → keep it and set `pending`. The executor may have died
      between `git commit` and writing the publication block; a fresh executor inspects the
-     committed range and either publishes that `HEAD` or resumes the task.
+     committed range and either publishes that `HEAD` or resumes the task. For a diagnosed
+     bug, `diagnosis_commit` alone is only the starting baseline and must never be published.
    - empty diff, branch not ahead → discard, set `pending`. Nothing lost.
    - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** with the same
      `main_root`, exact `worktree_path`, and absolute task/progress pointers.
@@ -98,7 +114,8 @@ Also check:
 - decomposition runs with a protocol record or planner drafts but no registered tasks →
   keep the immutable artifacts, mark the attempt interrupted in the dispatch log, and
   route back to `work`. It allocates a fresh `R-nnn`; never resume into or reuse the
-  interrupted run's paths.
+  interrupted run's paths. The exception is a reproduced `diagnosing` bug reservation:
+  its protocol, diagnosis, and worktree are one bound input, so resume that same run.
 - **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
   session died before it reached the user. Assign the `DEC-nnn`, move it into
   `decisions.md`, set the task `awaiting`, and surface it. This is the self-healing path
@@ -114,6 +131,7 @@ Also check:
 | `vision.md` partial | interview interrupted | `rune:vision` — from the last settled section |
 | vision done, decisions `open` | blocked on the user | present the open decisions |
 | decisions done, no milestones | vision unfinished | `rune:vision` — generate milestones |
+| task `diagnosing` | bug reproduction or planning interrupted | reconcile diagnosis, then `rune:work` |
 | protocol record or planner drafts, no registered tasks | planning interrupted | `rune:work` — allocate a fresh draft run |
 | milestones, none decomposed | ready to work | `rune:work` — decompose M-01 |
 | tasks pending | mid-milestone | `rune:work` — next available task |
@@ -182,6 +200,8 @@ becomes permanent.
 **Discard freely.** Under Serena, re-acquiring a working set is a handful of symbol
 lookups. Partial work of unknown provenance is worth less than the clean base it is
 occupying, and the task file — not the worktree — was always the durable state.
+For a diagnosed bug, the committed reproduction and progress block are also durable state:
+discard later implementation freely, but preserve `diagnosis_commit` as the task baseline.
 
 **Do not start work in this skill.** Reconcile, report, and hand to `rune:work` or
 `rune:vision`. Continue answers *where are we*; the other skills answer *what next*.

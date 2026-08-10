@@ -49,6 +49,7 @@ State beats intent. Some conditions answer the question regardless of what was a
 | `<main_root>/.agent/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
 | a decision is `open` | surface it | Nothing can proceed. Show it, get an answer. |
 | a task is `awaiting` | surface it | An executor asked something and is blocked on the reply. |
+| a task is `diagnosing`, fresh session | `continue` | Reconcile the reserved bug worktree before planning. |
 | tasks `in_progress`, fresh session | `continue` | Reconcile before doing anything new. |
 | no `<main_root>/.agent/`, repo has code | `init` → `vision` | Nothing is known yet. |
 | no `<main_root>/.agent/`, empty directory | `vision` | New project; init comes after the stack exists. |

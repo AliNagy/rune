@@ -17,6 +17,12 @@ from `ai-taskfmt`: behavior-changing tasks use `red_then_green`, refactors use
 incompatible mode is a defective task contract: return `status: blocked` and do not invent
 the evidence rule yourself.
 
+For `type: bug`, also require a terminal `diagnosis: reproduced` block in the progress
+file. Its check must match the reconciled task, its `diagnosis_commit` must exist on this
+task branch, and `HEAD` must contain it. That earlier commit is the task's expected starting
+state, not a completed publication or evidence that a previous executor died. A mismatch
+means decomposition failed to preserve diagnosis: return `status: blocked` without editing.
+
 Also load `ai-taskfmt`, `ai-serena`, and `ai-drift`.
 
 You are stateless. Assume nothing from any prior session. If a handoff note exists at
@@ -25,8 +31,9 @@ You are stateless. Assume nothing from any prior session. If a handoff note exis
 exists, and the worktree's uncommitted `git diff`. The committed range is what a prior
 attempt published; the dirty diff is what happened after it. If there is no publication
 but the task branch is ahead of its merge base with main, a prior executor died between
-`git commit` and recording the SHA. Inspect that committed range too; an empty dirty diff
-does not mean an empty task.
+`git commit` and recording the SHA — **unless** the progress file identifies that range as
+the bug's diagnosis commit. Inspect the committed range either way, but never mistake a
+diagnosis-only branch for a finished task. An empty dirty diff does not mean an empty task.
 
 **If `<main_root>/.agent/notes/T-nnn.verify.md` exists, read it — the last block first.** This task has
 been through verification before and came back. The last block is why the previous attempt
@@ -113,6 +120,8 @@ Stop and report — do not quietly widen your reach.
 - `red_then_green`: before changing the implementation, run the declared check and confirm
   it fails for the expected missing behavior. Record `verification`, `red`, then after the
   change record `green` from the same check. A different failure is not useful red evidence.
+  For a bug, preserve the diagnosis block and append a reconfirmed red result before the
+  first production edit; the committed reproduction test already exists in the worktree.
 - `green_baseline`: before changing production code, run the declared existing check and
   project oracle and record `verification` plus `baseline`. After the refactor, run the
   exact same commands and record `preserved`. Do not edit tests or fixtures and do not
@@ -176,7 +185,8 @@ pass:
 3. If the worktree is already clean and the task branch already contains the finished
    change, do not create an empty commit. Publish its current `HEAD`.
 4. Set `artifact_commit` to `git rev-parse HEAD`. Set `base_commit` to the merge base of
-   the main branch and `artifact_commit`.
+   the main branch and `artifact_commit`. For a bug, prove the resulting range contains
+   `diagnosis_commit`, so the published artifact includes both the regression test and fix.
 5. Prove the publication is usable: `base_commit` is an ancestor of `artifact_commit`,
    `git diff <base_commit>..<artifact_commit>` is non-empty, and
    `git status --porcelain` in the task worktree is empty. Any failure means you cannot

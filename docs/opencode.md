@@ -72,9 +72,10 @@ whole class of harness-specific breakage it existed to paper over.
 OpenCode's subagents cannot ask the harness for an isolated worktree.
 
 This is not an isolation downgrade. The parent assigns every task one absolute worktree
-path before its first executor. The executor creates that exact checkout if needed, and
-every retry, verifier, recoverer, and lander receives and validates the same path. All
-coordination reads and writes use the separately supplied absolute main-checkout path.
+path before its first task-bound worker. For a bug, `rune-ai-bug` creates that exact
+checkout before writing its reproduction; for other tasks, the first executor creates it.
+Every later executor, verifier, recoverer, and lander receives and validates the same
+path. All coordination reads and writes use the separately supplied absolute main-checkout path.
 Neither harness may substitute the worker's starting directory or a fresh anonymous
 checkout.
 
