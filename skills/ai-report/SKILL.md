@@ -60,6 +60,7 @@ The system's internal terms are precise and mean nothing to a reader. Translate:
 | drift / DRF-003 | the plan was wrong about X |
 | the ledger | progress / status |
 | task T-014 is in the verifying state | T-014 is being checked |
+| task T-014 is blocked; unblock_when X | T-014 stopped because Y; it can resume when X |
 | decomposed the milestone | split the work into 4 tasks |
 | context contract / forbidden list | which files this touches |
 | encapsulated task | self-contained task |
@@ -126,4 +127,16 @@ T-016 failed verification.
 - worktree discarded, task back in the queue
 
 Retrying once with the failure attached. If it fails again the plan is wrong, not the code.
+```
+
+## Reporting a blocker
+
+State the present condition and the observable fact that would allow work to resume. Say
+whether the user needs to act; do not describe a durable block as a transient retry.
+
+```
+TL;DR
+- T-017 stopped because the package registry is unreachable from its worktree.
+- Its partial work is preserved. It can resume when the registry probe succeeds.
+- No action needed yet; the other two tasks are still running.
 ```

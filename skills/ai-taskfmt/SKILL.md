@@ -225,8 +225,11 @@ The values sent in a real dispatch are absolute paths — never the literal
 `<main_root>` placeholder used in prose. Before doing any work, a task-bound worker
 confirms that `worktree_path` belongs to the same Git repository as `main_root`. A
 mismatch, a missing verifier/recovery path, or a wrong task branch is a blocked outcome,
-not permission to search for another checkout. A lander alone may accept a missing path
-after proving the exact verified commit is already in main, per its crash-recovery path.
+not permission to search for another checkout. An executor that blocks uses the durable
+blocked-return contract below: it preserves the recorded worktree identity, writes a task
+handoff, and names the objective condition that permits a retry. A lander alone may accept
+a missing path after proving the exact verified commit is already in main, per its
+crash-recovery path.
 
 **Pointers, not payloads.** The parent names where things are; the worker reads them
 itself. Passing content down means the parent had to hold it first, which is the cost the
@@ -317,6 +320,22 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
 
 Then whatever else that skill defines.
+
+`ai-execute` has one required conditional interface. `status: blocked` always adds:
+
+```yaml
+worktree: kept
+worktree_path: /workspace/acme/.agent/worktrees/T-014
+blocker: package registry is unreachable from the task worktree
+unblock_when: the declared registry probe succeeds from this environment
+handoff: /workspace/acme/.agent/notes/T-014.md
+```
+
+`blocker` says what is true now; `unblock_when` says what observable fact makes another
+attempt safe. Neither may be "retry later" or another restatement of `blocked`. The
+handoff is the durable detail, and the short return is the routing interface the parent
+records in the ledger. A blocked executor never discards or silently repoints the task's
+recorded worktree.
 
 **Do not force one vocabulary across all of them.** A verifier's outcome genuinely is not
 an executor's outcome, and `ai-execute`'s values are the ones the ledger's state machine
@@ -733,11 +752,16 @@ Written when an executor stops early. Read by a stranger, always.
 # T-014 handoff
 stopped_at: step 2 of 3
 reason: drift | budget | blocked | question
+blocker: package registry is unreachable from the task worktree
+unblock_when: the declared registry probe succeeds from this environment
 what_exists: TokenStore.rotate implemented and unit-tested; not yet wired into handle()
 what_surprised_me: handle() is called from two places, not one — see src/ws/upgrade.ts
 worktree: kept | discarded
 next: wire both call sites, or split the second into its own task
 ```
 
-No pronouns pointing at a conversation. No "as discussed". No "the approach we agreed".
-The reader has none of that.
+`blocker` and `unblock_when` are required when `reason: blocked` and omitted otherwise.
+Blocked handoffs always say `worktree: kept`; the next executor resumes from the ledger's
+same absolute path only after the unblock condition is proven. No pronouns pointing at a
+conversation. No "as discussed". No "the approach we agreed". The reader has none of
+that.

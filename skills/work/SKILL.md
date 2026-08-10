@@ -368,6 +368,35 @@ executor wrote the same publication to
 with the same `main_root`, the same exact `worktree_path`, and absolute pointers to the
 task and progress files. Do not read the worktree or accept an uncommitted success claim.
 
+Apply the authoritative executor-result mapping from `ai-ledger`. This route owns the
+actions that follow each transition; it does not redefine what the states mean.
+
+### When an executor is blocked
+
+`status: blocked` ends that dispatch attempt. Validate that the return names the live task,
+the ledger's exact absolute `worktree_path`, `worktree: kept`, a concrete `blocker`, an
+observable `unblock_when`, and an absolute `<main_root>/.agent/notes/T-nnn.md` handoff.
+Then, in one ledger write:
+
+1. set the task from `in_progress` to `blocked` without incrementing its attempt;
+2. preserve the exact worktree path;
+3. add or replace its `## Blockers` row with source `executor`, the two returned fields,
+   and the handoff pointer; and
+4. log the execute dispatch as blocked.
+
+Do not verify, land, discard, or immediately retry it. If any required field is missing or
+mismatched, fail closed: keep the task blocked and the worktree path unchanged; record
+`incomplete blocked return: <fields>` as the blocker, `missing blocked fields recovered or
+task explicitly reset` as the canonical unblock condition, and `record: missing` when the
+handoff is absent. Never invent the executor's intended unblock condition.
+
+Keep unrelated tasks in the batch running. Report the blocker and the exact condition that
+would clear it. A later `work` or `continue` may move it back to `pending` only after that
+condition is proven through an allowed bounded probe, durable coordination state such as a
+reconciled replacement, or explicit user confirmation. If none can prove it, report and
+wait. Remove the blocker row in the same write, and give the retry executor the existing
+handoff plus the same worktree path.
+
 ### Landing a batch
 
 Verify each task independently first (step 5), then land them **one at a time, in the order
@@ -485,6 +514,8 @@ Per `ai-ledger`:
 
 - Update statuses.
 - Any drift record → block the tasks it invalidates, do not delete them.
+- Any executor blocker → keep its worktree and durable handoff; do not retry until the
+  recorded condition is proven cleared.
 - Enough drift in one milestone → stop and re-decompose the remainder against the code as
   it now is. Do not patch task files one at a time; patched specs accumulate
   contradictions with their own amendments until nobody can tell what is still true.
@@ -512,8 +543,8 @@ Everything you write opens with a TL;DR and uses plain words. Say "the tests pas
 
 Stop and return to the user when: the milestone is complete, an `open` decision blocks
 progress, an executor asked a question, drift invalidates a substantial part of the plan,
-the same task fails twice, a lander returns `escalate: yes` or `stuck`, or nothing is
-dispatchable.
+an executor is blocked and nothing else is dispatchable, the same task fails twice, a
+lander returns `escalate: yes` or `stuck`, or nothing is dispatchable.
 
 ```
 TL;DR

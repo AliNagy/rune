@@ -35,9 +35,17 @@ main: green                 # green | red — red halts all dispatch. only ai-la
 | T-014 | Rotate refresh tokens        | in_progress | —          | /workspace/acme/.agent/worktrees/T-014 |
 | T-015 | Refresh endpoint             | pending     | T-014      | —               |
 | T-016 | Session restart persistence  | drifted     | —          | discarded       |
+| T-017 | Expiry sweep                  | blocked     | —          | /workspace/acme/.agent/worktrees/T-017 |
+| T-018 | Session audit                 | blocked     | T-016      | —               |
 
 ## Drift
 - DRF-003 (from T-016) invalidates: T-018, T-019 — awaiting re-plan
+
+## Blockers
+| task  | source   | reason                               | unblock_when                         | record           |
+|-------|----------|--------------------------------------|--------------------------------------|------------------|
+| T-017 | executor | package registry is unreachable      | registry probe succeeds              | /workspace/acme/.agent/notes/T-017.md   |
+| T-018 | DRF-003  | task assumes the retired store shape | replacement task contract reconciled | /workspace/acme/.agent/drift/DRF-003.md |
 
 ## Dispatches
 | phase       | followed      | for               | outcome                         |
@@ -58,6 +66,13 @@ Every live task worktree value is an absolute path. The parent allocates
 task-bound worker, and keeps that value unchanged through diagnosis, retries, verification,
 recovery, and landing. `kept`, `discarded`, and `merged` may replace it only when the path
 no longer contains live task state.
+
+Every `blocked` task has exactly one row in `## Blockers`. `source` names the return or
+durable record that caused the block; `reason` is the current fact; `unblock_when` is an
+observable condition rather than "retry"; and `record` points to the executor handoff,
+drift record, or landing record with the detail. `missing` is valid only for a malformed
+blocked return and invokes the fail-closed rule below. The parent is the only writer of
+both the task row and blocker row, so it changes them atomically.
 
 ## Log every dispatch
 
@@ -96,7 +111,10 @@ pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─
                       │                    └─fail──────────> pending (attempt++)
                       ├─drift────────────> drifted
                       ├─budget───────────> pending (handoff written)
+                      ├─blocked──────────> blocked (handoff + condition recorded; worktree kept)
                       └─question─────────> awaiting (open decision recorded)
+
+blocked ─unblock condition proven / replacement reconciled─> pending (preserve any worktree)
 ```
 
 - `diagnosing` — a bug id and worktree are reserved, but its immutable task spec does not
@@ -110,7 +128,20 @@ pending ─claim─> in_progress ─report─> verifying ─pass─> landing ─
   Never self-declared, and never set straight off a `pass`
 - `drifted` — the plan was wrong; a drift record exists; downstream may be invalid
 - `awaiting` — blocked on a user decision. Names the `DEC-nnn`; worktree kept
-- `blocked` — cannot proceed for an external reason, stated in the row
+- `blocked` — cannot be dispatched until the matching `## Blockers` condition is proven
+  cleared. Its durable record explains the reason; any live task worktree is kept
+
+### Executor result mapping
+
+This is the one state interface consumed by `work` and repaired by `continue`:
+
+| executor `status` | Task row | Worktree | Required durable record |
+|---|---|---|---|
+| `done` | `verifying` | kept | publication in `notes/T-nnn.progress` |
+| `drifted` | `drifted` | as the drift handoff states | drift record |
+| `budget` | `pending` | kept | task handoff |
+| `blocked` | `blocked` | kept | task handoff plus `## Blockers` row |
+| `question` | `awaiting` | kept | staged open-decision file, then allocated decision |
 
 `landing` exists because passing verification and surviving the merge are two separate
 claims, and there was previously no state between them — so a task that had landed and
@@ -121,6 +152,27 @@ done only after `ai-verify` names the published commit and `ai-land` lands that 
 
 `awaiting` returns to `pending` the moment its decision is marked `decided`. A fresh
 executor picks it up with the handoff, the worktree diff, and the resolved decision.
+
+### Blocked tasks
+
+An executor return maps `in_progress -> blocked` only when all of these are present and
+agree with the live row: `task`, `worktree: kept`, the same absolute `worktree_path`, a
+non-empty `blocker`, an objective `unblock_when`, and an absolute task-handoff pointer.
+The parent preserves the exact path, records the blocker, and does not increment the task
+attempt: no implementation or verification failed.
+
+A malformed blocked return fails closed. Keep the row `blocked`, preserve the recorded
+worktree, record `incomplete blocked return: <fields>` as the reason, use `missing blocked
+fields recovered or task explicitly reset` as the canonical unblock condition, and set
+`record: missing` when no handoff exists. Do not guess the executor's intended condition
+or put the task back in `pending`.
+
+Unblocking is one ledger write: prove the recorded condition through the route's permitted
+bounded probe, durable coordination state such as a newly reconciled replacement, or
+explicit user confirmation; remove the `## Blockers` row; set the task to `pending`; keep
+the same worktree path and handoff pointer for the next executor when they exist. If none
+of those can prove the condition, report it and wait. A new session, elapsed time, or an
+optimistic retry is not proof. User decisions use `awaiting`, not this transition.
 
 `diagnosing` is deliberately earlier than `pending`. A reproduced bug remains there while
 its planners consume `diagnosis_commit`; only successful reconciliation creates the task
@@ -151,7 +203,7 @@ what a landing does to a row:
 |---|---|
 | `landed` | `done`, worktree removed or cleanup `pending` as returned |
 | `refused`, `conflict`, or `reverted` | `pending`, worktree **kept**, attempt++ |
-| `stuck` | `blocked`, and set `main: red` at the top of the file |
+| `stuck` | `blocked`, add its landing record to `## Blockers` with unblock condition `human restores and confirms main: green`, and set `main: red` at the top of the file |
 
 Earlier landings that succeeded stay landed — one task that could not land is not a reason
 to unwind the ones that did. What does **not** stay is the merge that failed: `ai-land`
@@ -197,6 +249,7 @@ Your job is the mapping:
 |---|---|---|
 | valid complete publication, executor return missing | `verifying` | kept; dispatch `ai-verify` |
 | handoff note says `budget` | `pending` | kept |
+| handoff note says `blocked` and names `blocker` plus `unblock_when` | `blocked`; create or repair its `## Blockers` row | kept |
 | handoff note says `drift` | `drifted` | per the note |
 | `ai-recover` → `salvage` | `pending`, resume point in the row | kept |
 | `ai-recover` → `partial` | `pending`, note that the test must be redone red-first | kept |
@@ -210,17 +263,19 @@ task rather than looking: it reads the durable `verified_commit`, detects whethe
 exact SHA is already an ancestor of main, and runs the oracle instead of creating an empty
 merge. That is the same artifact and the same gate the live case uses.
 
-**No row may remain `in_progress` or `landing`** when reconciliation ends. A `diagnosing`
-row may remain only when its durable outcome is reproduced and planning is next, or when a
-recorded blocker prevents re-dispatch. That is the one
-invariant this section guarantees.
+**No row may remain `in_progress` or `landing`** when reconciliation ends. A `blocked` row
+may remain only with its matching durable blocker row and record. A `diagnosing` row may
+remain only when its durable outcome is reproduced and planning is next, or when a
+recorded diagnosis blocker prevents re-dispatch. That is the invariant this section
+guarantees.
 
 ## Drift invalidation
 
 When a drift record lands, downstream tasks may now be wrong. The parent must:
 
 1. Record `DRF-nnn` in the ledger with the tasks it names as invalidated.
-2. Set those tasks to `blocked`, referencing the drift id.
+2. Set those tasks to `blocked` and add one `## Blockers` row per task, referencing the
+   drift id and using `replacement task contract reconciled` as the unblock condition.
 3. Refuse to dispatch them until re-planned.
 
 Do not silently delete invalidated tasks. The drift record plus the tasks it killed is

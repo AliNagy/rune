@@ -1,7 +1,7 @@
 ---
 name: ai-execute
 user-invocable: false
-description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, task-specific verification evidence, publishing a completed task as a commit, budget stops, and the return format. Never used by the dispatcher on its own behalf.
+description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, task-specific verification evidence, publishing a completed task as a commit, durable budget or blocker stops, and the return format. Never used by the dispatcher on its own behalf.
 ---
 
 # Executing a task
@@ -143,6 +143,29 @@ worktree, return `status: budget`. Returning early with a good handoff is succes
 Running to exhaustion — truncated output, no handoff — forces the next attempt to start
 from nothing.
 
+**A blocker is a durable stop, not a retry request.** Use `status: blocked` only when an
+objective condition outside this executor's authority prevents progress: an invalid task
+contract, a missing dispatch input, a checkout-identity failure, or an unavailable external
+capability. A visible product choice is `question`; a false plan premise or required
+out-of-surface change is `drifted`; running long is `budget`.
+
+Before returning `blocked`:
+
+1. Stop without publishing or committing partial work.
+2. Leave the ledger-recorded worktree path untouched. Return `worktree: kept` even when
+   the blocker prevented its creation or validation; `kept` means the parent must preserve
+   that identity and must not discard anything at the supplied path.
+3. Write `<main_root>/.agent/notes/T-nnn.md` using the `ai-taskfmt` handoff schema with
+   `reason: blocked`, the exact `blocker`, an observable `unblock_when`, what exists, and
+   the next safe action.
+4. Return the same `blocker`, `unblock_when`, and absolute `handoff` pointer. Do not ask the
+   parent to infer them from the summary.
+
+A blocked task is re-dispatched only after the parent proves `unblock_when`. The next
+executor receives the handoff and the same absolute worktree path. Never loop on the
+failed operation yourself or downgrade the block to `budget` merely to put the task back
+in the queue.
+
 **Never mark yourself done.** A separate verification decides that, in a context that
 never saw your reasoning. Marking your own work done is the single failure the whole
 verification step exists to prevent, and you are the agent least able to judge it.
@@ -170,8 +193,8 @@ worse than deciding and noting it.
 worktree. Verification and landing run in fresh contexts; an uncommitted diff has no path
 through git into the main tree.
 
-Only a completed task is published. `budget`, `blocked`, `question`, and `drifted` keep or
-discard their dirty worktree exactly as their stopping rules say; do not commit partial
+Only a completed task is published. `blocked` always keeps the recorded worktree identity;
+`budget`, `question`, and `drifted` follow their own stopping rules. Do not commit partial
 work merely to make it durable.
 
 After the declared evidence chain is complete and the task-local check and project oracle
@@ -219,6 +242,9 @@ base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any
 decision: DEC-nnn     # if status is question
+blocker: package registry is unreachable       # required for status: blocked
+unblock_when: registry probe succeeds           # required for status: blocked
+handoff: /workspace/acme/.agent/notes/T-nnn.md # required for status: blocked
 ```
 
 Anything longer goes to `<main_root>/.agent/notes/`. The dispatcher must not have to read your
