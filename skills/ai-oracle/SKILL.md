@@ -21,7 +21,7 @@ coordination file against `main_root`, never the current directory.
 ## Two oracles
 
 **Project-global** — "did I break anything else." Established once by `rune:init`,
-recorded in `<main_root>/.agent/rune.yml`, run after every task.
+recorded in `<main_root>/.rune/rune.yml`, run after every task.
 
 **Task-local** — "did my specific thing work." Produced *by* the task, per
 `ai-taskfmt`. Every task leaves a check behind that did not exist before.
@@ -45,7 +45,7 @@ already do for free; running it is the entire reason this is a separate dispatch
    source: it states what the project itself believes verifies it.
 2. Execute the candidate on a clean tree.
 3. **Return** the outcome honestly. You do not write `rune.yml` — the parent does, from
-   what you hand back. You write only `<main_root>/.agent/notes/init-commands.md`. The canonical field
+   what you hand back. You write only `<main_root>/.rune/notes/init-commands.md`. The canonical field
    set lives in `init` §5; do not invent a second schema for it. What the parent records
    looks like:
 
@@ -78,7 +78,7 @@ dispatch, same discipline:
   anything you find; a failing build is a finding to report, not work to take on.
 - **Time each one.** Duration is what tells the dispatcher whether the oracle is usable
   after every task or only at milestone boundaries.
-- **Full output goes to `<main_root>/.agent/notes/init-commands.md`** — every command, its exit code,
+- **Full output goes to `<main_root>/.rune/notes/init-commands.md`** — every command, its exit code,
   and enough output to diagnose a failure later. Nobody should have to re-run a 30-second
   suite to find out what broke.
 - **Never summarise a failure you did not read.** The reason belongs in the note, quoted
@@ -94,7 +94,7 @@ typecheck: ok    11s
 run:       none found
 
 oracle: npm test — passing, verified on a clean tree
-detail: /workspace/acme/.agent/notes/init-commands.md
+detail: /workspace/acme/.rune/notes/init-commands.md
 ```
 
 The dispatcher acts on the verdict; the evidence stays on disk for whoever needs it.

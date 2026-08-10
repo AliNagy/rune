@@ -43,7 +43,7 @@ requires a forbidden path, that is drift — stop and report it (`ai-drift`), do
 quietly widen your reach.
 
 **Never read a file "to get oriented."** Orientation comes from
-`<main_root>/.agent/map.md`, which
+`<main_root>/.rune/map.md`, which
 already exists precisely so nobody has to re-derive it. If the map is missing or stale,
 that is an `rune:init` problem, not something to solve by browsing.
 
@@ -55,17 +55,17 @@ one extra call and removes the entire class of over-broad replacement mistakes.
 server is cold, the first symbol query is slow — that cost is paid once, not per query,
 so do not fall back to `Read` because one lookup felt slow.
 
-## Serena memories vs. `.agent/`
+## Serena memories vs. `.rune/`
 
 Two stores, different jobs, do not mix them.
 
 - **Serena memories** — stable, agent-facing background knowledge about the codebase.
   Architecture notes, subsystem explanations, gotchas. Survives sessions. Written by
   `rune:init` and by surveyors.
-- **`.agent/*`** — the plan and its mutable state. Human-readable, git-tracked, edited
+- **`.rune/*`** — the plan and its mutable state. Human-readable, git-tracked, edited
   by the user. Vision, milestones, tasks, ledger.
 
-If a human needs to read and edit it, it goes in `.agent/`. If it only exists to save an
+If a human needs to read and edit it, it goes in `.rune/`. If it only exists to save an
 agent from re-deriving something, it goes in a Serena memory.
 
 ## Budget discipline

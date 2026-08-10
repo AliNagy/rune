@@ -14,7 +14,7 @@ The default without this skill is to discard and restart. That is safe but waste
 the work was nearly done. Recovery is worth attempting; blind trust in a torn tree is not.
 
 **Run as a subagent.** This reads diffs and code, and the parent must not. Return a verdict
-under 200 tokens; write the detail to `<main_root>/.agent/notes/T-nnn.md` as the handoff
+under 200 tokens; write the detail to `<main_root>/.rune/notes/T-nnn.md` as the handoff
 the dead executor never wrote.
 
 The dispatch must include absolute `main_root`, the ledger's exact absolute
@@ -51,7 +51,7 @@ So:
    applied, or absent. Steps are written to be checkable precisely so this is possible.
 5. **Check containment.** Does every changed file appear in the declared change surface?
 6. **Decide.** Below.
-7. **Write the missing handoff** to `<main_root>/.agent/notes/T-nnn.md`, in the format
+7. **Write the missing handoff** to `<main_root>/.rune/notes/T-nnn.md`, in the format
    `ai-taskfmt` specifies, so the next executor gets what it should have had. Its
    `resume_at` is the exact schema-1 token returned below.
 
@@ -105,8 +105,8 @@ verification: red_then_green
 evidence: missing red         # forces the behavior change to be reset
 resume_at: step:3 | evidence:red_then_green | fresh
 worktree: kept
-worktree_path: /workspace/acme/.agent/worktrees/T-016
-detail: /workspace/acme/.agent/notes/T-016.md
+worktree_path: /workspace/acme/.rune/worktrees/T-016
+detail: /workspace/acme/.rune/notes/T-016.md
 ```
 
 Return `step:N` for `salvage`, `evidence:<the task's mode>` for `partial`, and `fresh` for

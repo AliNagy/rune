@@ -30,7 +30,7 @@ capabilities:
 |---|---|
 | **search** | Issue a query against a web index and get back candidate results |
 | **retrieve** | Fetch the actual content at a specific address |
-| **record** | Write files under `<main_root>/.agent/` |
+| **record** | Write files under `<main_root>/.rune/` |
 
 Use whatever your harness provides for the first two. If it provides neither, or they are
 blocked, **stop and report that** — see §9. Do not fall back to memory and do not
@@ -236,7 +236,7 @@ These are not guidelines and there is no case where they bend.
 
 ## 10. Output
 
-Write `<main_root>/.agent/notes/RES-nnn.md`, return **under 200 tokens** per `ai-report`. `RES-` is
+Write `<main_root>/.rune/notes/RES-nnn.md`, return **under 200 tokens** per `ai-report`. `RES-` is
 its own ID space and does not collide with task or drift IDs.
 
 ```markdown

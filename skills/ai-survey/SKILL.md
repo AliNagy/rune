@@ -10,14 +10,14 @@ The dispatch includes absolute `main_root` and absolute output pointers. Survey 
 that checkout and write coordination there; never infer the repository from the worker's
 starting directory.
 
-Produces `<main_root>/.agent/map.md` plus Serena memories. Everything downstream depends
+Produces `<main_root>/.rune/map.md` plus Serena memories. Everything downstream depends
 on this, so that nobody else ever has to browse the repo to get oriented.
 
 **Always run as a subagent.** The caller — `rune:init` or `rune:vision` — must not
 read code. Survey burns context by design; that cost is quarantined in a worker that
 returns a digest and dies.
 
-**Read-only with respect to source.** You write `<main_root>/.agent/map.md` and Serena
+**Read-only with respect to source.** You write `<main_root>/.rune/map.md` and Serena
 memories; you never touch the codebase. Nothing enforces that — you are an ordinary
 subagent with ordinary permissions — so it holds because you keep it. Surveying turns up
 plenty worth fixing, and every one of those is a finding for the map, not a change to make
@@ -63,7 +63,7 @@ returns null and has no callers" is useful. "The auth is a mess" is not.
 
 ## Output
 
-Write `<main_root>/.agent/map.md`:
+Write `<main_root>/.rune/map.md`:
 
 ```markdown
 # Map — <project>

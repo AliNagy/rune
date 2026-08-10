@@ -13,17 +13,23 @@ not a generation task. Take the time it needs.
 **Your context is for the interview.** That is the one thing here that genuinely cannot be
 delegated — you are the only agent talking to the user. Everything else follows from it:
 
-- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
-- **Read** `<main_root>/.agent/` coordination files.
-- **Write** `<main_root>/.agent/vision.md` and `decisions.md`, incrementally, as the
+- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+  exception outside this route's own files.
+- **Read** `<main_root>/.rune/` coordination files.
+- **Write** `<main_root>/.rune/vision.md` and `decisions.md`, incrementally, as the
   interview settles them.
 - **Talk to the user** — this is the job.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
 
-Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`. Resolve
-every coordination path against that absolute root and include it, plus absolute pointers,
-in every dispatch.
+## Coordination-root preflight
+
+Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
+follow `ai-root` with that absolute root and `mode: initialize` before any coordination
+read or write. Stop and report any failure it returns. Resolve every coordination path
+against the returned root and include `main_root`, plus absolute pointers, in every
+dispatch.
 
 **Anything not on that list is a dispatch**, including reading source code and generating
 the milestone graph. Holding the interview is why your context is precious; spending it on
@@ -31,7 +37,7 @@ work a subagent could do is how the interview ends early.
 
 ## First: is the ground ready?
 
-Check `<main_root>/.agent/rune.yml`.
+Check `<main_root>/.rune/rune.yml`.
 
 - **Missing, and the repo has code** → run `rune:init` first. Do not ask; just do it and
   say so. Vision without a map produces a plan disconnected from the codebase.
@@ -91,7 +97,7 @@ finishing and deleting are both legitimate, and the agent may not choose.
 **Suggest. Never assume.**
 
 Every choice with more than one defensible answer becomes a decision record in
-`<main_root>/.agent/decisions.md`, per `ai-taskfmt`:
+`<main_root>/.rune/decisions.md`, per `ai-taskfmt`:
 
 ```markdown
 ## DEC-007 · State management
@@ -128,7 +134,7 @@ Anything unanswered is an open decision, not a default.
 Only once every blocking decision is `decided`.
 
 **Dispatch a subagent that follows `ai-decompose` with `main_root` and absolute pointers
-to write `<main_root>/.agent/milestones.md`. You do not write it yourself.** By this point
+to write `<main_root>/.rune/milestones.md`. You do not write it yourself.** By this point
 everything the graph needs is already on disk — `vision.md` and
 `decisions.md`, which you have been writing as the interview settled, plus the survey
 digest and `map.md` in Mode B. It reads those, writes the milestone graph per

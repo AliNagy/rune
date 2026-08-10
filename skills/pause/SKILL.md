@@ -30,22 +30,28 @@ before handing the repo to someone else.
 
 **You stop the loop and leave the tree safe to walk away from.** This list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
-- **Read** `<main_root>/.agent/` coordination files.
-- **Write** `<main_root>/.agent/PAUSED`, and `ledger.md` to settle the rows you drained.
+- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+  exception outside this route's pause and ledger records.
+- **Read** `<main_root>/.rune/` coordination files.
+- **Write** `<main_root>/.rune/PAUSED`, and `ledger.md` to settle the rows you drained.
 - **Talk to the user** — the report, and the confirmation before `abandon`.
 - **Dispatch subagents**, naming the skill each one must follow.
 
-Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`. Resolve
-every coordination path against it. Verification and landing dispatches must carry that
-root, the task's exact absolute `worktree_path` from the ledger, and absolute pointers.
+## Coordination-root preflight
+
+Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
+follow `ai-root` with that absolute root and `mode: initialize` before setting the flag or
+reading state. Stop and report any failure it returns. Resolve every coordination path
+against the returned root. Verification and landing dispatches must carry `main_root`, the
+task's exact absolute `worktree_path` from the ledger, and absolute pointers.
 
 **Anything not on that list is a dispatch** — including the verification and the checks in
 the drain below. You do not run them; you dispatch them and record what comes back.
 
 ## What it writes
 
-`<main_root>/.agent/PAUSED` is its own file rather than a ledger field so the flag can be
+`<main_root>/.rune/PAUSED` is its own file rather than a ledger field so the flag can be
 set *before* the ledger is even read — step 1 below — and so `work`'s precondition is one
 file-existence test rather than a ledger parse.
 
@@ -141,7 +147,7 @@ Pause does not lift itself and no other skill lifts it silently.
 That last one makes this skill the status check too — running it twice is safe and tells
 you where things stand.
 
-When the pause lifts, delete `<main_root>/.agent/PAUSED`. Do not leave a stale flag behind
+When the pause lifts, delete `<main_root>/.rune/PAUSED`. Do not leave a stale flag behind
 with a note saying it is inactive; the next reader will believe it.
 
 ## What pause is not

@@ -10,13 +10,13 @@ Turns one milestone into independent draft cuts and then reconciled task files. 
 **immediately before that milestone executes**, never during vision.
 
 The dispatch includes absolute `main_root` and absolute coordination pointers. Resolve
-every `.agent/...` read or write against `main_root`; never use the worker's starting
+every `.rune/...` read or write against `main_root`; never use the worker's starting
 directory or a harness-created worktree as the coordination checkout.
 
 ## Bind the selected protocol
 
 A planner or reconciler receives an absolute pointer to the run's
-`<main_root>/.agent/drafts/M-nn/R-nnn/protocol.md`. Read it before source or draft work,
+`<main_root>/.rune/drafts/M-nn/R-nnn/protocol.md`. Read it before source or draft work,
 confirm its `run` matches the assigned work id, and accept only these pairs:
 
 | type | protocol to load |
@@ -58,7 +58,7 @@ are not actually independent, and then every executor blows its budget rediscove
 shared context.
 
 1. For planner or reconcile work, bind and load the protocol above.
-2. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance. For a bug,
+2. Read `<main_root>/.rune/map.md` and the milestone's scope and acceptance. For a bug,
    also read the supplied diagnosis block and committed reproduction diff.
 3. Use `ai-serena` to look at the actual symbols the milestone touches in the correct
    source checkout: the reserved worktree for a bug, `main_root` otherwise. Overview
@@ -71,21 +71,21 @@ You are dispatched for one of three jobs, and never more than one at a time. The
 work id and pointers say which job it is; conversation context is never an input.
 
 **Milestone graph** (from `rune:vision`) — read `vision.md`, `decisions.md`, and where they
-exist `map.md` and the survey digest. Write `<main_root>/.agent/milestones.md` per
+exist `map.md` and the survey digest. Write `<main_root>/.rune/milestones.md` per
 `ai-taskfmt`.
 Everything you need is on disk; the dispatcher's conversation is not available to you and
 is not supposed to be. If something the graph obviously needs is missing from those files,
 say so and stop rather than inventing it — a gap on disk is a real finding. Return
-`plan: graph` and `artifact: <main_root>/.agent/milestones.md`.
+`plan: graph` and `artifact: <main_root>/.rune/milestones.md`.
 
 **Planner draft** (from `rune:work`) — the work id names one assigned slot such as
 `M-03/R-002/P-01`, and a pointer names the exact
-`<main_root>/.agent/drafts/M-03/R-002/P-01.md` destination. A second pointer names that
+`<main_root>/.rune/drafts/M-03/R-002/P-01.md` destination. A second pointer names that
 run's `protocol.md`. Decompose the milestone against real code and the loaded protocol,
 then write one complete candidate cut there per `ai-taskfmt`. Repeat the protocol `type`
 and skill in the draft frontmatter and use only local `D-nnn` ids. Do not create a final
 `T-nnn`, write under
-`<main_root>/.agent/tasks/`, inspect or update `<main_root>/.agent/ledger.md`, or write any
+`<main_root>/.rune/tasks/`, inspect or update `<main_root>/.rune/ledger.md`, or write any
 path other than the assigned draft. If the assigned path already exists, return
 `plan: blocked`; never overwrite an artifact whose writer may still be alive.
 For a bug, mark exactly one proposed task `reservation: primary`; it must own the committed
@@ -105,15 +105,15 @@ reproduction files. Say which cut you took as the base and what you moved. Where
 disagreed, that seam is the part of the milestone that is genuinely hard to divide; treat
 it as the thing to get right, not a tie to break quickly. You are the only worker in the
 run allowed to write
-`<main_root>/.agent/tasks/`, and you still never write `<main_root>/.agent/ledger.md`.
+`<main_root>/.rune/tasks/`, and you still never write `<main_root>/.rune/ledger.md`.
 
 Every return is ≤200 tokens:
 
 ```
 plan: drafted | reconciled | blocked | graph
 task: M-03/R-002/P-01       # planner; M-03/R-002 for reconciler
-artifact: /workspace/acme/.agent/drafts/M-03/R-002/P-01.md # milestones.md for graph
-artifacts: <main_root>/.agent/tasks/T-021.md, <main_root>/.agent/tasks/T-022.md
+artifact: /workspace/acme/.rune/drafts/M-03/R-002/P-01.md # milestones.md for graph
+artifacts: <main_root>/.rune/tasks/T-021.md, <main_root>/.rune/tasks/T-022.md
 summary: ids, one-line titles, and dependency edges; or the blocking pointer
 ```
 

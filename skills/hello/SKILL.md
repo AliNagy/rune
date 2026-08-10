@@ -14,30 +14,37 @@ enough state to route correctly, route, and get out of the way.
 
 This list is exhaustive, and it is the shortest in Rune:
 
-- **Run** `git rev-parse --show-toplevel` as the one bounded identity probe.
-- **Read** the `<main_root>/.agent/` files named in step 1. Nothing else.
+- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+  exception for this otherwise read-only route.
+- **Read** the `<main_root>/.rune/` files named in step 1. Nothing else.
 - **Talk to the user** — one question if the route is genuinely ambiguous.
 - **Route** to another skill.
 
-**You write nothing and dispatch nothing.** Every other route earns its context by doing
-something; you earn yours by handing over early and leaving it empty for whoever you hand
-to.
+**You write nothing directly and dispatch nothing.** `ai-root` may perform its bounded,
+recoverable storage migration before you read state; it is the sole exception. Every
+other route earns its context by doing something; you earn yours by handing over early and
+leaving it empty for whoever you hand to.
+
+## Coordination-root preflight
 
 Resolve `main_root` once from the harness workspace root or the bounded probe
-`git rev-parse --show-toplevel`, then resolve every `.agent/...` path below against that
-absolute root. Never route from a task worktree's relative `.agent/` directory.
+`git rev-parse --show-toplevel`. Before any coordination read, follow `ai-root` with that
+absolute `main_root` and `mode: resolve`. Stop and report any failure it returns. Resolve
+every `.rune/...` path below against the returned root. Never route from a task
+worktree's relative `.rune/` directory.
 
 ## 1. Read the state
 
 Cheap reads only. Never source code.
 
 ```
-<main_root>/.agent/PAUSED        · is work stopped?
-<main_root>/.agent/rune.yml      · initialized?
-<main_root>/.agent/vision.md     · is there a plan?
-<main_root>/.agent/milestones.md · how far along?
-<main_root>/.agent/ledger.md     · anything in flight or waiting on the user?
-<main_root>/.agent/sessions/     · a recent session handoff?
+<main_root>/.rune/PAUSED        · is work stopped?
+<main_root>/.rune/rune.yml      · initialized?
+<main_root>/.rune/vision.md     · is there a plan?
+<main_root>/.rune/milestones.md · how far along?
+<main_root>/.rune/ledger.md     · anything in flight or waiting on the user?
+<main_root>/.rune/sessions/     · a recent session handoff?
 ```
 
 If `ledger.md` exists, validate it per `ai-ledger` before routing from any task row. No
@@ -50,14 +57,14 @@ State beats intent. Some conditions answer the question regardless of what was a
 
 | State | Go to | Why |
 |---|---|---|
-| `<main_root>/.agent/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
+| `<main_root>/.rune/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
 | legacy ledger with no schema marker | `continue` | Migrate and validate durable state before any other route trusts it. |
 | a decision is `open` | surface it | Nothing can proceed. Show it, get an answer. |
 | a task is `awaiting` | surface it | An executor asked something and is blocked on the reply. |
 | a task is `diagnosing`, fresh session | `continue` | Reconcile the reserved bug worktree before planning. |
 | tasks `in_progress`, fresh session | `continue` | Reconcile before doing anything new. |
-| no `<main_root>/.agent/`, repo has code | `init` → `vision` | Nothing is known yet. |
-| no `<main_root>/.agent/`, empty directory | `vision` | New project; init comes after the stack exists. |
+| no `<main_root>/.rune/`, repo has code | `init` → `vision` | Nothing is known yet. |
+| no `<main_root>/.rune/`, empty directory | `vision` | New project; init comes after the stack exists. |
 
 Otherwise route on what they said:
 

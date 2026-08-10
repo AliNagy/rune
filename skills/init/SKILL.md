@@ -1,6 +1,6 @@
 ---
 name: init
-description: Use when starting Rune on a repository for the first time, or re-running after the codebase has changed substantially. Establishes the pass/fail oracle, verifies build and test commands, maps modules and conventions, flags danger zones, and scaffolds .agent/.
+description: Use when starting Rune on a repository for the first time, or re-running after the codebase has changed substantially. Establishes the pass/fail oracle, verifies build and test commands, maps modules and conventions, flags danger zones, and scaffolds .rune/.
 ---
 
 # rune:init
@@ -13,9 +13,11 @@ interview. Re-runnable.
 **You establish ground truth and report it.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Read** coordination files under `<main_root>/.agent/`, and manifests small enough to
+- **Follow** `ai-root`; its root rename, migration marker, pointer rewrites, and exact
+  `.gitignore` update are part of initialization.
+- **Read** coordination files under `<main_root>/.rune/`, and manifests small enough to
   name a command from.
-- **Write** `<main_root>/.agent/rune.yml`, the `<main_root>/.agent/` scaffolding, and one
+- **Write** `<main_root>/.rune/rune.yml`, the `<main_root>/.rune/` scaffolding, and one
   line in `<main_root>/.gitignore`.
 - **Talk to the user** — the report at the end.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
@@ -31,7 +33,7 @@ The probes you may run, and nothing else:
 git status --porcelain | head -20
 git rev-parse HEAD
 git rev-parse --show-toplevel
-git worktree list
+git worktree list --porcelain
 ```
 
 plus Serena `activate_project` and a single symbol query to confirm the language server is
@@ -42,7 +44,7 @@ dispatch.
 ## When it runs
 
 - First use of Rune on a repo
-- `rune:vision` finds no `.agent/rune.yml` and triggers it automatically
+- `rune:vision` finds no `.rune/rune.yml` and triggers it automatically
 - Re-run after major change, or when `rune.yml` is stale (commit differs substantially
   from the recorded one)
 
@@ -51,16 +53,25 @@ inspect until the stack is chosen. Vision knows this and orders it correctly.
 
 ## Procedure
 
-### 1. Git baseline
+### 1. Coordination-root preflight
 
-First set the absolute result of `git rev-parse --show-toplevel` as `main_root`. Keep it
-constant, resolve every coordination path against it, and include it in every dispatch.
+First resolve `main_root`, keep it constant, and capture the working-tree baseline before
+any repository write or coordination read:
 
 ```
-git status --porcelain | head -20   # clean, or the user must accept the dirt
-git rev-parse HEAD
 git rev-parse --show-toplevel       # stable main_root for dispatches and coordination
-git worktree list
+git status --porcelain | head -20   # clean, or the user must accept the dirt
+```
+
+Then follow `ai-root` with the absolute `main_root` and `mode: initialize`. It creates a
+fresh `.rune/`, migrates recognizable legacy state when safe, or fails closed with a
+diagnostic you report before doing anything else.
+
+After it succeeds, finish the remaining bounded probes:
+
+```
+git rev-parse HEAD
+git worktree list --porcelain
 ```
 
 These four, and nothing else. The `head -20` is the bound: a repo with 500 dirty files is
@@ -85,7 +96,7 @@ apply and the effective budget per task drops considerably.
 ### 3. Survey
 
 Dispatch a subagent that follows `ai-survey` with `main_root` and absolute output pointers.
-It writes `<main_root>/.agent/map.md` and Serena memories, and returns a ≤300 token digest.
+It writes `<main_root>/.rune/map.md` and Serena memories, and returns a ≤300 token digest.
 
 ### 4. Commands and the oracle
 
@@ -96,7 +107,7 @@ possible place to absorb them.
 
 Pass it `main_root`, absolute pointers, and the candidates you can name from the survey
 digest and manifests. It runs each one on that clean checkout, writes the full output to
-`<main_root>/.agent/notes/init-commands.md`, and returns a
+`<main_root>/.rune/notes/init-commands.md`, and returns a
 per-command verdict with durations plus the oracle result, in ≤200 tokens.
 
 The rule it enforces on your behalf, per `ai-oracle`: **run it, do not infer it.** Then
@@ -110,7 +121,7 @@ record what came back:
 A `none` or a red baseline is a real result. Do not re-run anything yourself to check —
 that is the leak this dispatch exists to close, and the evidence is already on disk.
 
-### 5. Write `<main_root>/.agent/rune.yml`
+### 5. Write `<main_root>/.rune/rune.yml`
 
 ```yaml
 initialized: 2026-08-04
@@ -137,7 +148,7 @@ confidence:
   oracle: high
 ```
 
-Scaffold the rest of `<main_root>/.agent/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
+Scaffold the rest of `<main_root>/.rune/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
 `drift/`, and, only when no ledger exists, this valid empty schema-1 ledger (fill the
 top-level values from the init result rather than leaving placeholders):
 
@@ -168,7 +179,7 @@ migration, and init never resets task history. Run and
 planner-specific directories beneath `drafts/` are created only when `work` assigns a new
 decomposition run, writes its protocol record, and assigns distinct planner slots.
 
-Add `.agent/worktrees/` to `<main_root>/.gitignore` if worktrees will live inside the repo.
+Add `.rune/worktrees/` to `<main_root>/.gitignore` if worktrees will live inside the repo.
 
 ## Report
 
