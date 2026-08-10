@@ -12,6 +12,7 @@ Bug diagnosis is task-bound even though the immutable task specification does no
 yet. The parent reserves the task identity first and dispatches all of these:
 
 - `task: T-nnn`
+- `attempt: N`, matching the diagnosis counter already persisted by the parent
 - absolute `main_root`
 - absolute `worktree_path` at `<main_root>/.agent/worktrees/T-nnn`
 - the run's absolute `protocol.md` pointer, whose `reserved_task` matches `task`
@@ -39,6 +40,11 @@ cd <worktree_path>
 If `task/T-nnn` already exists, attach or reuse only that branch at the supplied path.
 Confirm it belongs to the same repository as `main_root`. A mismatch is
 `diagnosis: blocked`, not permission to search for a nearby checkout.
+
+Every blocked diagnosis appends a terminal progress block with a lowercase `blocker` slug,
+`blocker_reason`, and one observable `unblocks_when` condition before returning. The
+parent stores `external:<slug>` and points `latest_finding` at this block; a short return
+alone is not durable enough to recover after a crash.
 
 You are the reproduction subagent — reproduction reads code and runs things, while the
 parent stays clean.
@@ -158,11 +164,13 @@ without a run, as usual.
 ```text
 diagnosis: reproduced | not_reproduced | reclassified | blocked
 task: T-nnn
+attempt: 1
 worktree: kept | discarded
 worktree_path: /workspace/acme/.agent/worktrees/T-nnn
 progress: /workspace/acme/.agent/notes/T-nnn.progress
 summary: failing check and root cause, missing reproduction input, reclassification, or blocker
 type: feature | refactor | investigation  # reclassified only
+blocker: repository-access                # blocked only
 diagnosis_base_commit: a3f91c2            # reproduced only
 diagnosis_commit: b7a03d4                 # reproduced only
 ```

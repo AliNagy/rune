@@ -52,7 +52,8 @@ So:
 5. **Check containment.** Does every changed file appear in the declared change surface?
 6. **Decide.** Below.
 7. **Write the missing handoff** to `<main_root>/.agent/notes/T-nnn.md`, in the format
-   `ai-taskfmt` specifies, so the next executor gets what it should have had.
+   `ai-taskfmt` specifies, so the next executor gets what it should have had. Its
+   `resume_at` is the exact schema-1 token returned below.
 
 ## Deciding
 
@@ -102,10 +103,16 @@ applied: steps 1-2 complete, step 3 partly (rotate() exists, not wired into hand
 containment: clean            # or: touched src/api/routes.ts, outside surface
 verification: red_then_green
 evidence: missing red         # forces the behavior change to be reset
-resume_at: step 3 - restore the base, observe red, then reapply rotate()
+resume_at: step:3 | evidence:red_then_green | fresh
 worktree: kept
 worktree_path: /workspace/acme/.agent/worktrees/T-016
+detail: /workspace/acme/.agent/notes/T-016.md
 ```
+
+Return `step:N` for `salvage`, `evidence:<the task's mode>` for `partial`, and `fresh` for
+`discard`. Put explanatory prose such as "restore the base, observe red, then reapply" in
+the handoff's `next` field, not in `resume_at`; the parent copies the token into the ledger
+without interpreting prose.
 
 ## What not to do
 

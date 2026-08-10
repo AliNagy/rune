@@ -100,7 +100,7 @@ Everything worth keeping lives in `.agent/`:
   vision.md              the vision document
   decisions.md           decisions made and still open — open ones block milestones
   milestones.md          the road to v1
-  ledger.md              everything that changes as work runs. only the main session writes here
+  ledger.md              versioned task state, attempts, blockers, and resume points; parent-written
   drafts/M-nn/R-nnn/     selected work protocol plus one complete cut per planner
   tasks/T-nnn.md         task specs. never edited; changes are appended
   notes/T-nnn.md         handoff notes and long results

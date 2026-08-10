@@ -35,6 +35,7 @@ because the situation seems to call for one.
 
 - `main_root` — the absolute orchestration checkout where merging and coordination writes happen
 - `worktree_path` — the exact absolute task worktree used by execution and verification
+- `attempt` — the positive landing attempt already incremented in schema-1 ledger state
 - the task id and its task branch
 - `<main_root>/.agent/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
   task's to answer for
@@ -51,9 +52,10 @@ Run every main-tree Git command with `git -C <main_root>` and every task-tree pr
 `git -C <worktree_path>`. The harness's starting directory is irrelevant.
 
 **Read the landing record first when it exists.** You are stateless — every dispatch starts
-empty — so that file is the only thing that tells you which attempt this is and what the
-last four already tried. Without it you would re-land blind on every pass and never reach
-the ceiling below.
+empty — so that file tells you what earlier attempts observed. The dispatch's `attempt` is
+authoritative: every existing block number must be unique and lower. Gaps are dead
+dispatches that wrote no outcome; a duplicate or later number is `refused`, not permission
+to invent another attempt.
 
 ## Sequence
 
@@ -190,7 +192,8 @@ which is what carries it across the rollback at step 5 — a record written into
 worktree would be invisible to the parent until merge, which is precisely the moment it
 stops mattering.
 
-Append one block per attempt; never edit an earlier one. The history is the point.
+Append one block for the exact dispatched `attempt`; never edit an earlier one. The
+history is the point.
 
 ```markdown
 ## attempt 2 — 2026-08-07
@@ -220,9 +223,10 @@ defect, and patching it inside the task hides the real problem.
 
 ## When to stop and hand back
 
-**Ceiling: 5 attempts.** Count the blocks in the landing record — that is which attempt
-this is. On the fifth, escalate whatever it looks like. A task that has not landed in five
-tries is telling you something about the plan, and the sixth attempt does not find it out.
+**Ceiling: 5 attempts.** The ledger-provided `attempt` is which attempt this is; refuse an
+attempt above five. On the fifth, escalate whatever it looks like. A task that has not
+landed in five tries is telling you something about the plan, and the sixth attempt does
+not find it out.
 
 **A `landed` outcome never escalates**, whatever attempt it was on — the loop ended
 because it succeeded. Everything below applies only when the outcome is `refused`,
@@ -256,7 +260,7 @@ landing: landed | refused | conflict | reverted | stuck
 main: green | red
 worktree_path: /workspace/acme/.agent/worktrees/T-014
 verified_commit: 4a91c02
-attempt: 2 of 5
+attempt: 2 of 5              # exactly the attempt supplied by the parent
 summary: rotation drops the device id the api layer reads back
 escalate: no             # or: yes (rule 3) — session.test.ts failed on attempt 1 too
 detail: /workspace/acme/.agent/notes/T-014.landing.md
