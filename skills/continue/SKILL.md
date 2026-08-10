@@ -60,13 +60,20 @@ to act on one.
 
 ### Validate or migrate the ledger first
 
-Before treating any row as state, apply `ai-ledger`'s schema validation. `schema: 1` must
+Before treating any row as state, apply `ai-ledger`'s schema validation. `schema: 2` must
 validate completely. An unknown schema stops here and is reported.
 
-A ledger with no schema marker is legacy schema 0. Migrate it once, before reconciliation:
+Schema 1 is the recognized predecessor. Migrate it once, before reconciliation: validate
+its exact ordered table, run the legacy-amendment preflight below, append the
+`replaced_by` header and `—` to every row, change the marker to 2, validate the complete
+candidate, then replace `ledger.md` once. Do not infer replacement lineage for an
+existing drift blocker; only a completed replan can do that.
+
+A ledger with no schema marker is legacy schema 0. Migrate it directly to schema 2:
 
 1. Read only coordination artifacts. Map each old milestone table row into the canonical
-   schema-1 Tasks table; the enclosing milestone heading supplies `milestone`.
+   schema-2 Tasks table; the enclosing milestone heading supplies `milestone`, and every
+   row starts with `replaced_by: —`.
 2. Derive `d/e/v/l` from durable dispatch rows and numbered diagnosis, verification, and
    landing blocks. Gaps remain counted when a dispatch row exists. Count verifier `fail`
    blocks into `failures`.
@@ -76,13 +83,48 @@ A ledger with no schema marker is legacy schema 0. Migrate it once, before recon
 5. Validate the complete candidate and replace `ledger.md` once; never partially upgrade
    in place.
 
-Only schema 0 has this path. Migration is idempotent because a successful replacement is
-schema 1 and later runs validate it instead of migrating again.
+For either predecessor, inspect the task file for every mapped row before the final
+replacement. A legacy `## Amendments` footer is nonempty when anything other than
+whitespace or its old placeholder comment follows the heading.
+
+- A `done` amended task remains `done`. Preserve the entire file byte-for-byte as the
+  historical contract that was executed; no route reads it as a live schema-2 contract.
+- Any unfinished amended task fails closed. Choose the lowest-id amended row as the
+  record's `from_task`, put every other unfinished amended row in `invalidates`, compute
+  their unioned unfinished reverse-dependency closure, and allocate one migration
+  `DRF-nnn`. Before dispatching,
+  append or recover the one pending `## Dispatches` assignment that binds that id to its
+  exact output path, then dispatch `ai-drift` in record-only mode with the amended task
+  pointers and the pre-migration ledger. The record names the selected origin, every other
+  amended task and the closure, and all amended task files as evidence; it does not
+  interpret amendment prose.
+- If that worker or session dies, keep the predecessor ledger and its pending assignment;
+  the next `continue` reuses the same id and path. Once the record validates, the single
+  schema-2 candidate adds its `quiescing` drift entry, sets every inactive affected row to
+  `drifted` with that DRF pointer and `resume_at: replan`, maps `worktree: —` to
+  `discarded`, and preserves absolute worktrees for the quiescing pass. Active-looking
+  rows are stale in a fresh session and are reconciled under the freeze, never resumed
+  normally.
+
+This is the only pre-migration worker dispatch. It creates evidence required by the
+schema-2 candidate; no diagnosis, execution, verification, landing, or decomposition may
+start against a predecessor ledger.
+
+Only schemas 0 and 1 have migration paths. Migration is idempotent because a successful
+replacement is schema 2 and later runs validate it instead of migrating again.
 
 ## 2. Reconcile
 
 Per `ai-ledger`. The critical step, and the one that is easy to skip because
 everything *looks* fine.
+
+Reconcile every `quiescing` entry under `## Drift` before the ordinary status rules below.
+Its frozen ids must not resume their old lifecycle: consume durable worker returns only as
+evidence, use `ai-drift` quiesce for unpublished registered worktrees, and use `ai-land`
+`drift-observe` for a stale `landing` row whose prior return is missing. Already-reachable
+green work becomes `done`; `not_landed` is discarded; ambiguous or red main state stops.
+A row with no worktree becomes `discarded` without a cleanup dispatch. Resume the replan
+only when every remaining frozen row is inactive and discarded.
 
 **Reconcile `diagnosing` rows before executable tasks.** No immutable task file exists yet,
 so never send one to `ai-execute` or `ai-recover`.
@@ -144,17 +186,22 @@ Also check:
 - orphaned worktrees with no ledger row → remove; if their task commit is already in main,
   delete the merged task branch too
 - `verifying` rows whose verifier never returned → first check for a durable block matching
-  the row's current `v`; consume it with the same complete mapping as `work` (including
-  `failures++` only for `fail`, the finding pointer, and the returned dispatch row) if
-  present. Otherwise increment `v`, persist, and
-  re-dispatch that attempt against the row's exact `worktree_path`; never create a fresh
-  verifier checkout
+  the row's current `v`. If it is `unverified` for `evidence` or `acceptance`, recover the
+  pending record-only drift assignment: validate an existing assigned DRF and apply the
+  freeze transition, or re-dispatch `ai-drift` with the same id and path when the file is
+  absent. Never allocate a second DRF for the same verdict. Consume every other verdict
+  with `work`'s complete mapping (including `failures++` only for `fail`, the finding
+  pointer, and the returned dispatch row). If no verdict exists, increment `v`, persist,
+  and re-dispatch that attempt against the row's exact `worktree_path`; never create a
+  fresh verifier checkout
 - `landing` rows whose lander never returned → first consume a durable block matching the
   current `l` with `work`'s complete outcome mapping when present. Otherwise, if `l` is
   below five, increment it, persist, and
   re-dispatch that attempt against the same verified artifact and exact worktree. At `l5`,
   stop and surface the exhausted landing ceiling rather than creating attempt six
-- drift records not yet reflected in the ledger's blocked list
+- completed record-only drift records not yet reflected in `## Drift` → validate their
+  assigned task/finding inputs, then atomically add the exact quiescing closure and block
+  inactive rows; a pending assignment with no file is re-dispatched to the same path
 - `blocked` rows whose finding is missing, unreadable, or lacks the blocker reason and
   observable unblock condition → keep them blocked, report the damaged durable record,
   and do not redispatch; never infer that elapsed time cleared the condition
@@ -163,6 +210,19 @@ Also check:
   route back to `work`. It allocates a fresh `R-nnn`; never resume into or reuse the
   interrupted run's paths. The exception is a reproduced `diagnosing` bug reservation:
   its protocol, diagnosis, and worktree are one bound input, so resume that same run.
+- drift-replan runs with new task files or `replacements.md` but no atomic ledger
+  transaction → if the immutable replacement map is complete, every mapped task file
+  validates, every target id is new, the protocol and drift pointers match, and the old
+  rows still equal the frozen retirement set with no live worktrees, finish the exact
+  schema-2 transaction and record the recovered reconcile outcome. Otherwise keep every
+  artifact and burn every file id, leave the old rows drift-blocked, and route `work`
+  through a fresh `R-nnn`. Never register a partial map or infer lineage from task titles.
+  If the schema-2 transaction is already present, validate the complete old-to-new map and
+  treat the run as finished. A fresh reproduced bug reservation may be finalized only when
+  its diagnosis evidence and replacement task file both validate for that same new id.
+- `retired` rows → validate their drift pointer and explicit `replaced_by` disposition,
+  but never recover, claim, or resurrect them. Follow replacement chains only to report
+  the current leaf tasks.
 - **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
   session died before it reached the user. Assign the `DEC-nnn`, move it into
   `decisions.md`, set the task `awaiting`, store `decision:DEC-nnn`, point at the decision
@@ -183,9 +243,9 @@ Also check:
 | protocol record or planner drafts, no registered tasks | planning interrupted | `rune:work` — allocate a fresh draft run |
 | milestones, none decomposed | ready to work | `rune:work` — decompose M-01 |
 | tasks pending | mid-milestone | `rune:work` — next available task |
-| tasks `blocked` by drift | plan needs repair | `rune:work` — re-decompose remainder |
+| tasks `drifted` or `blocked` by drift | plan needs repair | `rune:work` — re-decompose and atomically retire the obsolete contracts |
 | task `blocked` by executor | executor condition unresolved | report the reason and exact unblock condition; route to `rune:work` only after it is proven cleared |
-| all milestones done | v1 reached | report; ask what is next |
+| every non-retired leaf task in all milestones is `done` | v1 reached | report; ask what is next |
 
 ### Resuming from a pause
 

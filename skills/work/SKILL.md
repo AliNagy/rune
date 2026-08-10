@@ -56,7 +56,7 @@ Two consequences are load-bearing:
   if you must act on it.
 - You **re-read `ledger.md` from disk** between dispatches. Never carry ledger state in
   context — a stale in-memory copy is how you dispatch a task someone already finished.
-- Validate schema 1 on every read and every candidate replacement, per `ai-ledger`. An
+- Validate schema 2 on every read and every candidate replacement, per `ai-ledger`. An
   invalid or unknown ledger is a stop condition, not permission to infer missing state.
 
 If either slips, the parent hits its ceiling around task 25 no matter how clean the
@@ -153,8 +153,8 @@ After triage returns `bug`:
 3. In one validated ledger update add a provisional row with the milestone, title,
    `status: diagnosing`, the absolute `<main_root>/.rune/worktrees/T-nnn` path,
    `attempts: d1/e0/v0/l0`, zero failures, no finding or blocker, and
-   `resume_at: diagnose`. This reserves identity and claims diagnosis; no task spec exists
-   and the row is not executable.
+   `resume_at: diagnose`, `replaced_by: —`. This reserves identity and claims diagnosis;
+   no task spec exists and the row is not executable.
 4. Dispatch one `ai-bug` worker with that task id, `attempt: 1`, `main_root`, `worktree_path`, and
    absolute protocol and `notes/T-nnn.progress` pointers. The worker creates or validates
    the exact worktree before writing the reproduction check.
@@ -221,7 +221,8 @@ Use this exact two-phase protocol:
 5. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
    edges. Then register exactly those tasks in `<main_root>/.rune/ledger.md` in one
    validated parent update. New rows start `pending`, `d0/e0/v0/l0`, zero failures, no
-   finding or blocker, `resume_at: fresh`, and no worktree. For a bug, update the existing
+   finding or blocker, `resume_at: fresh`, `replaced_by: —`, and no worktree. For a bug,
+   update the existing
    reserved row's title and dependencies, move `diagnosing -> pending`, preserve `d1` and
    its absolute worktree, clear the blocker, and set `resume_at: fresh`; add only the extra
    rows. Draft planners and the reconciler never register tasks themselves.
@@ -238,6 +239,62 @@ This is the one step in Rune that earns a fan-out, per *Judgment fans out, mecha
 not* below. Where the independent artifacts agree, the cut is probably sound. Where they
 disagree, that seam is exactly where decomposition goes wrong, and it is now named instead
 of being discovered four tasks later.
+
+### Replanning after drift
+
+Drift uses the same fan-out but has an additional atomic handoff between obsolete and new
+contracts:
+
+1. Read the drift record and compute the complete retirement closure: its originating
+   unfinished task, every unfinished task it names, and every unfinished task whose
+   dependency chain reaches one of them. Keep `done` tasks unchanged. In one schema-2
+   update, add a `quiescing` entry under `## Drift` naming the exact frozen ids,
+   drift-block every inactive row in that set, and stop **all** new diagnosis, execution,
+   verification, retry, and landing dispatches for the set. An inactive row with
+   `worktree: —` becomes `worktree: discarded` in that update. The ledger drift entry,
+   not an active row's status, is the durable freeze seen after a crash.
+2. Drain every frozen row by its pre-freeze state; ordinary outcome routing is suspended:
+   - `pending`, `awaiting`, `blocked`, or already `drifted`: leave it drift-blocked. If it
+     owns an absolute worktree, dispatch `ai-drift` in quiesce mode after its prior worker
+     is confirmed stopped; otherwise its worktree is already `discarded`.
+   - `diagnosing`, `in_progress`, or `verifying`: wait for the already-dispatched worker
+     or reconcile its durable return, but never advance that return to planning,
+     verification, retry, or landing. A task that returned drifted and discarded is
+     complete; otherwise dispatch `ai-drift` quiesce on its registered worktree, then set
+     `drifted`, the causal drift blocker and pointer, `resume_at: replan`, and
+     `worktree: discarded` in one update.
+   - `landing`: wait for the live lander. `landed` with a green main becomes `done` and is
+     removed from the retirement set; its code is part of the replan baseline. Any
+     non-landed return starts no retry and goes through `ai-drift` quiesce. If the return
+     was lost, increment `l` and dispatch `ai-land` with `mode: drift-observe`: an artifact
+     already reachable from main is oracle-checked and becomes `done`; `not_landed` is
+     quiesced without merging; `stuck` sets `main: red` and stops the route.
+   A refused cleanup or any source state whose publication cannot be proven is a stop
+   condition. Do not replan until every remaining frozen row is inactive with
+   `worktree: discarded`; never transfer its branch, commits, diagnosis, or diff to a new
+   id.
+3. Allocate a fresh `R-nnn`. Its immutable protocol adds `drift: DRF-nnn` and
+   `retiring: [...]`. Give every planner the same absolute drift pointer plus absolute
+   pointers to all retiring task files. Give the reconciler those pointers, its distinct
+   `replacements.md` output pointer, and the completed drafts.
+   If the selected protocol is `bug`, also allocate a fresh reserved task id not in the
+   retirement set, add its `diagnosing` row, and reproduce the failure in its own new
+   worktree before planning. Never transfer the retired task's diagnosis commit or reuse
+   its branch; diagnosis evidence is bound to task identity. The final transaction updates
+   this reproduced reservation to `pending` instead of adding a second row for it.
+4. Accept reconciliation only when every returned task path is new and the replacement
+   artifact maps every retiring id exactly once to `none` or new ids, maps every new id at
+   least once, and leaves no live dependency on a retiring id. Never overwrite or delete
+   any old task file.
+5. After every new file exists, perform the one ledger transaction from `ai-ledger`: add
+   the new `pending` rows (or finalize the fresh reproduced bug reservation) and move all
+   old rows to terminal `retired` with their immediate `replaced_by` values. If validation
+   or the write fails, none of the old rows retires and none of the new tasks becomes
+   executable. Unregistered task-file ids remain burned.
+
+The user gate below shows both sides: which task ids became history and which fresh task
+ids now carry their outcomes. A `none` disposition is called out explicitly; it means the
+replan proved no replacement work is required, not that a task silently disappeared.
 
 ## Judgment fans out, mechanics do not
 
@@ -393,7 +450,7 @@ Consume every outcome in one validated ledger update:
 | `budget` | set `pending`, preserve the absolute worktree, point `latest_finding` at the handoff, set the returned pending resume token |
 | `blocked` | set `blocked`, keep the absolute worktree or mark it `discarded` exactly as returned, store `external:<slug>`, and point at the handoff containing `blocker_reason`, `unblocks_when`, and the compatible resume token |
 | `question` | after parent id allocation set `awaiting`, `decision:DEC-nnn`, the decision pointer, and the returned resume token |
-| `drifted` | set `drifted`, `drift:DRF-nnn`, the drift pointer, and `resume_at: replan` |
+| `drifted` | require `worktree: discarded`; set `drifted`, `drift:DRF-nnn`, the drift pointer, `resume_at: replan`, and keep `replaced_by: —` until replan succeeds |
 
 For `done`, the commit ids are routing data, not the durable record — the executor wrote
 the same publication to `<main_root>/.rune/notes/T-nnn.progress`. Do not read the
@@ -402,6 +459,11 @@ land before the verifier is dispatched.
 
 The status meanings and row validity rules remain owned by `ai-ledger`; the table above is
 this route's atomic action for each returned outcome.
+
+Before applying that table, check the ledger's `## Drift` freeze set. A return for a
+frozen task is consumed only by *Replanning after drift*: it may supply durable evidence,
+but it cannot trigger a new verifier, retry, diagnosis, or lander. This check closes the
+race where drift is recorded after a worker was dispatched but before its result arrives.
 
 ### When an executor is blocked
 
@@ -413,7 +475,7 @@ with the complete row update above; the executor attempt was already counted whe
 so returning blocked does not increment `e` again.
 
 Do not verify, land, or immediately retry it. If any required field is missing or
-mismatched, fail closed without constructing an invalid schema-1 blocked row: preserve the
+mismatched, fail closed without constructing an invalid schema-2 blocked row: preserve the
 already-valid claimed row and recorded worktree, append the incomplete dispatch outcome in
 one validated write, stop the normal loop, and enter `continue` reconciliation before
 reporting. Never invent missing blocker fields, discard source state, or leave the stale
@@ -444,7 +506,7 @@ something task B calls without either touching the other's files. Re-running the
 after each landing is what catches that, and landing one at a time is what tells you which
 one did it.
 
-Five outcomes:
+Five normal outcomes (`not_landed` exists only for drift-observe recovery):
 
 | `landing:` | What happened | What you record |
 |---|---|---|
@@ -538,8 +600,17 @@ possible judge of its own work.
 - `unverified` → not a soft pass. Point `latest_finding` at its verdict block.
   `reason: artifact` goes to `pending` with the worktree kept and `resume_at: publish`; a
   fresh executor must publish one clean immutable range. `reason: evidence`
-  or `acceptance` is a task-contract finding: record it as drift, set `drifted` with the
-  drift blocker and `resume_at: replan`, then send it back to decomposition.
+  or `acceptance` is a task-contract finding, but the verifier cannot write its causal
+  record. Keep the row `verifying`, allocate one unused `DRF-nnn`, and append a dispatch
+  row binding that verifier attempt to the exact drift output path. Dispatch `ai-drift`
+  in record-only mode with the task and verifier pointers. When the record returns, use
+  it as the evidence for one update that adds the exact unfinished dependency closure to
+  the ledger drift freeze, sets the originating row and every inactive affected row to
+  the causal drift blocker with `resume_at: replan`, and points `latest_finding` at the
+  DRF. The DRF in turn preserves the verifier block as its evidence. Then quiesce the set
+  before decomposition. If the record dispatch dies, leave the valid `verifying` row and
+  its frozen verifier verdict in place; `continue` reuses the assigned id and path rather
+  than allocating another.
   `reason: oracle` sets `blocked`, `external:oracle-unavailable`, the verifier finding, and
   `resume_at: verify`; stop the batch until the check is available again.
 
@@ -553,12 +624,13 @@ from conversation memory or mistakes an `unverified` result for a failed criteri
 Per `ai-ledger`:
 
 - Update statuses.
-- Any drift record → block the tasks it invalidates, do not delete them.
+- Any drift record → drift-block the full unfinished dependency closure; do not delete or
+  edit its task files.
 - Any executor blocker → keep its worktree and durable handoff; do not retry until the
   recorded condition is proven cleared.
-- Enough drift in one milestone → stop and re-decompose the remainder against the code as
-  it now is. Do not patch task files one at a time; patched specs accumulate
-  contradictions with their own amendments until nobody can tell what is still true.
+- Enough drift in one milestone → use *Replanning after drift* to write fresh task ids,
+  atomically retire the obsolete rows with replacement lineage, and continue only after
+  the replacement transaction validates.
 
 Then report, and **re-check `<main_root>/.rune/PAUSED` before dispatching the next batch.** The user
 can pause at any point; the check belongs at the top of every loop iteration, not only at

@@ -149,13 +149,13 @@ confidence:
 ```
 
 Scaffold the rest of `<main_root>/.rune/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
-`drift/`, and, only when no ledger exists, this valid empty schema-1 ledger (fill the
+`drift/`, and, only when no ledger exists, this valid empty schema-2 ledger (fill the
 top-level values from the init result rather than leaving placeholders):
 
 ```markdown
 # Ledger
 
-schema: 1
+schema: 2
 vision: absent
 current_milestone: —
 oracle: npm test
@@ -163,8 +163,8 @@ main: green
 
 ## Tasks
 
-| id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at |
-|---|---|---|---|---|---|---|---|---|---|---|
+| id | milestone | title | status | blocked_by | worktree | attempts | failures | latest_finding | blocker | resume_at | replaced_by |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Drift
 
@@ -174,8 +174,8 @@ main: green
 ```
 
 Validate the complete candidate per `ai-ledger` before writing it. On a re-run, validate
-and preserve an existing schema-1 ledger; a legacy ledger routes through `continue` for
-migration, and init never resets task history. Run and
+and preserve an existing schema-2 ledger; a schema-0 or schema-1 ledger routes through
+`continue` for migration, and init never resets task history. Run and
 planner-specific directories beneath `drafts/` are created only when `work` assigns a new
 decomposition run, writes its protocol record, and assigns distinct planner slots.
 

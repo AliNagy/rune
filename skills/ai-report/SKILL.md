@@ -61,6 +61,7 @@ The system's internal terms are precise and mean nothing to a reader. Translate:
 | the ledger | progress / status |
 | task T-014 is in the verifying state | T-014 is being checked |
 | task T-014 is blocked; `unblocks_when` X | T-014 stopped because Y; it can resume when X |
+| task T-016 is `retired`, `replaced_by: T-020,T-021` | T-016's plan was replaced by T-020 and T-021 |
 | decomposed the milestone | split the work into 4 tasks |
 | context contract / forbidden list | which files this touches |
 | encapsulated task | self-contained task |

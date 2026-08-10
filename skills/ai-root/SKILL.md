@@ -59,7 +59,7 @@ The generic name may belong to another tool. Migrate only when all top-level ent
 Rune's documented layout and at least one independent Rune signal is present:
 
 - initialized `rune.yml` with its command/oracle structure;
-- a complete schema-1 Rune ledger, or a recognizable legacy Rune ledger;
+- a complete schema-2 Rune ledger, or a recognizable schema-1/schema-0 Rune ledger;
 - an interrupted `# Vision` plus `# Decisions` pair;
 - a `# Map — <project>` survey record;
 - a Rune session handoff or PAUSED record;
@@ -127,10 +127,10 @@ or `.rune/.rune-migration-lock/` after it.
    - the exact `.agent/worktrees/` line in `.gitignore`.
 7. Ensure `.rune/worktrees/` is present once in `.gitignore`.
 8. Handle the migrated ledger by schema:
-   - schema 1: validate the complete rewritten candidate against `ai-ledger` before
+   - schema 2: validate the complete rewritten candidate against `ai-ledger` before
      replacing it;
-   - recognized schema 0: preserve it except for safe pointer rewrites, then let
-     `continue` perform the one supported schema upgrade after this protocol returns;
+   - recognized schema 1 or schema 0: preserve it except for safe pointer rewrites, then
+     let `continue` perform the supported schema upgrade after this protocol returns;
    - missing or unknown ownership/schema: stop without replacing the ledger.
    Preserve file permissions and every non-pointer byte that did not need rewriting.
 9. Remove the marker only after all rewrites and validation succeed, then remove the

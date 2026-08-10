@@ -1,7 +1,7 @@
 ---
 name: ai-taskfmt
 user-invocable: false
-description: Use when writing or amending any file under .rune/ - task files, milestones, decision records, handoff notes, or drift records. Defines the schemas, the encapsulated-task contract, checkable steps, task-specific verification evidence, and single-writer ownership.
+description: Use when writing any file under .rune/ - task files, milestones, decision records, handoff notes, or drift records. Defines the schemas, the encapsulated-task contract, checkable steps, task-specific verification evidence, and single-writer ownership.
 ---
 
 # Rune file formats
@@ -22,7 +22,8 @@ stranger with an empty context.
   ledger.md              # versioned mutable task state. single writer: the parent
   drafts/M-nn/R-nnn/protocol.md # immutable type/protocol selection for one run
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
-  tasks/T-nnn.md         # immutable spec + appended amendments
+  drafts/M-nn/R-nnn/replacements.md # replan-only old -> new task lineage
+  tasks/T-nnn.md         # immutable task specification; never edited or deleted
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # diagnosis, step ticks, verification evidence, publications
   notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
@@ -93,7 +94,8 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `map.md` | a worker on `ai-survey` |
 | `drafts/M-nn/R-nnn/protocol.md` | the parent, once before that run is dispatched |
 | `drafts/M-nn/R-nnn/P-nn.md` | the planner assigned that exact run and slot |
-| `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` (creates), fixer (appends amendments only) |
+| `drafts/M-nn/R-nnn/replacements.md` | the single reconciler for that replan run |
+| `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` that creates it |
 | `notes/T-nnn.progress` | the worker holding T-nnn: `ai-bug` during diagnosis, then `ai-execute` |
 | `notes/T-nnn.md` | the worker holding T-nnn |
 | `notes/T-nnn.verify.md` | a worker on `ai-verify` |
@@ -101,7 +103,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `decisions/open/T-nnn.md` | the worker holding T-nnn |
 | `notes/init-commands.md` | a worker on `ai-oracle` |
 | `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered |
-| `drift/DRF-nnn.md` | whoever detected the drift |
+| `drift/DRF-nnn.md` | the detector, or the one `ai-drift` record-only worker assigned that exact id |
 
 ## The concurrency rule that generates this table
 
@@ -125,10 +127,12 @@ row above.
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
 
-The canonical ledger schema is owned by `ai-ledger`. Schema 1 has one task row containing
+The canonical ledger schema is owned by `ai-ledger`. Schema 2 has one task row containing
 identity, status, dependencies, stable worktree, phase attempt counters, verifier-failure
-count, latest-finding pointer, live blocker, and resume token. The detailed finding remains
-in its per-task sole-writer file; the ledger pointer is the authoritative routing field.
+count, latest-finding pointer, live blocker, resume token, and the immediate replacement
+task ids or explicit no-replacement disposition for a retired contract. The detailed
+finding remains in its per-task sole-writer file; the ledger pointer is the authoritative
+routing field.
 
 Every parent route validates the ledger before reading it as state and validates a complete
 candidate before replacing it. A transition is one replacement containing all changed
@@ -301,11 +305,31 @@ evidence: SessionMiddleware.handle exists, but profile storage does not.
 shape: thin end-to-end slice through the existing session boundary
 ```
 
+A drift replan adds the causal record and the complete retirement set. These are ids, not
+copied contracts; planner dispatches carry absolute pointers to the drift record and every
+old task file:
+
+```yaml
+drift: DRF-003
+retiring: [T-016, T-018, T-019]
+```
+
+The parent computes the transitive retirement set before writing this record: the drifted
+task, every unfinished task named by the drift record, and every unfinished task whose
+dependency chain reaches one of them. A `done` task is excluded and remains history. Once
+written, the protocol record is immutable like every other run.
+
 A bug run adds exactly one field before diagnosis:
 
 ```yaml
 reserved_task: T-014
 ```
+
+For a drift replan of a diagnosed bug, `reserved_task` is a fresh globally unused id and
+must not appear in `retiring`. Diagnosis evidence is task-bound: the old task's reproduction
+and branch remain historical inputs, but they do not transfer to the new identity. The
+parent creates the new reservation and `ai-bug` reproduces the failure in its new worktree
+before replacement planning continues.
 
 That id binds the ledger row, `task/T-014` branch, worktree, progress file, and eventual
 primary bug task. Bug planner and reconciler dispatches also receive absolute `diagnosis`
@@ -374,7 +398,11 @@ What *is* shared: the id, one plain-words summary, an enumerated outcome, and a 
 An `ai-decompose` planner returning `plan: drafted` also returns exactly one `artifact:`
 path, and it must equal its assigned draft pointer. A reconciler returning
 `plan: reconciled` returns `artifacts:` with the final `tasks/T-nnn.md` paths plus the
-one-line titles and dependency edges the parent needs to register. `plan: blocked`
+one-line titles and dependency edges the parent needs to register. A drift replan also
+returns `replacement_artifact:` pointing to its immutable `replacements.md`; the parent
+uses that map rather than inferring lineage from the task summaries. `artifacts: []` is
+valid only for a drift replan whose map explicitly assigns every retiring task to `none`
+and whose reconciler confirms the milestone acceptance already holds. `plan: blocked`
 returns no invented paths and names the missing or contradictory pointer in `summary`.
 
 ### The published task artifact
@@ -531,10 +559,52 @@ write another planner's slot. The reconciler maps the selected local dependencie
 `T-nnn` ids and writes new final task files; it never renames a draft into the final
 namespace because a draft may be grafted from more than one cut.
 
+### Replacement map
+
+A drift replan's reconciler also writes its one assigned
+`drafts/M-nn/R-nnn/replacements.md` artifact after every new task file exists:
+
+```markdown
+# Replacements
+
+run: M-03/R-004
+drift: DRF-003
+
+| retired | replaced_by | disposition |
+|---|---|---|
+| T-016 | T-020,T-021 | split persistence from restore behavior |
+| T-018 | T-022 | recut against both session entry points |
+| T-019 | none | existing code already satisfies the obsolete task outcome |
+```
+
+Every id in the protocol record's `retiring` list appears exactly once. `replaced_by` is
+either `none` or one or more of the newly written task ids; every new task appears at least
+once, though one new task may replace several old contracts. The disposition is one line
+and never substitutes for the causal drift record. This file is immutable when the
+reconciler returns and is the parent's durable input for the atomic schema-2 ledger update.
+The parent never infers lineage from titles.
+
 ## Task file
 
 A task is **encapsulated**: it carries its own goal, change surface, acceptance, and
 check. It can be executed, retried, or reviewed with no knowledge of its siblings.
+
+A task specification is also **immutable from creation**. The reconciler writes it once;
+no later role edits, appends to, overwrites, or deletes it. A verification finding is
+evidence about an attempt and belongs in
+`notes/T-nnn.verify.md`. If drift changes the contract itself, the old task is retired in
+the ledger and a fresh reconciler writes replacement tasks with globally unused ids. The
+old file remains the exact historical contract that produced its attempts and findings.
+
+Schema 0 and 1 projects may already contain task files with the removed
+`## Amendments` footer. Migration never treats that footer as valid schema-2 input and
+never tries to merge its prose into the sections above. A file whose footer contains
+anything beyond whitespace or the old placeholder comment is a **legacy amended task**.
+`continue` preserves its bytes as historical evidence; if its row is unfinished, it
+creates a migration drift record and sends the complete unfinished dependency closure
+through retirement and fresh re-decomposition. A `done` legacy task stays done and its
+whole file is frozen as the historical contract that was actually executed. No role may
+append another amendment before, during, or after migration.
 
 Encapsulate the *contract*, reference the *context*. Goal, surface, acceptance and check
 belong in the task. Conventions and module layout are pointed at, never copied — copies
@@ -582,16 +652,12 @@ after: must pass
 - [ ] The check above passes
 - [ ] Project oracle still passes (no regression)
 - [ ] rotate() is called exactly once per refresh
-
-## Amendments
-<!-- fixers append here; never edit sections above -->
 ```
 
-**A verification finding is not an amendment.** When a verifier rejects a task, its finding
-goes to `notes/T-nnn.verify.md` and never into this file. The task file is the contract,
-and the contract did not change just because an attempt failed to meet it. Amendments are
-for the contract itself changing; findings are evidence about one attempt at it. Keeping
-them apart is what lets a task file stay readable after four attempts.
+When a verifier rejects a task, its finding goes to `notes/T-nnn.verify.md` and never into
+the task file. The contract did not change merely because an attempt failed to meet it.
+When the contract really is wrong, retiring it and allocating replacement ids keeps the
+old evidence attributable to the contract that was actually executed.
 
 ### Sizing
 
@@ -787,7 +853,7 @@ unblocks_when: required only for blocked — one observable condition the parent
 No pronouns pointing at a conversation. No "as discussed". No "the approach we agreed".
 The reader has none of that.
 
-`resume_at` is copied into the ledger; keep it to the schema-1 tokens. For a blocked
+`resume_at` is copied into the ledger; keep it to the schema-2 tokens. For a blocked
 handoff, the parent stores `external:<slug>` and points `latest_finding` here, while these
 two conditional lines preserve the full reason and unblock condition. It must not
 redispatch merely because time passed; it first observes `unblocks_when`.
