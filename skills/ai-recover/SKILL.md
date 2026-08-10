@@ -44,7 +44,8 @@ So:
 
 1. **Read the task spec** — type, verification mode, steps, change surface, acceptance,
    and the stated check.
-2. **Read the progress file** — ticks and the mode-specific evidence recorded so far.
+2. **Read the progress file** — diagnosis, ticks, and the mode-specific evidence recorded
+   so far. For a bug, bind the recovery baseline to its recorded `diagnosis_commit`.
 3. **Read `git -C <worktree_path> diff`.** This is the authoritative record of what happened.
 4. **Map the diff onto the declared steps.** For each step, decide: applied, partly
    applied, or absent. Steps are written to be checkable precisely so this is possible.
@@ -77,6 +78,12 @@ reasoning about an abandoned edit. The exact number matters less than that it is
 **Why discard is the fallback.** Under Serena a fresh executor re-acquires its working set
 for about 10k. Abandoned work of unknown provenance is worth less than the clean base it
 occupies.
+
+**A bug's diagnosis commit is not abandoned implementation.** Every discard or partial
+verdict for a diagnosed bug drops or resets only work after `diagnosis_commit`. Preserve
+that commit, its progress block, task branch, and exact worktree identity: they contain the
+already-proven regression check from before planning. A fresh executor starts from that
+diagnosis baseline and reconfirms red; it must never recreate the test from memory.
 
 **What partial means.** Keep the worktree, but restore the pre-change state before resuming
 the evidence chain. A `red_then_green` task must observe the declared failure before the

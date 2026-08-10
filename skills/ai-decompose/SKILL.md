@@ -30,6 +30,13 @@ the milestone title, decides the protocol. A missing, relative, out-of-run, malf
 mismatched pointer is `plan: blocked` before any file is written. An investigation never
 reaches this skill for task decomposition.
 
+A bug protocol also requires `reserved_task: T-nnn`, the exact reserved
+`worktree_path`, and an absolute diagnosis progress pointer. Confirm the progress file ends
+in `diagnosis: reproduced`, its commit ids exist on `task/T-nnn`, and the worktree is the
+registered checkout of that branch. Read bug source and the reproduction from that
+worktree, not from `main_root`; do not modify it. A missing or mismatched reservation is
+`plan: blocked`, never permission to allocate a replacement id or worktree.
+
 Milestone-graph work from `rune:vision` is the only job here without a protocol pointer;
 it creates milestones rather than executable tasks.
 
@@ -51,8 +58,10 @@ are not actually independent, and then every executor blows its budget rediscove
 shared context.
 
 1. For planner or reconcile work, bind and load the protocol above.
-2. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance.
-3. Use `ai-serena` to look at the actual symbols the milestone touches. Overview
+2. Read `<main_root>/.agent/map.md` and the milestone's scope and acceptance. For a bug,
+   also read the supplied diagnosis block and committed reproduction diff.
+3. Use `ai-serena` to look at the actual symbols the milestone touches in the correct
+   source checkout: the reserved worktree for a bug, `main_root` otherwise. Overview
    and signatures — not bodies, unless a specific decision depends on one.
 4. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
 
@@ -79,6 +88,8 @@ and skill in the draft frontmatter and use only local `D-nnn` ids. Do not create
 `<main_root>/.agent/tasks/`, inspect or update `<main_root>/.agent/ledger.md`, or write any
 path other than the assigned draft. If the assigned path already exists, return
 `plan: blocked`; never overwrite an artifact whose writer may still be alive.
+For a bug, mark exactly one proposed task `reservation: primary`; it must own the committed
+reproduction check and root-cause fix.
 
 **Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
 are given the run's protocol pointer plus pointers to two or three completed draft
@@ -87,7 +98,10 @@ is missing, duplicated, outside the run, lacks any part of the planner-draft sch
 declares a different type or protocol. Then pick the strongest cut, graft anything better
 from the others, run the protocol-specific sanity pass again on the proposed final cut,
 allocate the next unused final `T-nnn` ids, translate all local dependency edges, and write
-the final task files. Say which cut you took as the base and what you moved. Where the cuts
+the final task files. For a bug, require exactly one `reservation: primary` in the final
+cut and map it to the protocol's existing `reserved_task`; allocate ids only for additional
+tasks. Confirm that primary task's check and change surface include the diagnosis commit's
+reproduction files. Say which cut you took as the base and what you moved. Where the cuts
 disagreed, that seam is the part of the milestone that is genuinely hard to divide; treat
 it as the thing to get right, not a tie to break quickly. You are the only worker in the
 run allowed to write
@@ -228,7 +242,9 @@ Then run the loaded protocol's checks:
 
 - **Bug / `ai-bug`:** the task is grounded in the already-observed reproduction; the
   reproduction becomes the regression test; boundary cases appear in acceptance; and a
-  mitigation is explicit and has a root-cause follow-up. No reproduction means no task.
+  mitigation is explicit and has a root-cause follow-up. The exact diagnosis check and
+  commit are supplied, exactly one proposed task is `reservation: primary`, and that task
+  owns the check and root-cause fix. No confirmed reproduction means no task.
 - **Feature / `ai-feature`:** the scope boundary and exclusions are present; every
   user-visible decision is settled; tasks are vertical slices; and each task names its
   integration point and failure behavior.
@@ -246,8 +262,8 @@ These are shape checks, not substitutes for reading the protocol:
 
 ```text
 bug + ai-bug
-  D-001 keep the reproduced login redirect failure as a regression test, fix its cause,
-        and assert the adjacent redirect cases from reproduction
+  D-001 reservation: primary — keep the reproduced login redirect failure as a regression
+        test, fix its cause, and assert the adjacent redirect cases from reproduction
 
 feature + ai-feature
   D-001 store one profile field end to end through the existing API, including its error

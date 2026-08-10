@@ -24,7 +24,7 @@ stranger with an empty context.
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   tasks/T-nnn.md         # immutable spec + appended amendments
   notes/T-nnn.md         # handoff notes, long results
-  notes/T-nnn.progress   # step ticks, verification evidence, commit publications. executor-owned
+  notes/T-nnn.progress   # diagnosis, step ticks, verification evidence, publications
   notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
   notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
@@ -52,6 +52,7 @@ from the dispatch envelope below; it is never inferred from a worker's current d
 | Written by a worker | Lands in |
 |---|---|
 | source changes while incomplete | its worktree as an uncommitted diff |
+| confirmed bug reproduction | a diagnosis commit on its reserved task branch |
 | source changes when complete | commits on its task branch |
 | planner drafts and reconciled task files | `<main_root>/.agent/` |
 | `notes/T-nnn.progress`, handoff notes | `<main_root>/.agent/` |
@@ -66,6 +67,11 @@ drift, `INV-` investigation, `RES-` research. Planning drafts use a separate loc
 namespace: `R-nnn` is a decomposition run under one milestone, `P-nn` is a planner slot
 assigned by the parent, and `D-nnn` identifies a proposed task only inside that planner's
 artifact. None of those local ids may appear as a final task id or ledger task row.
+
+A bug reservation burns its `T-nnn` as soon as its protocol record, ledger row, or progress
+file is written. Allocation treats an id found in **any** coordination artifact as used,
+even when diagnosis later fails or reclassifies the request. Reusing an abandoned id would
+let a late diagnosis return attach evidence to a different task.
 
 ## Single-writer rule
 
@@ -88,7 +94,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `drafts/M-nn/R-nnn/protocol.md` | the parent, once before that run is dispatched |
 | `drafts/M-nn/R-nnn/P-nn.md` | the planner assigned that exact run and slot |
 | `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` (creates), fixer (appends amendments only) |
-| `notes/T-nnn.progress` | the worker holding T-nnn |
+| `notes/T-nnn.progress` | the worker holding T-nnn: `ai-bug` during diagnosis, then `ai-execute` |
 | `notes/T-nnn.md` | the worker holding T-nnn |
 | `notes/T-nnn.verify.md` | a worker on `ai-verify` |
 | `notes/T-nnn.landing.md` | a worker on `ai-land` |
@@ -146,15 +152,18 @@ relative pointer rather than guessing what it is relative to.
 
 Task-bound work also carries `worktree_path`:
 
-- The parent chooses `<main_root>/.agent/worktrees/T-nnn` before the first executor,
-  records that absolute path in the ledger, and never changes it during the task.
-- The first executor creates that exact worktree if it does not exist. If it exists, the
-  executor validates and reuses it. It never substitutes the directory where the harness
-  happened to start it.
+- The parent chooses `<main_root>/.agent/worktrees/T-nnn` before the first task-bound
+  worker, records that absolute path in the ledger, and never changes it during the task.
+- For a bug, `ai-bug` creates that exact worktree during `diagnosing`, before it writes the
+  reproduction check. For every other task, the first executor creates it. Either worker
+  validates and reuses an existing path; neither substitutes the directory where the
+  harness happened to start it.
 - Retries, verifiers, recoverers, and landers receive the same `worktree_path`. They must
   target it directly and must not request or create a fresh worktree.
-- Only a successful lander may remove it. Until then, the path is part of the task's
-  durable identity, alongside its id and branch.
+- After confirmed reproduction, only a successful lander may remove it. Before that,
+  `ai-bug` may discard its own exact provisional worktree when diagnosis cannot reproduce
+  or reclassifies the request. The burned id and progress record survive either way.
+  Otherwise the path is part of the task's durable identity, alongside its id and branch.
 
 Harness worktree isolation may be used only when it can target this exact existing path.
 An isolation mode that silently creates a new worktree must be omitted: a clean anonymous
@@ -197,6 +206,21 @@ pointers:
   - /workspace/acme/.agent/tasks/T-014.md
 ```
 
+Bug diagnosis uses the same task-bound envelope before the task-file pointer exists:
+
+```yaml
+follow:        ai-bug
+task:          T-014
+main_root:     /workspace/acme
+worktree_path: /workspace/acme/.agent/worktrees/T-014
+pointers:
+  protocol: /workspace/acme/.agent/drafts/M-03/R-002/protocol.md
+  progress: /workspace/acme/.agent/notes/T-014.progress
+```
+
+The parent writes the protocol and `diagnosing` ledger row before this dispatch. The
+worker creates or validates the exact supplied worktree before any source write.
+
 The values sent in a real dispatch are absolute paths — never the literal
 `<main_root>` placeholder used in prose. Before doing any work, a task-bound worker
 confirms that `worktree_path` belongs to the same Git repository as `main_root`. A
@@ -227,12 +251,18 @@ pointers:
   draft:     /workspace/acme/.agent/drafts/M-03/R-002/P-01.md
 ```
 
+A bug planner or reconciler additionally receives the reserved task's
+`worktree_path` and `diagnosis: /workspace/acme/.agent/notes/T-014.progress`. Its assigned
+work id remains the run or planner slot; it validates the task branch against
+`reserved_task` in the protocol. It may read that worktree but never write source there.
+
 The parent chooses the next unused `R-nnn` beneath the milestone and assigns distinct
 `P-nn` slots before dispatch. Before starting any planner, it writes the run's immutable
-`protocol.md` from the final triage result. A retry gets a new unused slot; it never reuses
-a path that a late worker could still write. The reconciler is dispatched only after the
-parent has the completed absolute draft paths, and receives the same protocol pointer plus
-every draft as a pointer.
+`protocol.md` from the final triage result. For a bug it writes that record earlier, before
+dispatching diagnosis, with a `reserved_task`; confirmed diagnosis then becomes another
+planner pointer. A retry gets a new unused slot; it never reuses a path that a late worker
+could still write. The reconciler is dispatched only after the parent has the completed
+absolute draft paths, and receives the same protocol pointer plus every draft as a pointer.
 
 The protocol record is deliberately small:
 
@@ -245,6 +275,17 @@ protocol: ai-feature
 evidence: SessionMiddleware.handle exists, but profile storage does not.
 shape: thin end-to-end slice through the existing session boundary
 ```
+
+A bug run adds exactly one field before diagnosis:
+
+```yaml
+reserved_task: T-014
+```
+
+That id binds the ledger row, `task/T-014` branch, worktree, progress file, and eventual
+primary bug task. Bug planner and reconciler dispatches also receive absolute `diagnosis`
+and `worktree_path` pointers. The protocol does not copy the diagnosis result or absolute
+paths; the progress file and dispatch envelope remain authoritative.
 
 Only these mappings are valid: `bug -> ai-bug`, `feature -> ai-feature`, and
 `refactor -> ai-refactor`. An investigation never reaches decomposition. The record is a
@@ -271,6 +312,7 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-land` | `landing: landed \| refused \| conflict \| reverted \| stuck` |
 | `ai-recover` | `verdict: salvage \| discard \| partial` |
 | `ai-triage` | `type: bug \| feature \| refactor \| investigation` |
+| `ai-bug` | `diagnosis: reproduced \| not_reproduced \| reclassified \| blocked` |
 | `ai-oracle` | `oracle: passing \| failing \| none` |
 | `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
 
@@ -308,6 +350,8 @@ Only an executor returning `status: done` publishes an artifact. It commits the 
 source change on the task branch, proves `worktree_path` clean, and appends `base_commit`
 plus `artifact_commit` to `<main_root>/.agent/notes/T-nnn.progress`. Incomplete outcomes
 keep their uncommitted diff in that same task worktree and do not invent an artifact.
+A bug's earlier `diagnosis_commit` is an input inside the eventual publication range, not
+a publication by itself; its absence of `artifact_commit` is deliberate.
 
 The verifier reads the latest publication and checks exactly
 `git diff <base_commit>..<artifact_commit>`. A pass writes the identical SHA as
@@ -433,6 +477,13 @@ dependencies, goal, context contract, change surface, steps, check, and acceptan
 notes` records the assumptions, exclusions, and disputed seams the user gate and
 reconciler need. A summary that omits those sections is not a draft artifact.
 
+For a bug run, every complete draft marks exactly one proposed task
+`reservation: primary`. That local marker is not a second id: it tells the reconciler
+which proposed task must become the protocol's `reserved_task`. The primary task owns the
+reproduction check and root-cause fix. Other proposed tasks keep local `D-nnn` ids and are
+allocated normally. Non-bug drafts must not use the marker, and the reconciler removes the
+local marker when it writes the final task contract.
+
 The file becomes immutable when its planner returns. That planner writes only its exact
 assigned draft path: it does not create `tasks/T-nnn.md`, inspect or update `ledger.md`, or
 write another planner's slot. The reconciler maps the selected local dependencies to final
@@ -522,8 +573,31 @@ Steps are coarse intent, not a script.
 
 ### Progress and the write-order rule
 
-Ticks, verification evidence, and publication blocks live in `notes/T-nnn.progress`,
-owned by the executor.
+Bug diagnosis, ticks, verification evidence, and publication blocks live in
+`notes/T-nnn.progress`. Ownership follows the task sequentially: `ai-bug` writes the first
+diagnosis block while the row is `diagnosing`; `ai-execute` appends execution evidence only
+after reconciliation changes the row to `pending`.
+
+A confirmed bug diagnosis block names the exact check, expected assertion, boundary cases,
+root cause, and its immutable task-branch commit:
+
+```text
+## diagnosis — 2026-08-10
+diagnosis: reproduced
+verification: red_then_green
+check_file: src/auth/__tests__/rotation.test.ts
+check_command: npm test -- rotation.test.ts
+assertion: refresh issues a new token and invalidates the prior one
+red: confirmed — fails because rotate is not implemented
+boundary: login and logout still pass
+root_cause: TokenStore.rotate is missing from the refresh path
+diagnosis_base_commit: a3f91c2
+diagnosis_commit: b7a03d4
+```
+
+`diagnosis_commit` contains only the reproduction check and necessary fixtures. It is not
+an `artifact_commit`, so verification and landing must refuse to treat it as completed
+work. The reconciled task and later publication include that commit in their full range.
 
 **Always make the edit first, then tick.** This is not stylistic. If the process dies
 between the two, the only reachable desync is a *missing* tick — and that self-heals,
@@ -562,6 +636,11 @@ green: confirmed 2026-08-04 - rotation.test.ts passes
 
 A check written after the change and never seen red proves nothing. Nobody downstream can
 reconstruct that evidence reliably, so the executor must leave it.
+
+For a bug, `ai-bug` creates the check and first red observation during `diagnosing`, before
+the task contract exists. The executor must verify that the reconciled check matches that
+diagnosis and re-run it red before its first production edit. It appends the reconfirmed
+red and eventual green result; it never overwrites the diagnosis block.
 
 `green_baseline` is the behavior-preservation contract for refactors. Before changing
 production code, run the declared existing check and the project oracle and record the

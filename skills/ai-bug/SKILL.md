@@ -1,25 +1,47 @@
 ---
 name: ai-bug
 user-invocable: false
-description: Use when something that used to work no longer does, or a request is classified as a defect. Requires a failing reproduction before any planning, root cause over symptom, and turns the reproduction into the regression test.
+description: Use when something that used to work no longer does, or a request is classified as a defect. Reproduces it inside a reserved task worktree before planning, finds root cause over symptom, and turns the reproduction into the regression test.
 ---
 
 # Bug protocol
 
 **Governing rule: no fix without a failing reproduction.**
 
-The dispatch includes absolute `main_root`. Inspect and run the reproduction against that
-checkout unless a task-bound dispatch also supplies an exact `worktree_path`; never infer
-the repository from the worker's starting directory.
+Bug diagnosis is task-bound even though the immutable task specification does not exist
+yet. The parent reserves the task identity first and dispatches all of these:
+
+- `task: T-nnn`
+- absolute `main_root`
+- absolute `worktree_path` at `<main_root>/.agent/worktrees/T-nnn`
+- the run's absolute `protocol.md` pointer, whose `reserved_task` matches `task`
+- the absolute `<main_root>/.agent/notes/T-nnn.progress` pointer
+
+Reject a missing, relative, or mismatched input. Never infer the repository from the
+worker's starting directory, read the ledger, allocate another id, or create an anonymous
+worktree. The `diagnosing` ledger row already exists and belongs to the parent.
 
 Not a description of the failure. Not a stack trace. An executable case that fails now
 and will pass after. Everything else in this protocol follows from that.
 
 ## 1. Reproduce first
 
-Before any planning, any decomposition, any ledger entry.
+Before any planning or decomposition, but **after** the task id and ledger row have been
+reserved. Identity comes before diagnosis; the immutable task contract comes after it.
 
-Use a subagent — reproduction reads code and runs things, and the parent must stay clean.
+Validate or create the exact supplied worktree before writing a reproduction:
+
+```bash
+git -C <main_root> worktree add <worktree_path> -b task/T-nnn
+cd <worktree_path>
+```
+
+If `task/T-nnn` already exists, attach or reuse only that branch at the supplied path.
+Confirm it belongs to the same repository as `main_root`. A mismatch is
+`diagnosis: blocked`, not permission to search for a nearby checkout.
+
+You are the reproduction subagent — reproduction reads code and runs things, while the
+parent stays clean.
 **One bug per subagent.** Several reported bugs get several reproduction agents, never one
 agent working a list: a reproduction that has just found the cause of one bug will see that
 same cause in the next, and two bugs with one root cause is a conclusion that has to be
@@ -30,11 +52,15 @@ reached independently, not assumed by batching.
 - Establish the boundary: what inputs fail, what adjacent inputs succeed. A bug you can
   only trigger one way is under-characterised, and you will not know if the fix was
   general.
+- Do not edit production code. Diagnosis may add only the reproduction check and fixtures
+  needed to run it. The later task contract decides the implementation surface.
 
 ### If you cannot reproduce
 
-Stop. Do not plan a fix. Report what you tried and what you observed, and ask for what
-you need — exact input, environment, version, sequence of actions.
+Stop. Do not plan a fix. Append `diagnosis: not_reproduced`, what you tried, and what input
+is missing to the supplied progress file. Discard the exact reserved worktree and branch;
+the durable evidence remains under `main_root`. The parent removes the provisional ledger
+row but never reuses its id.
 
 A fix for an unreproduced bug is a guess with a test that was green before you started.
 There is no way to tell it from a no-op, and it will be marked `done` regardless.
@@ -64,7 +90,30 @@ recorded as a fix.
 ## 3. The reproduction becomes the test
 
 This is where the bug protocol pays off. Red-then-green is free — you already observed
-red in step 1, before any change existed. Record that evidence in the progress file.
+red in step 1, before any production change existed. Record it in the supplied progress
+file before returning:
+
+```text
+## diagnosis — 2026-08-10
+diagnosis: reproduced
+verification: red_then_green
+check_file: src/auth/__tests__/rotation.test.ts
+check_command: npm test -- rotation.test.ts
+assertion: refresh issues a new token and invalidates the prior one
+red: confirmed — fails because rotate is not implemented
+boundary: refresh fails; login and logout still pass
+root_cause: TokenStore.rotate is missing from the refresh path
+diagnosis_base_commit: a3f91c2
+diagnosis_commit: b7a03d4
+```
+
+Stage only the reproduction check and its necessary fixtures, commit them on
+`task/T-nnn`, and record both commit ids. `diagnosis_base_commit` is the branch `HEAD`
+immediately before that commit; `diagnosis_commit` is the new `HEAD`. Prove the former is
+an ancestor of the latter, their diff is non-empty, and the worktree is clean. The commit
+is durable diagnosis input, **not** a completed task publication: it has no
+`artifact_commit`, cannot be verified, and cannot be landed on its own. Leave the worktree
+kept so planners and the eventual executor see the exact same test.
 
 Put it where the suite will keep running it. A reproduction living in a scratch file is
 not a regression test.
@@ -98,4 +147,26 @@ Triage guesses from a sentence. You have now looked at the code. Two common corr
   to surface, then a feature or refactor.
 
 Say so plainly and reroute. Reclassifying early is cheap; discovering it three tasks in
-is not.
+is not. Append `diagnosis: reclassified` plus `type: feature | refactor | investigation`
+to the progress file, discard the reserved worktree and branch, and return the id to the
+parent as burned. A change-producing route receives a fresh decomposition run; it never
+recycles the abandoned task id or rewrites the old protocol record. An investigation exits
+without a run, as usual.
+
+## Return (≤200 tokens)
+
+```text
+diagnosis: reproduced | not_reproduced | reclassified | blocked
+task: T-nnn
+worktree: kept | discarded
+worktree_path: /workspace/acme/.agent/worktrees/T-nnn
+progress: /workspace/acme/.agent/notes/T-nnn.progress
+summary: failing check and root cause, missing reproduction input, reclassification, or blocker
+type: feature | refactor | investigation  # reclassified only
+diagnosis_base_commit: a3f91c2            # reproduced only
+diagnosis_commit: b7a03d4                 # reproduced only
+```
+
+`reproduced` requires a kept, clean worktree plus both commit ids. Every other outcome
+must explain itself in the progress file before returning. The parent acts on this short
+result; it never reads the source diff or test output itself.

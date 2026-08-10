@@ -90,6 +90,12 @@ If required evidence is absent, mismatched, or internally contradictory, the res
 **unverified**, not passed. Do not substitute red evidence for a refactor or accept a
 manufactured failure as proof of behavior preservation.
 
+For `type: bug`, also require the original `diagnosis: reproduced` block, matching check
+identity, `diagnosis_base_commit`, and `diagnosis_commit`. Prove that the published
+`base_commit..artifact_commit` range contains the diagnosis commit and its reproduction
+files. The executor's reconfirmed red and green results complete that chain; a standalone
+diagnosis commit is never a verifiable task artifact.
+
 **5. Hunt vacuous checks using the mode.** Read the check in every mode.
 - Does it assert anything meaningful, or does it assert `true`?
 - Is the subject mocked so thoroughly that only the mock is exercised?

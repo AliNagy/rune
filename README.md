@@ -46,7 +46,8 @@ node scripts/sync-opencode.mjs
 Skills become `/rune-init`, `/rune-vision`, and so on. See
 [docs/opencode.md](docs/opencode.md) for options and the remaining harness differences.
 Rune does not depend on an anonymous harness-created checkout: every task gets one stable
-absolute worktree path that all executors, verifiers, recoverers, and landers reuse.
+absolute worktree path that diagnosis workers, executors, verifiers, recoverers, and
+landers reuse.
 
 ## Use
 
@@ -178,7 +179,9 @@ half-applied change, and the flag lives on disk so nothing clears it quietly.
 
 **Checkout identity is explicit.** Every worker receives the absolute orchestration
 checkout path. Task-bound workers also receive one absolute task-worktree path, allocated
-before execution and kept unchanged through retries, verification, recovery, and landing.
+before their first source write and kept unchanged through diagnosis, retries, verification,
+recovery, and landing. A bug reserves its task id and creates that worktree before its
+reproduction test is written; planning then consumes the committed failing check.
 Coordination files are always read and written through the orchestration path, so an
 uncommitted task file cannot disappear merely because a worker started in another
 worktree. A verifier must inspect the executor's exact kept worktree; a clean anonymous
@@ -186,8 +189,10 @@ checkout is rejected rather than mistaken for the artifact.
 
 **Work is checked, not claimed.** A task's test must be seen *failing* before the change is
 made, with the evidence recorded — a test written after the fix and never seen failing
-proves nothing, and a reviewer in a fresh context can't tell the two apart. Each finished
-task is then committed and checked by a different agent that never saw the work. The SHA
+proves nothing, and a reviewer in a fresh context can't tell the two apart. For a bug,
+that happens during task-bound diagnosis before planning; the executor later reconfirms
+the same failure before implementing the fix. Each finished task is then committed and
+checked by a different agent that never saw the work. The SHA
 that agent approves is the only SHA the lander may merge. Tasks are self-contained
 — goal, files it may touch, what counts as done, its test — so any one can be run, retried,
 or reviewed without knowing about the others, and up to three run in parallel when their
@@ -226,7 +231,7 @@ skills/
   ai-triage       is it a bug, a feature, a refactor, or a question
   ai-decompose    milestone to tasks, and how big a task should be
   ai-execute      doing one task: worktree, required evidence, publishing its commit
-  ai-bug          reproduce before planning
+  ai-bug          reproduce in a reserved task worktree before planning
   ai-feature      thin end-to-end slices, open questions decided first
   ai-refactor     cover behaviour with tests first, then leave them alone
   ai-investigate  read-only, ends in an answer
