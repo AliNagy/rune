@@ -53,6 +53,9 @@ main: green
 | plan-draft  | ai-decompose  | M-03/R-002/P-01   | draft: P-01.md                  |
 | plan-draft  | ai-decompose  | M-03/R-002/P-02   | draft: P-02.md                  |
 | reconcile   | ai-decompose  | M-03/R-002        | T-014..T-017 written            |
+| report-slot | ai-drift      | T-014/e2          | unused DRF-006                  |
+| report-slot | ai-drift      | T-016/e1          | recorded DRF-003: /workspace/acme/.rune/drift/DRF-003.md |
+| report-slot | ai-investigate| INV-004           | recorded INV-004: /workspace/acme/.rune/notes/INV-004.md |
 | execute     | ai-execute    | T-014             | done @ 4a91c02                  |
 | verify      | ai-verify     | T-014             | pass @ 4a91c02                  |
 | land        | ai-land       | T-014             | landed @ 4a91c02                |
@@ -171,11 +174,35 @@ an executable validator or a second implementation that could drift from these r
 ## Log every dispatch
 
 **Every subagent you dispatch gets a row in `## Dispatches`.** Ordinarily the line is
-written when it returns. A record-only drift dispatch is the deliberate exception: its
-line is written before dispatch with `outcome: pending DRF-nnn -> <absolute path>` because
-that assignment is what makes a crash retry reuse the same global id and sole-writer
-destination. Its return replaces only that outcome with `recorded: DRF-nnn`; it never
-appends a second assignment.
+written when it returns. Every `DRF-`, `INV-`, or `RES-` report reservation is the
+deliberate exception: before dispatch, write a `report-slot` row that binds the globally
+unused id to both its absolute `open/` staging path and final path. This reservation is
+the allocator's durable claim and makes concurrent workers use different sole-writer
+destinations.
+
+Use one of these exact outcome shapes:
+
+```text
+pending DRF-007: <absolute staging> -> <absolute final>
+recorded DRF-007: <absolute final>
+unused DRF-007
+blocked DRF-007: <absolute staging> -> <absolute final>; <reason>
+```
+
+`INV-` and `RES-` use the same shapes. A worker return never appends a second assignment;
+the parent replaces only the matching pending outcome after atomic promotion, marks it
+unused when the reserved report was not needed, or marks it blocked while retaining both
+paths. A pending or unused row burns its id just as surely as a file does. A blocked row
+does too. Allocation scans final files, staging files, and every report-slot row before
+choosing the next number.
+
+Report promotion is deliberately ordered outside the ledger replacement: validate the
+complete assigned staging file, atomically promote it with no-replace semantics to the
+assigned final path, then replace `pending` with `recorded` in the same candidate that
+consumes the worker's outcome. A crash after the promotion leaves `pending` plus a
+complete final file, which `continue` can finish. A crash before it leaves either a
+complete staging file or no file.
+The final path is therefore never a partial report and no retry receives a new id.
 
 The point is not the audit trail — it is that the absence becomes visible. Expensive work
 done in the parent leaves no dispatch row, so a phase that completed with no rows against
@@ -289,8 +316,11 @@ terminal history, not resolved work, so validation rejects any live task that st
 one as a dependency.
 
 Claiming is one atomic update: allocate or preserve the absolute worktree, set
-`in_progress`, increment `e`, set `resume_at: recover`, validate, and persist. Dispatch
-only afterward and pass the recorded `e` value as `attempt`.
+`in_progress`, increment `e`, set `resume_at: recover`, reserve a fresh `DRF-` report
+slot with its exact staging and final paths, validate, and persist. Dispatch only
+afterward and pass the recorded `e` value as `attempt` plus that report assignment.
+Every executor attempt gets its own slot. A non-drift return burns it as `unused`; a
+retry never inherits an earlier attempt's slot.
 
 ### Claiming several at once
 
@@ -371,6 +401,11 @@ Your job is the mapping:
 | `ai-recover` → `discard` | `pending`, resume `fresh`, finding points at handoff | dropped |
 | empty diff, branch ahead, no publication | `pending`, resume `publish` | kept; executor recovers the committed range |
 | empty diff, branch not ahead, no note | `pending`, resume `fresh` | dropped |
+
+A recovery `discard` with `premise_drift: true` is the exception to its table row. Reserve
+a fresh DRF report slot, dispatch `ai-drift` record-only from the task and recovery
+handoff, promote the assigned staging record, and apply the normal drift freeze. Recovery
+never writes a report itself and never inherits the dead executor attempt's DRF slot.
 
 **A row left at `landing` is the dangerous one.** A dead lander may have merged and never
 rolled back, so the main tree is in a state nobody recorded. Re-dispatch `ai-land` on that

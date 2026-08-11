@@ -64,6 +64,7 @@ State beats intent. Some conditions answer the question regardless of what was a
 | a task is `awaiting` | surface it | An executor asked something and is blocked on the reply. |
 | a task is `diagnosing`, fresh session | `continue` | Reconcile the reserved bug worktree before planning. |
 | tasks `in_progress`, fresh session | `continue` | Reconcile before doing anything new. |
+| a `DRF-`, `INV-`, or `RES-` report slot is pending or blocked | `continue` | Promote, recover, or surface its assigned artifact before reusing state. |
 | no `<main_root>/.rune/`, repo has code | `init` → `vision` | Nothing is known yet. |
 | no `<main_root>/.rune/`, empty directory | `vision` | New project; init comes after the stack exists. |
 

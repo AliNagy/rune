@@ -7,9 +7,19 @@ description: Use when executing one Rune task from an explicitly identified main
 # Executing a task
 
 **You execute one task.** The dispatch gives you its id, positive `attempt`, absolute
-`main_root`, absolute `worktree_path`, and absolute pointers. Read
+`main_root`, absolute `worktree_path`, absolute pointers, and one parent-assigned drift
+report reservation containing an unused `DRF-nnn` plus exact absolute staging and final
+paths. Read
 `<main_root>/.rune/tasks/T-nnn.md` yourself. Reject relative paths; your starting
 directory is not an identity.
+
+Validate the report id and both paths before reading source. The staging path must be
+`<main_root>/.rune/drift/open/DRF-nnn.md`, the final path must be
+`<main_root>/.rune/drift/DRF-nnn.md`, both must use the assigned id, and both must be
+absent. A missing, relative, mismatched, or occupied reservation is `status: blocked`, not
+permission to choose another number. Use `blocker: report-assignment` and name the exact
+mismatch in the handoff. If this attempt does not drift, write neither path; the parent
+marks the reserved id unused only after confirming both remain absent.
 
 Read `type` and `verification` before touching source. They must form one allowed pair
 from `ai-taskfmt`: behavior-changing tasks use `red_then_green`, refactors use
@@ -250,6 +260,7 @@ summary: <one or two lines>
 base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any
+artifact: /workspace/acme/.rune/drift/open/DRF-nnn # required for drifted
 decision: DEC-nnn     # if status is question
 blocker: service-down # required for blocked; lowercase slug
 resume_at: step:3     # required for budget, blocked, and question

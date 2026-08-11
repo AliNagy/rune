@@ -15,8 +15,15 @@ looked up, and attach a plausible-looking link it never opened. The answer is of
 roughly right, which is what makes it dangerous — it is wrong in the details that made
 the question worth asking, and nothing in the output distinguishes it from real research.
 
-The dispatch includes absolute `main_root` and absolute output pointers. Resolve every
-coordination write against it; never use the research worker's starting directory.
+The dispatch includes absolute `main_root`, a parent-assigned `RES-nnn`, and exact absolute
+staging and final output pointers. Resolve every coordination write against it; never use
+the research worker's starting directory, scan for the next id, or derive a report path.
+
+Before the first query, require the staging path to be
+`<main_root>/.rune/notes/open/RES-nnn.md`, the final path to be
+`<main_root>/.rune/notes/RES-nnn.md`, and both paths to use the assigned id and be absent.
+A missing, relative, mismatched, or occupied assignment is `research: blocked` before any
+search begins.
 
 Everything below is machinery for making that failure impossible to commit silently.
 
@@ -236,8 +243,13 @@ These are not guidelines and there is no case where they bend.
 
 ## 10. Output
 
-Write `<main_root>/.rune/notes/RES-nnn.md`, return **under 200 tokens** per `ai-report`. `RES-` is
-its own ID space and does not collide with task or drift IDs.
+Write the complete report only to the assigned
+`<main_root>/.rune/notes/open/RES-nnn.md` staging path. Validate it in a collision-resistant
+sibling candidate and atomically install it at staging with no-replace semantics; the
+operation must fail if staging exists, and the worker also refuses an existing final. The
+parent validates and atomically promotes that unchanged staging file to
+`<main_root>/.rune/notes/RES-nnn.md` after return. `RES-` is its own ID space and does not
+collide with task or drift IDs.
 
 ```markdown
 # RES-007 · Is `fastjson` safe to adopt for the ingest path
@@ -311,3 +323,15 @@ built, that is a separate `rune:work` invocation which will triage it properly.
 The gap between "here is what the evidence says" and "I have begun acting on it" is the
 point of this protocol, exactly as in `ai-investigate`. Do not close it on your own
 initiative.
+
+## 12. Return (≤200 tokens)
+
+```yaml
+research: answered | blocked
+task: RES-007
+artifact: /workspace/acme/.rune/notes/open/RES-007.md # answered only
+summary: two unresolved advisories make the package unsafe for untrusted input
+```
+
+Return only the assigned id and staging pointer. Never write the final report path or
+substitute a nearby unused number.

@@ -13,24 +13,28 @@ Drift handled well is information. Drift handled badly is a ledger that stops de
 reality.
 
 This skill always receives absolute `main_root`. Detect and quiesce also receive the
-ledger's exact `worktree_path`; record-only has no source checkout. All coordination
-writes resolve against `main_root`, and every source or diff check targets only the
-supplied task worktree. Never infer either root from the current directory.
+ledger's exact `worktree_path`; record-only has no source checkout. Any mode that writes a
+new record receives a parent-assigned unused `DRF-nnn` plus exact absolute `staging` and
+`final` paths. All coordination writes resolve against `main_root`, and every source or
+diff check targets only the supplied task worktree. Never infer either root, id, or output
+path from the current directory or by scanning `.rune/`.
 
 ## Modes
 
 The ordinary mode is **detect**: the task worker discovered drift, writes the causal
-record and handoff below, and discards its own worktree.
+record to its assigned staging path plus the handoff below, and discards its own worktree.
+Every executor attempt receives a fresh report reservation before it starts. If no drift
+is found, the parent marks that slot unused; the worker never repurposes it.
 
 Two bounded modes reuse the same ownership rules without claiming to have discovered new
 source facts:
 
-- **record-only** receives a parent-assigned unused `DRF-nnn`, its exact absolute output
-  path, one or more immutable task pointers, and durable evidence pointers. It is used when an
+- **record-only** receives the same assigned id, staging and final paths, one or more
+  immutable task pointers, and durable evidence pointers. It is used when an
   `ai-verify` verdict says the task's evidence or acceptance contract is not checkable, or
   when migration finds a nonempty legacy `## Amendments` section. Read only those
   coordination artifacts and the ledger dependency graph, write exactly the assigned
-  drift record, and return it. The finding is the record's evidence; never rewrite the
+  staging record, and return it. The finding is the record's evidence; never rewrite the
   verifier record or interpret legacy amendment prose into a new contract. Do not read or
   change source, write a task handoff, or touch a worktree.
 - **quiesce** receives an existing causal drift pointer, task id, and the ledger's exact
@@ -41,9 +45,12 @@ source facts:
   commit is reachable from main, or cleanup cannot prove the source is unpublished, stop
   and return `status: refused`; a `landing` task must be reconciled by `ai-land` instead.
 
-Each mode is one dispatch and one sole writer. A retry after a crash receives the same
-assigned path or the same registered worktree; it never allocates another drift id or
-guesses a nearby checkout.
+Each mode is one dispatch and one sole writer. A record writer first validates a complete
+collision-resistant sibling candidate, then atomically installs it at the exact staging
+path with no-replace semantics. The operation must fail if staging already exists, and the
+worker also refuses an existing final path; the parent promotes a complete staging file
+instead of re-dispatching. A retry after a crash receives the same assigned paths or the same
+registered worktree; it never allocates another drift id or guesses a nearby checkout.
 
 ## The tripwire
 
@@ -71,7 +78,9 @@ adaptation is how plans rot while every row stays green.
 
 Three things, in this order.
 
-**1. Write the drift record** — `<main_root>/.rune/drift/DRF-nnn.md`:
+**1. Write the drift record** — only the assigned
+`<main_root>/.rune/drift/open/DRF-nnn.md` staging path. The parent already chose the id;
+the final `<main_root>/.rune/drift/DRF-nnn.md` path must remain absent until promotion:
 
 ```markdown
 # DRF-003
@@ -109,9 +118,28 @@ Then return to the parent (≤200 tokens):
 
 ```
 status: drifted
+task: T-016
+attempt: 2
 drift: DRF-003
+artifact: /workspace/acme/.rune/drift/open/DRF-003.md
 worktree: discarded
+worktree_path: /workspace/acme/.rune/worktrees/T-016
 summary: handle() has two call sites; T-016 assumed one. T-018/T-019 also affected.
+```
+
+The parent accepts only the assigned id and staging pointer, validates the record, then
+atomically promotes staging to the assigned final path with no-replace semantics before
+writing any ledger pointer or drift freeze. You never write, overwrite, or edit the final
+file.
+
+A separate record-only dispatch returns the same interface with its own outcome:
+
+```yaml
+status: recorded
+task: T-016
+drift: DRF-003
+artifact: /workspace/acme/.rune/drift/open/DRF-003.md
+summary: immutable task evidence requires replanning
 ```
 
 ## Stopping for budget

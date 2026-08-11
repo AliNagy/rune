@@ -99,7 +99,10 @@ Everything worth keeping lives in `.rune/`:
   drafts/M-nn/R-nnn/     selected protocol, planner cuts, and drift replacement map
   tasks/T-nnn.md         immutable task specs; never edited, overwritten, or deleted
   notes/T-nnn.md         handoff notes and long results
+  notes/{INV,RES}-nnn.md  promoted investigation and research answers
+  notes/open/             assigned investigation/research reports awaiting atomic promotion
   drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
+  drift/open/             assigned drift reports awaiting atomic promotion
 ```
 
 **Commit it.** The vision, decisions, milestones, and ledger are project knowledge worth
@@ -270,10 +273,10 @@ you if it finds a layout it doesn't recognise rather than guessing.
 
 ## Status
 
-**Not yet production-tested.** `v0.12.0` keeps task specifications immutable when drift
-forces replanning: obsolete work is retired, replacement work gets new ids, and schema 2
-records the lineage. Rune has not yet been run end to end on a real repository. Expect to
-adjust:
+**Not yet production-tested.** `v0.12.1` makes report publication collision-safe: the
+parent reserves every drift, investigation, and research id and output path before work
+starts, workers write distinct staging files, and complete reports are promoted atomically.
+Rune has not yet been run end to end on a real repository. Expect to adjust:
 
 - the 200-token limit on what subagents return (models go over it)
 - how worktrees behave on Windows paths
