@@ -103,6 +103,9 @@ Everything worth keeping lives in `.rune/`:
   notes/open/             assigned investigation/research reports awaiting atomic promotion
   drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
   drift/open/             assigned drift reports awaiting atomic promotion
+  decisions/open/        per-task questions awaiting parent-assigned decision ids
+  sessions/              session handoffs for fresh-context recovery
+  worktrees/             disposable task checkouts; ignored by Git
 ```
 
 **Commit it.** The vision, decisions, milestones, and ledger are project knowledge worth

@@ -13,15 +13,38 @@ not a generation task. Take the time it needs.
 **Your context is for the interview.** That is the one thing here that genuinely cannot be
 delegated — you are the only agent talking to the user. Everything else follows from it:
 
-- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Run** only the exact bounded state probes named below.
 - **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's own files.
 - **Read** `<main_root>/.rune/` coordination files.
+- **Inspect** at most 20 top-level entry names, excluding Git and Rune coordination roots,
+  only to choose new-project versus in-progress mode.
 - **Write** `<main_root>/.rune/vision.md` and `decisions.md`, incrementally, as the
   interview settles them.
 - **Talk to the user** — this is the job.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
+
+## Permitted commands and probes
+
+This is the complete command interface for the parent route.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
+git rev-parse HEAD
+find <main_root> -mindepth 1 -maxdepth 1 ! -name .git ! -name .rune ! -name .agent -print | head -20
+```
+
+The first two each return exactly one line; the last returns at most 20 entry names.
+`ai-root` may run only its own separately bounded migration probe while this route follows
+it. Source inspection and survey output remain dispatched.
+
+### Mutating lifecycle commands
+
+`none` — this route writes its two parent-owned files through file operations; the graph
+worker owns `milestones.md`, and Git task lifecycle is dispatched.
 
 ## Coordination-root preflight
 
@@ -139,6 +162,11 @@ everything the graph needs is already on disk — `vision.md` and
 `decisions.md`, which you have been writing as the interview settled, plus the survey
 digest and `map.md` in Mode B. It reads those, writes the milestone graph per
 `ai-taskfmt`, and returns the list in ≤200 tokens for you to show the user.
+
+Dispatch exactly one graph worker at a time. Accept `plan: graph` only when `artifact:` is
+the exact absolute `<main_root>/.rune/milestones.md` pointer and the completed file
+validates; the parent records no copy and never edits or promotes the graph. Confirm a
+stopped predecessor before retrying the same final path.
 
 This is the reason `vision.md` and `decisions.md` are written incrementally rather than at
 the end: the graph is generated from the files, never from your conversation. If something

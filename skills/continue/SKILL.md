@@ -16,11 +16,14 @@ no longer true, and reporting them as status propagates the lie. Repair first.
 **You work out where things stand and say so.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Run** only the exact bounded state probes named below.
 - **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's reconciliation records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/ledger.md`, repairing the rows a dead session left behind.
+- **Write** a recovered worker question under its parent-assigned id in
+  `<main_root>/.rune/decisions.md`, then **delete** only the consumed
+  `<main_root>/.rune/decisions/open/T-nnn.md` staging file.
 - **Promote** a complete worker-authored report from an assigned `open/` staging path to
   its exact final path with a same-filesystem atomic no-replace operation. You never
   compose or edit report content.
@@ -29,6 +32,37 @@ from that, and this list is exhaustive:
 - **Talk to the user** — the status report, and the question if one is owed.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
+
+## Permitted commands and probes
+
+This is the complete command interface for the parent route. `<main_head>`,
+`<worktree_head>`, and `<merge_base>` are the one-line values returned by earlier probes.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
+git -C <main_root> rev-parse HEAD
+git -C <worktree_path> status --porcelain | head -1
+git -C <worktree_path> rev-parse HEAD
+git -C <worktree_path> cat-file -e <commit>^{commit}
+git -C <worktree_path> merge-base HEAD <main_head>
+git -C <worktree_path> rev-list --count <merge_base>..HEAD
+git -C <main_root> merge-base --is-ancestor <worktree_head> HEAD
+git -C <main_root> worktree list --porcelain | awk 'BEGIN { RS=""; FS="\n" } { path=""; branch="detached"; for (i=1; i<=NF; i++) { if ($i ~ /^worktree /) path=substr($i,10); else if ($i ~ /^branch /) branch=substr($i,8) } n++; if (n<=50) print path "\t" branch } END { print "registered_worktrees=" n }'
+```
+
+The bounds are: one line for root, heads, merge-base, and ahead-count;
+zero output plus an exit status for commit existence and ancestry; at most one dirty path;
+and at most 50 registered `path<TAB>branch-ref-or-detached` rows plus one total-count line.
+A total above 50 is a stop condition requiring a separately dispatched inspection.
+`ai-root` may run only its own separately bounded migration probe.
+
+### Mutating lifecycle commands
+
+`none` — reconciliation changes parent-owned coordination files only. Cleanup of a proven
+landed orphan is dispatched to `ai-land` cleanup mode; unpublished discard is dispatched
+to `ai-drift`.
 
 ## Coordination-root preflight
 
@@ -218,7 +252,12 @@ session. For each:
      executor may have died between `git commit` and writing the publication block; a fresh executor inspects the
      committed range and either publishes that `HEAD` or resumes the task. For a diagnosed
      bug, `diagnosis_commit` alone is only the starting baseline and must never be published.
-   - empty diff, branch not ahead → discard, set `pending`, `resume_at: fresh`. Nothing lost.
+   - empty diff, branch not ahead → dispatch `ai-drift` in `discard-empty` mode with the
+     exact task id, registered path, branch ref, and main head from the probes above. Only
+     its `status: discarded` return permits setting `pending`, `worktree: discarded`, and
+     `resume_at: fresh`; a refusal leaves the absolute path in the row and is reported.
+     No source work is lost because the worker re-proves both the empty diff and zero
+     commits ahead immediately before cleanup.
    - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** with the same
      `main_root`, exact `worktree_path`, and absolute task/progress pointers.
      It maps the diff onto the task's declared steps, decides whether the work is
@@ -236,8 +275,11 @@ session. For each:
 
 Also check:
 
-- orphaned worktrees with no ledger row → remove; if their task commit is already in main,
-  delete the merged task branch too
+- orphaned worktrees with no ledger row → dispatch one `ai-land` worker in `cleanup` mode
+  with the exact bounded `path<TAB>branch-ref` row returned above. A detached checkout,
+  malformed branch ref, path outside `<main_root>/.rune/worktrees/T-nnn`, or task-id
+  mismatch is reported and left untouched. Remove it only when that worker proves the path
+  is clean and its branch tip is already reachable from main
 - `verifying` rows whose verifier never returned → first check for a durable block matching
   the row's current `v`. If it is `unverified` for `evidence` or `acceptance`, recover the
   pending record-only drift assignment: reconcile its assigned staging/final pair and

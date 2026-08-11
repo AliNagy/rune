@@ -83,6 +83,12 @@ is not supposed to be. If something the graph obviously needs is missing from th
 say so and stop rather than inventing it — a gap on disk is a real finding. Return
 `plan: graph` and `artifact: <main_root>/.rune/milestones.md`.
 
+You are the sole writer for that file. Build and validate the complete graph in a sibling
+candidate, then atomically replace `milestones.md`; never ask the parent to compose, copy,
+promote, or amend it. The parent dispatches at most one milestone-graph worker at a time
+and must confirm an interrupted predecessor stopped before retrying, so two graph writers
+can never be live concurrently.
+
 **Planner draft** (from `rune:work`) — the work id names one assigned slot such as
 `M-03/R-002/P-01`, and a pointer names the exact
 `<main_root>/.rune/drafts/M-03/R-002/P-01.md` destination. A second pointer names that

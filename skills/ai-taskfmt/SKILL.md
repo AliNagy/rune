@@ -36,6 +36,7 @@ stranger with an empty context.
   drift/open/DRF-nnn.md  # complete drift record awaiting parent promotion
   decisions/open/T-nnn.md # a worker's question, awaiting a DEC-nnn from the parent
   sessions/<stamp>.md    # session handoffs. written by `handoff`
+  worktrees/T-nnn/       # disposable task source checkout; never coordination state
   PAUSED                 # present only while work is stopped. written by `pause`
 ```
 
@@ -102,7 +103,8 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `ledger.md` | the parent |
 | `PAUSED` | the parent |
 | `rune.yml` | the parent |
-| `vision.md`, `decisions.md`, `milestones.md` | the parent |
+| `vision.md`, `decisions.md` | the parent |
+| `milestones.md` | the one worker on `ai-decompose` assigned the milestone-graph job |
 | `sessions/<stamp>.md` | the parent |
 | `map.md` | a worker on `ai-survey` |
 | `drafts/M-nn/R-nnn/protocol.md` | the parent, once before that run is dispatched |
@@ -153,15 +155,26 @@ Every parent route validates the ledger before reading it as state and validates
 candidate before replacing it. A transition is one replacement containing all changed
 fields and its returned dispatch row. No worker starts between partial edits.
 
-The parent writes mutable coordination and user-owned planning state. Workers write the
-outputs that require delegated context — maps, planner drafts, reconciled task files,
-progress, and results. The parent's only interaction with worker report content is the
-unchanged atomic no-replace `open/` → final promotion defined below. A parent about to
-compose or edit anything outside its rows has found a dispatch it skipped.
+The parent writes mutable coordination and user-owned interview state. Workers write the
+outputs that require delegated context — maps, the milestone graph, planner drafts,
+reconciled task files, progress, and results. The parent's only interaction with worker
+report content is the unchanged atomic no-replace `open/` → final promotion defined below.
+A parent about to compose or edit anything outside its rows has found a dispatch it
+skipped. `milestones.md` has no promotion step: its one graph worker writes the final path
+directly, and the parent only validates the returned absolute pointer before reporting it.
 
-`milestones.md` is the exception worth explaining: the parent owns the file, but it never
-composes it. A worker on `ai-decompose` writes the graph and the parent records it, for the
-same reason the parent does not read code.
+## Worktree container lifecycle
+
+`<main_root>/.rune/worktrees/` is an idempotently scaffolded container, not a source of
+task identity. Init creates the container when missing and never clears or replaces it.
+Task identity remains the ledger's exact absolute `worktree_path`.
+
+Only task-bound workers create child `T-nnn/` worktrees. A successful `ai-land` removes
+the clean landed child; `ai-bug` may remove its own unreproduced provisional child; and
+`ai-drift` removes an assigned unpublished child while quiescing or abandoning work.
+`continue` sends a clean, fully merged orphan to `ai-land`'s cleanup mode. No public route
+removes a worktree or branch directly, and the container itself is never removed during
+normal operation.
 
 ## Checkout identity contract
 
@@ -197,10 +210,14 @@ Task-bound work also carries `worktree_path`:
   harness happened to start it.
 - Retries, verifiers, recoverers, and landers receive the same `worktree_path`. They must
   target it directly and must not request or create a fresh worktree.
-- After confirmed reproduction, only a successful lander may remove it. Before that,
-  `ai-bug` may discard its own exact provisional worktree when diagnosis cannot reproduce
-  or reclassifies the request. The burned id and progress record survive either way.
-  Otherwise the path is part of the task's durable identity, alongside its id and branch.
+- Worktree removal has exactly three worker owners. `ai-bug` may discard its own exact
+  provisional checkout when diagnosis does not reproduce or reclassifies. `ai-drift` may
+  discard an assigned unpublished checkout for detect, quiesce, confirmed abandon, or the
+  mechanically empty recovery case. `ai-land` removes a successfully landed checkout or
+  a clean orphan whose branch tip it proves is already in main. Every case preserves
+  coordination history; no parent route removes a worktree or branch directly. Outside
+  those cases the path remains part of the task's durable identity alongside its id and
+  branch.
 
 Harness worktree isolation may be used only when it can target this exact existing path.
 An isolation mode that silently creates a new worktree must be omitted: a clean anonymous
@@ -433,7 +450,7 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 |---|---|
 | `ai-execute` | `status: done \| drifted \| budget \| blocked \| question` |
 | `ai-verify` | `verdict: pass \| fail \| unverified` |
-| `ai-land` | `landing: landed \| refused \| conflict \| reverted \| stuck` |
+| `ai-land` | `landing: landed \| refused \| conflict \| reverted \| stuck \| not_landed \| cleaned` |
 | `ai-recover` | `verdict: salvage \| discard \| partial` |
 | `ai-triage` | `type: bug \| feature \| refactor \| investigation` |
 | `ai-bug` | `diagnosis: reproduced \| not_reproduced \| reclassified \| blocked` |
@@ -441,7 +458,7 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
 | `ai-investigate` | `investigation: answered \| blocked` |
 | `ai-research` | `research: answered \| blocked` |
-| `ai-drift` (separate dispatch) | `status: recorded \| quiesced \| refused` |
+| `ai-drift` (separate dispatch) | `status: recorded \| quiesced \| abandoned \| discarded \| refused` |
 
 Then whatever else that skill defines.
 
@@ -521,6 +538,14 @@ its output grows with the codebase, which is the whole reason it gets dispatched
 The class is documentation. **What makes it checkable is that each skill lists its own
 permitted probes by name** — an agent should never have to judge whether something
 qualifies. If a command is not written down in that skill, it is a dispatch.
+
+Every executable command in a public route must occupy a fenced block whose info string
+is exactly `rune-commands`. The route's `Permitted commands and probes` section is the
+allowlist: a `rune-commands` line later in the procedure must match one admitted command
+verbatim after stripping its explanatory trailing comment. Shell commands in unlabeled,
+`text`, `bash`, `sh`, or other fences are invalid; those fences are examples or data only.
+Static validation rejects an unknown command—including `rm`, `mv`, or a newly introduced
+shell executable—instead of silently deciding it was prose.
 
 ### Why there are no agents
 
