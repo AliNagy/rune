@@ -21,7 +21,10 @@ from that, and this list is exhaustive:
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
 - **Write** the parent-assigned result of a worker question to
   `<main_root>/.rune/decisions.md`, then **delete** only that worker's consumed
-  `<main_root>/.rune/decisions/open/T-nnn.md` staging file.
+  `<main_root>/.rune/decisions/open/T-nnn-eN.md` staging file.
+- **Write** parent-authored `source: planning` behaviour/scope decision records to
+  `<main_root>/.rune/decisions.md` only at the pre-reconciliation gate. This is the same
+  sole parent writer; planners never allocate ids or edit the file.
 - **Promote** a complete worker-authored `DRF-`, `INV-`, or `RES-` staging file to the
   exact final path already reserved in `ledger.md`, using a same-filesystem atomic
   no-replace operation. You never compose or edit report content.
@@ -235,15 +238,18 @@ Use this exact two-phase protocol:
    confirmed bug, reuse the exact run whose protocol and `reserved_task` produced the
    diagnosis; for every other type, create the run here. Write `protocol.md` using the
    canonical schema in `ai-taskfmt`: the final `type`, exact protocol skill, and triage
-   evidence and shape. The only valid mappings are `bug -> ai-bug`, `feature -> ai-feature`,
-   and `refactor -> ai-refactor`. Then assign `P-01` through `P-03`; the parent is the only
-   allocator for the run, protocol record, bug reservation, and planner slots.
+   evidence and shape, plus `decisions: [...]` containing every decided record that
+   constrains this milestone/request. The only valid mappings are `bug -> ai-bug`,
+   `feature -> ai-feature`, and `refactor -> ai-refactor`. Then assign `P-01` through
+   `P-03`; the parent is the only allocator for the run, protocol record, bug reservation,
+   and planner slots.
 2. Dispatch two or three planners in parallel. Each gets one work id such as
    `M-03/R-002/P-01`, the same `main_root` and absolute milestone inputs, and one distinct
    output pointer such as `<main_root>/.rune/drafts/M-03/R-002/P-01.md`. Every dispatch
-   also gets the absolute pointer to that run's `protocol.md`. A planner loads the named
-   protocol and writes only its complete draft, using local `D-nnn` ids; it never writes a
-   final task file or the ledger. For a bug, also pass the reserved task's exact
+   also gets absolute pointers to that run's `protocol.md` and to `decisions.md`. A planner
+   loads the named protocol and its listed settled decisions, then writes only its complete
+   draft, using local `D-nnn` ids; it never writes a final task file or the ledger. For a
+   bug, also pass the reserved task's exact
    `worktree_path` plus the absolute diagnosis progress pointer. The planner reads the
    committed reproduction there and marks exactly one proposed task
    `reservation: primary`.
@@ -252,14 +258,25 @@ Use this exact two-phase protocol:
    late original worker cannot collide with it. Wait until every planner in the run has
    returned or is confirmed stopped; do not reconcile while one may still produce another
    cut, and do not reconcile fewer than two complete cuts.
-4. Dispatch one fresh reconciler with work id `M-03/R-002` and pointers to every completed
+4. **Run the pre-reconciliation gate below.** No final `tasks/T-nnn.md` file exists yet.
+   Present the candidate shapes, assumptions, exclusions, and disputed seams from the
+   complete draft artifacts. A harmless implementation assumption is internal,
+   reversible, and cannot change behaviour, scope, acceptance, data retention, error
+   semantics, or a public interface. Anything else is a behaviour/scope decision: assign
+   it a parent-owned `DEC-nnn` with `source: planning`, persist and settle it with the
+   user, abandon this immutable run, and start a fresh run whose protocol lists that id.
+   All fresh planners therefore read the durable choice before drafting. User additions
+   that change the cut also start a fresh run; never patch an old draft or reconcile it
+   under new input.
+5. Only after the gate accepts a run with no decision candidates, dispatch one fresh
+   reconciler with work id `M-03/R-002` and pointers to every completed
    draft artifact. Give it the same `main_root`, the same absolute protocol pointer, and
-   the absolute draft pointers. For a bug, give it the same diagnosis pointer and
+   the absolute decisions and draft pointers. For a bug, give it the same diagnosis pointer and
    `worktree_path`. It validates that every draft used that protocol, repeats the
    type-specific sanity pass, compares the cuts, and writes the final task files. The
    reconciler maps the selected `reservation: primary` task to the protocol's already-used
    `T-nnn`; it allocates ids only for any additional tasks.
-5. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
+6. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
    edges. Then register exactly those tasks in `<main_root>/.rune/ledger.md` in one
    validated parent update. New rows start `pending`, `d0/e0/v0/l0`, zero failures, no
    finding or blocker, `resume_at: fresh`, `replaced_by: —`, and no worktree. For a bug,
@@ -357,28 +374,34 @@ Each parallel agent still gets **one issue** — the rule above is unaffected. T
 planners on one milestone is three agents on the same single issue, which is fan-out.
 One planner on three milestones is batching, which is forbidden.
 
-## 3. The gate — always
+### Pre-reconciliation gate — always
 
-**Stop here. Every time. No implementation begins until the user has seen the plan and
-been asked whether they want to add anything.** There is no flag that skips this.
+**Stop here after draft fan-out and before the reconciler writes final task files. Every
+time.** No final task contract or production implementation exists until the user has
+seen the candidate plan and been asked whether they want to add anything. A confirmed bug
+may already have its committed failing reproduction evidence. There is no flag that skips
+this.
 
 Not "proceed?" — that invites a yes and nothing else. Ask for **additions**, and give them
 something concrete to react to: what you are about to do, what you decided on their behalf,
 and what you are deliberately leaving out.
 
 ```
-About to start M-03 · session lifecycle — 4 tasks
+Proposed M-03 · session lifecycle — candidate cut of 4 tasks
 
-  T-014  rotate refresh tokens        auth      ~3 files
-  T-015  refresh endpoint             api       after T-014
-  T-016  session restart persistence  auth,db   ~4 files
-  T-017  expiry sweep job             worker    ~2 files
+  rotate refresh tokens        auth      ~3 files
+  refresh endpoint             api       after rotation
+  session restart persistence  auth,db   ~4 files
+  expiry sweep job             worker    ~2 files
 
-T-014, T-016 and T-017 touch different files, so they can run at the same time.
+Rotation, persistence, and the sweep touch different files, so the eventual tasks can run
+at the same time.
 
-Assumed
-- sessions expire after 30 days — nothing in the code says, I took the config default
-- rotation happens on refresh only, not on every request
+Implementation assumptions
+- private helper names follow the existing auth convention
+
+Decision needed before final tasks
+- session expiry: fixed 30 days or user-configurable? Recommendation: fixed for v1.
 
 Not doing
 - device management and OAuth — those are M-06 and M-07
@@ -388,15 +411,16 @@ Anything you want to add, change, or take out before I start?
 
 The three things that make this gate earn its place:
 
-- **Assumptions, stated.** Anything you settled without being told. This is the last cheap
-  moment to correct them — after four tasks are built on one, it is not cheap.
+- **Implementation assumptions, stated.** These may be made only when harmless and
+  reversible. Anything user-visible is a decision, not an assumption.
 - **Exclusions, stated.** Users often assume something is included. Saying what is out
   surfaces that before it becomes a surprise.
 - **An open question, not a yes/no.** "Proceed?" gets a yes. "Anything to add?" gets the
   thing they had been meaning to mention.
 
-If they add something, fold it in and show the revised plan. If it changes the shape of the
-work, re-decompose rather than bolting a task on the end.
+If they add something, or a behaviour/scope decision is discovered, persist it first and
+start a fresh run whose protocol carries every settled decision. Show that revised plan.
+Never reconcile drafts built before their durable inputs existed.
 
 A single-task fix gets a shorter version of the same thing, not a skipped one:
 
@@ -406,12 +430,13 @@ About to fix the login redirect bug.
   one task, ~2 files in src/auth. Reproduced it first: the redirect drops the
   query string when the session is renewed.
 
-Assumed you want the query string preserved rather than the redirect removed.
+Decision needed: preserve the query string or remove the redirect? Recommendation:
+preserve it to maintain current navigation behaviour.
 
 Anything to add before I start?
 ```
 
-## 4. Dispatch
+## 3. Dispatch
 
 ### Choosing a batch
 
@@ -482,7 +507,8 @@ base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
 drift: DRF-003          # if any
 artifact: /workspace/acme/.rune/drift/open/DRF-003.md # drifted only
-decision: DEC-012       # if status is question
+decision: pending-id    # if status is question; workers never allocate DEC ids
+decision_artifact: /workspace/acme/.rune/decisions/open/T-014-e2.md
 blocker: service-down   # blocked only; parent stores external:service-down
 resume_at: step:3       # budget, blocked, or question
 detail: /workspace/acme/.rune/notes/T-014.md
@@ -622,9 +648,17 @@ invisible.
 `status: question` means the executor hit a choice it has no authority to make. It has
 written an open decision record and stopped.
 
-The record arrives in `<main_root>/.rune/decisions/open/T-nnn.md` with no id. **Assign the
+The record arrives in `<main_root>/.rune/decisions/open/T-nnn-eN.md` with no id. Require
+the path, `raised_by`, `source_attempt`, returned task, and persisted executor attempt to
+match. **Assign the
 `DEC-nnn`, move it into `decisions.md`, and delete the open file.** That hop is yours
 because id allocation cannot be done safely by three concurrent workers.
+
+Reconcile all simultaneously returned question artifacts in numeric task-id/attempt order
+and serially apply `ai-taskfmt`'s crash-safe transaction: persist the assigned decision
+with unique `source: T-nnn/eN`, then persist the `awaiting` row and pointer, then delete
+that exact staging file. On recovery, reuse a record with the same source; never allocate
+a second id. A conflicting source/path/attempt stops the route.
 
 Do not answer it yourself. In the same update that moves the task to `awaiting`, store
 `decision:DEC-nnn`, point `latest_finding` at that record, and preserve the worker's

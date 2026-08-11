@@ -21,6 +21,9 @@ delegated — you are the only agent talking to the user. Everything else follow
   only to choose new-project versus in-progress mode.
 - **Write** `<main_root>/.rune/vision.md` and `decisions.md`, incrementally, as the
   interview settles them.
+- **Create** the canonical empty schema-2 ledger only for the documented empty-project
+  bootstrap, then **write** only its top-level `vision` phase using `ai-ledger`; preserve
+  every other field and row.
 - **Talk to the user** — this is the job.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -43,8 +46,8 @@ it. Source inspection and survey output remain dispatched.
 
 ### Mutating lifecycle commands
 
-`none` — this route writes its two parent-owned files through file operations; the graph
-worker owns `milestones.md`, and Git task lifecycle is dispatched.
+`none` — this route writes its parent-owned interview files and ledger phase through file
+operations; the graph worker owns `milestones.md`, and Git task lifecycle is dispatched.
 
 ## Coordination-root preflight
 
@@ -65,8 +68,24 @@ Check `<main_root>/.rune/rune.yml`.
 - **Missing, and the repo has code** → run `rune:init` first. Do not ask; just do it and
   say so. Vision without a map produces a plan disconnected from the codebase.
 - **Missing, and the repo is empty** → new project. Vision runs first; init runs after the
-  stack is chosen and scaffolded.
+  stack is chosen and scaffolded. If `ledger.md` is also absent, the parent writes the
+  canonical empty schema-2 shape from `init` with `oracle: —`, `main: green`, and
+  `vision: absent` immediately after `ai-root` scaffolds the coordination root. Validate
+  it before creation. This is the only pre-init bootstrap; init later fills the oracle and
+  preserves the phase and history.
 - **Present but stale** → mention it, offer a re-run, proceed if the user declines.
+
+After the ground is ready, validate schema 2 per `ai-ledger`. Before asking the first
+interview question or writing either interview file, replace `vision: absent` with
+`vision: drafting` in one validated ledger write. Preserve `drafting` on resume. A
+`complete` phase never re-enters the interview; proceed only to open decisions or a
+missing milestone graph. No file-shape heuristic may override this field.
+
+Write `vision.md` incrementally using `ai-taskfmt`'s exact **Vision document** routing
+shape. A topic changes from `open` to `settled` only after its nonempty answer and complete
+decision-id list are durable. Mode B also requires the settled survey-reality and
+discrepancy sections. These fields let recovery verify durable inputs; they never replace
+the ledger phase.
 
 ## Mode A · New project
 
@@ -125,6 +144,7 @@ Every choice with more than one defensible answer becomes a decision record in
 ```markdown
 ## DEC-007 · State management
 status: open
+source: vision
 options:
   - Zustand — light, minimal ceremony
   - Redux Toolkit — heavier, more structure, familiar
@@ -154,7 +174,16 @@ Anything unanswered is an open decision, not a default.
 
 ## Milestones
 
-Only once every blocking decision is `decided`.
+After the final answer and any resulting decision records are durable, validate that the
+seven canonical interview topics (plus both Mode B sections when applicable) validate as
+settled on disk. Then replace
+`vision: drafting` with `vision: complete` in one validated ledger write. This write is
+the completion marker and happens before graph dispatch. If the session dies immediately
+before it, `continue` may validate the same checklist and finish only this transition; if
+it dies after it, the interview is complete even when `milestones.md` is absent.
+
+Generate milestones only with `vision: complete` and once every blocking decision is
+`decided`.
 
 **Dispatch a subagent that follows `ai-decompose` with `main_root` and absolute pointers
 to write `<main_root>/.rune/milestones.md`. You do not write it yourself.** By this point
@@ -165,7 +194,8 @@ digest and `map.md` in Mode B. It reads those, writes the milestone graph per
 
 Dispatch exactly one graph worker at a time. Accept `plan: graph` only when `artifact:` is
 the exact absolute `<main_root>/.rune/milestones.md` pointer and the completed file
-validates; the parent records no copy and never edits or promotes the graph. Confirm a
+validates; log its return as `plan-graph | ai-decompose | vision | graph: <absolute
+milestones path>`. The parent records no copy and never edits or promotes the graph. Confirm a
 stopped predecessor before retrying the same final path.
 
 This is the reason `vision.md` and `decisions.md` are written incrementally rather than at
@@ -196,6 +226,9 @@ each section settles — never only at the end.
 
 If the session ends mid-interview, `rune:continue` picks up from the last settled
 section and the open decision queue. Nothing is held in conversation memory.
+
+`ledger.md` decides whether the interview is unfinished. `vision.md` supplies its durable
+answers but has no competing completion marker.
 
 ## Finishing
 

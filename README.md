@@ -80,9 +80,10 @@ Typical first run on an existing project:
 New project, no code yet: `/rune:vision` first — init runs afterward, once there's a stack
 to look at.
 
-Before any code is written, work stops once and shows you the plan, the assumptions it
-made, and what it's leaving out — then asks what you'd like to add. You can't turn that
-off.
+Before final task files or production implementation are written, work stops after
+independent draft cuts and shows you the proposed plan, its harmless implementation
+assumptions, and what it leaves out. Any behaviour or scope choice becomes a recorded
+decision and fresh planners receive that settled input. You can't turn the gate off.
 
 ## What Rune writes into your repo
 
@@ -103,7 +104,7 @@ Everything worth keeping lives in `.rune/`:
   notes/open/             assigned investigation/research reports awaiting atomic promotion
   drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
   drift/open/             assigned drift reports awaiting atomic promotion
-  decisions/open/        per-task questions awaiting parent-assigned decision ids
+  decisions/open/        per-task-attempt questions awaiting parent-assigned decision ids
   sessions/              session handoffs for fresh-context recovery
   worktrees/             disposable task checkouts; ignored by Git
 ```
@@ -217,9 +218,10 @@ that no replacement is needed). Completed tasks remain completed history. A cras
 the atomic ledger update leaves the old tasks blocked and the unregistered new ids burned,
 so recovery cannot mistake half a replan for live work.
 
-**You decide the things worth deciding.** Every run stops once before writing code to show
-you the plan, the assumptions it made on your behalf, and what it's deliberately leaving
-out — then asks what you'd like to add. There's no flag to skip it. An agent that hits a
+**You decide the things worth deciding.** Every run stops before final task reconciliation
+to show you the candidate plan, harmless implementation assumptions, and what it is
+deliberately leaving out — then asks what you'd like to add. There's no flag to skip it.
+An agent that hits a
 choice you'd want a say in writes down the question and its recommendation and stops rather
 than guessing, but only when the answer changes behaviour you'd notice and neither the task
 nor the surrounding code settles it. You get an update after each task, batch, milestone,

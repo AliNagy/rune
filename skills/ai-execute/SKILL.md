@@ -164,8 +164,12 @@ it.
 **You cannot talk to the user — the dispatcher can.** When you hit a choice the user would
 notice and might disagree with, and neither the task spec nor an existing convention
 settles it, write an open decision record with your recommendation to
-`<main_root>/.rune/decisions/open/T-nnn.md` — **no id; the parent assigns it** — and stop with
+`<main_root>/.rune/decisions/open/T-nnn-eN.md`, where `eN` is this dispatch's persisted
+executor attempt — **no id; the parent assigns it** — and stop with
 `status: question`. Keep the worktree; the work so far is blocked, not wrong.
+The record includes `raised_by: T-nnn` and `source_attempt: eN`, both matching the exact
+path and this dispatch. Install the complete staging file with no-replace semantics; an
+existing path is recovery evidence and must not be overwritten.
 
 Write it to disk rather than only reporting it. Your worktree survives your death so the
 *work* is not lost; the question has to survive on the same terms.
@@ -261,7 +265,8 @@ base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any
 artifact: /workspace/acme/.rune/drift/open/DRF-nnn # required for drifted
-decision: DEC-nnn     # if status is question
+decision: pending-id  # required for question; never a DEC-nnn
+decision_artifact: /workspace/acme/.rune/decisions/open/T-014-e2.md # question only
 blocker: service-down # required for blocked; lowercase slug
 resume_at: step:3     # required for budget, blocked, and question
 detail: /workspace/acme/.rune/notes/T-nnn.md  # early stops

@@ -34,7 +34,9 @@ rushed and lossy, which defeats the point.
 - **Delete** only an earlier `sessions/<stamp>.md` written by this same session after the
   replacement handoff is complete and validated.
 - **When draining in-flight work**, use `pause`'s exact ledger-settlement and assigned
-  report-promotion permissions; do not compose or edit report content.
+  report-promotion and staged-question promotion permissions, including deletion of only
+  the consumed `<main_root>/.rune/decisions/open/T-nnn-eN.md`; do not compose or edit
+  worker-authored content.
 - **Talk to the user** — the paste block at the end.
 - **Dispatch subagents**, naming the skill each one must follow.
 
@@ -72,8 +74,9 @@ possible place to start reading files.
 
 ## 1. Settle the tree first
 
-If work is in flight, drain it exactly as `pause` does — let executors finish, verify,
-merge. Never hand a torn tree to a session that has no idea what caused it.
+If work is in flight, drain it exactly as `pause` does — let executors finish, promote any
+staged question into a parent-assigned decision and `awaiting` row, verify, and merge.
+Never hand a torn tree to a session that has no idea what caused it.
 
 If the user wants out immediately, that is `/rune:pause stop` first, then handoff. Say
 which you did.

@@ -23,17 +23,28 @@ needs revisiting. Do not silently graft it onto the nearest one.
 
 ## 2. Surface decisions before building
 
-Any choice with more than one defensible answer becomes a **decision record** per
-`ai-taskfmt`, and blocks decomposition until resolved.
+Any behaviour/scope choice with more than one defensible answer becomes a **decision
+record** per `ai-taskfmt`, and blocks final reconciliation and task generation until
+resolved.
+Independent planner drafts may surface a candidate, but may not silently choose it; the
+parent settles it and starts a fresh run before any final task file is written.
 
 Typical: storage shape, sync vs. async, where validation lives, what happens on partial
 failure, whether this is user-configurable.
+
+A harmless implementation assumption is narrower: an internal, reversible choice that
+does not alter behaviour, scope, acceptance, data retention, error semantics, or a public
+interface. It may be recorded in a planner draft's `assumptions`. Anything outside that
+definition is a behaviour/scope decision candidate. Draft workers record the candidate;
+the parent settles it before final reconciliation and restarts planning with the decided
+record listed in the fresh protocol.
 
 **Recommend, do not assume.** State your preference and why, then wait. A decision the
 agent made silently is one nobody will find until it is load-bearing across four tasks
 and expensive to reverse.
 
-The gate is mechanical: no task may be generated that depends on an `open` decision.
+The gate is mechanical: no final task may be generated that depends on an `open` decision
+or a draft's unresolved `decision_candidates`.
 
 ## 3. Slice vertically
 

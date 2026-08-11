@@ -67,6 +67,49 @@ any normal lifecycle dispatch. The sole exception is its assigned record-only wo
 an amended legacy contract requires drift evidence for the migration candidate. An
 unknown schema is a hard stop, never a best-effort parse.
 
+### Vision phase
+
+The top-level `vision` field is the **only authoritative vision phase**. Its exact enum is
+`absent | drafting | complete`; the existence, headings, or apparent prose completeness
+of `vision.md` never override it. The sole writer is the parent role identified by
+`ai-taskfmt`, including while that parent follows `init`, `vision`, or `continue`.
+
+| From | To | Persisted boundary |
+|---|---|---|
+| `absent` | `drafting` | before the first interview question or any vision/decision write |
+| `drafting` | `drafting` | after each settled answer is first written to `vision.md` and any related decision is written to `decisions.md` |
+| `drafting` | `complete` | after the final answer is durable, all required topics are represented, and every behaviour/scope choice has a decision record |
+
+No reverse transition exists. `complete` does not mean every decision is decided; open
+records may still block the milestone graph. Milestone generation requires
+`vision: complete` and no blocking open decision in either decision location.
+
+The ordering makes crashes deterministic. Before the first transition, recovery starts a
+new interview. While `drafting`, recovery reads durable sections and decisions and resumes
+at the first unanswered topic. If the final answer is durable but the phase write was
+interrupted, `continue` validates `ai-taskfmt`'s exact Vision-document checklist and may perform only the
+missing `drafting -> complete` replacement without re-asking a settled question. After
+`complete`, recovery never resumes interviewing: it presents open decisions or generates
+the missing milestone graph. A missing/invalid field or a graph present while the phase is
+not `complete` is a stop condition.
+
+For an empty project that runs vision before init, `oracle: —` is valid only while
+`rune.yml` is absent, Tasks is empty, and Dispatches is empty or contains only these exact
+coordination-only pre-init rows: `plan-graph | ai-decompose | vision | graph: <absolute
+milestones path>`, `survey | ai-survey | — | map.md written`, and
+`commands | ai-oracle | — | oracle: <command>`. `vision` creates that canonical bootstrap
+and logs its graph worker as `plan-graph`; `init` may then log survey/command
+discovery before it replaces only `oracle` and `main` from ground truth, preserving the
+vision phase and all rows. No diagnose, plan-draft, reconcile, execute, verify, land, or
+other task-bound/report dispatch may start while the oracle is `—`.
+
+The crash-safe post-init/pre-manifest state has `rune.yml` absent, `oracle != —`, no Tasks,
+and the same restricted coordination-only Dispatches. It means init persisted the ledger
+first and died before atomically installing `rune.yml`. Only `init` may recover it: rerun
+its idempotent discovery, preserve vision/history, persist any refreshed ledger result
+first, then install the complete `rune.yml`. `rune.yml` present with `oracle: —`, or either
+missing-manifest state with a task/report dispatch, is invalid and stops.
+
 Schema 1 has the same ordered columns through `resume_at`. Migration appends
 `replaced_by` to the header and `—` to every existing row, then changes the marker to 2 in
 the same validated replacement. Before that replacement, `continue` scans unfinished
