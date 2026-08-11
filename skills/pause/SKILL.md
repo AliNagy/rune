@@ -35,6 +35,10 @@ before handing the repo to someone else.
   exception outside this route's pause and ledger records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/PAUSED`, and `ledger.md` to settle the rows you drained.
+- **Write** the parent-assigned result of a drained worker question to
+  `<main_root>/.rune/decisions.md`, then **delete** only its consumed
+  `<main_root>/.rune/decisions/open/T-nnn-eN.md` staging file, using `ai-taskfmt`'s exact
+  promotion transaction.
 - **Delete** `<main_root>/.rune/PAUSED` only when an already-paused user explicitly asks
   this route to resume.
 - **Promote** a complete assigned report staging file to its exact final path with one
@@ -111,7 +115,10 @@ state, say so explicitly and say what is dangling.
      not begin decomposition while pausing. Consume each executor's reserved drift-report
      slot exactly as `work` does: non-drift outcomes mark it unused; a drifted outcome is
      recorded only after its assigned staging file is atomically promoted, and it never
-     advances to verification. For completed `done` executors, atomically set `verifying`,
+     advances to verification. A `question` outcome follows `ai-taskfmt`'s deterministic
+     per-attempt allocation transaction: persist the assigned decision, set the row
+     `awaiting`, and delete staging last; it is safely drained but remains waiting on the
+     user. For completed `done` executors, atomically set `verifying`,
      increment `v`, and **dispatch `ai-verify`** against each ledger-recorded
      `worktree_path`; after a pass, set `landing`, increment `l`, and **dispatch `ai-land`**
      one task at a time against that same path. Pass each recorded attempt. Then stop. You
@@ -133,8 +140,10 @@ state, say so explicitly and say what is dangling.
    `continue`; never recycle its id or discard its evidence during `abandon`.
 5. Confirm no worker is live and no task is left `in_progress` or `landing`. A completed
    reproduced reservation may remain `diagnosing` for planning after resume. A paused
-   ledger with a task still marked in progress is a lie about the state of the world, same
-   as after a crash.
+   task may remain `awaiting` on the promoted decision. A staged question that could not
+   be validated keeps the tree non-clean and routes recovery through `continue`; do not
+   claim a clean drain. A paused ledger with a task still marked in progress is a lie
+   about the state of the world, same as after a crash.
 6. Report.
 
 ## Report

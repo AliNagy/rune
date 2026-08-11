@@ -191,7 +191,9 @@ An agent that asks about things it could have determined is worse than one that 
 because it spends the user's attention, which is the scarcest thing in the system.
 
 When you do ask, write an open decision record rather than inventing a new artifact — the
-same gate already blocks on it. Write it to **`<main_root>/.rune/decisions/open/T-nnn.md`** and
+same gate already blocks on it. Write it to
+**`<main_root>/.rune/decisions/open/T-nnn-eN.md`**, where `eN` is the current persisted
+executor attempt, and
 **do not assign an id**: three executors run at once, so a shared file races and two
 workers would both reach for `DEC-012`. The parent assigns the number and moves it into
 `decisions.md`.
@@ -200,6 +202,7 @@ workers would both reach for `DEC-012`. The parent assigns the number and moves 
 ## Expired session rows
 status: open
 raised_by: T-017
+source_attempt: e2
 options:
   - Delete the row - simpler, no cleanup job
   - Keep it flagged - supports "you were logged out at 4pm", needs a sweep
@@ -214,8 +217,13 @@ just blocked — and return:
 ```
 status: question
 task: T-017
+attempt: 2
 worktree: kept
-decision: DEC-012
+worktree_path: /workspace/acme/.rune/worktrees/T-017
+decision: pending-id
+decision_artifact: /workspace/acme/.rune/decisions/open/T-017-e2.md
+resume_at: step:2
+detail: /workspace/acme/.rune/notes/T-017.md
 summary: expired sessions - delete or flag? blocked until decided
 ```
 

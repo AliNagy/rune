@@ -34,7 +34,7 @@ stranger with an empty context.
   notes/open/RES-nnn.md  # complete research awaiting parent promotion
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
   drift/open/DRF-nnn.md  # complete drift record awaiting parent promotion
-  decisions/open/T-nnn.md # a worker's question, awaiting a DEC-nnn from the parent
+  decisions/open/T-nnn-eN.md # one executor attempt's question, awaiting a parent id
   sessions/<stamp>.md    # session handoffs. written by `handoff`
   worktrees/T-nnn/       # disposable task source checkout; never coordination state
   PAUSED                 # present only while work is stopped. written by `pause`
@@ -115,7 +115,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `notes/T-nnn.md` | the worker holding T-nnn |
 | `notes/T-nnn.verify.md` | a worker on `ai-verify` |
 | `notes/T-nnn.landing.md` | a worker on `ai-land` |
-| `decisions/open/T-nnn.md` | the worker holding T-nnn |
+| `decisions/open/T-nnn-eN.md` | the worker holding that exact T-nnn executor attempt |
 | `notes/init-commands.md` | a worker on `ai-oracle` |
 | `notes/open/INV-nnn.md`, `notes/open/RES-nnn.md` | the worker assigned that exact id and staging path |
 | `drift/open/DRF-nnn.md` | the detector or record-only worker assigned that exact id and staging path |
@@ -133,7 +133,7 @@ thing that makes each executor unique. Planner drafts apply the same rule with a
 run and planner slot because several planners are working on the same milestone and cannot
 use the task id to distinguish themselves yet.
 
-That rule is why `notes/T-nnn.progress`, `decisions/open/T-nnn.md`, report staging files,
+That rule is why `notes/T-nnn.progress`, `decisions/open/T-nnn-eN.md`, report staging files,
 and planner drafts are shaped the way they are. Parallel report workers never choose a
 number or destination: the parent assigns both before dispatch, and each worker writes
 only its own `open/` path. Parallel planners similarly receive one exact
@@ -369,6 +369,7 @@ main_root: /workspace/acme
 pointers:
   milestone: /workspace/acme/.rune/milestones.md#M-03
   protocol:  /workspace/acme/.rune/drafts/M-03/R-002/protocol.md
+  decisions: /workspace/acme/.rune/decisions.md
   draft:     /workspace/acme/.rune/drafts/M-03/R-002/P-01.md
 ```
 
@@ -385,13 +386,15 @@ planner pointer. A retry gets a new unused slot; it never reuses a path that a l
 could still write. The reconciler is dispatched only after the parent has the completed
 absolute draft paths, and receives the same protocol pointer plus every draft as a pointer.
 
-The protocol record is deliberately small:
+The protocol record is deliberately small. `decisions` contains every decided
+`DEC-nnn` whose choice constrains this run; an empty list is explicit:
 
 ```markdown
 ---
 run: M-03/R-002
 type: feature
 protocol: ai-feature
+decisions: [DEC-004, DEC-007]
 ---
 evidence: SessionMiddleware.handle exists, but profile storage does not.
 shape: thin end-to-end slice through the existing session boundary
@@ -580,6 +583,66 @@ The consequence for a worker: if you find a second issue while working, **report
 stop**. Whether it becomes another dispatch belongs to whoever dispatched you. Taking it on
 yourself merges two contexts that the system spent a dispatch to keep apart.
 
+## Vision document
+
+`vision.md` is incremental interview content, not the authoritative phase marker. It has
+this exact routing shape so `continue` can determine whether the final answer reached disk:
+
+```markdown
+# Vision
+
+mode: new
+
+## What and why
+status: settled
+decisions: []
+<nonempty settled answer>
+
+## V1 line
+status: settled
+decisions: [DEC-001]
+<nonempty settled answer and explicit exclusions>
+
+## Shape
+status: settled
+decisions: []
+<nonempty settled answer>
+
+## Data
+status: settled
+decisions: [DEC-002]
+<nonempty settled answer>
+
+## Stack
+status: settled
+decisions: [DEC-003]
+<nonempty settled answer>
+
+## Constraints
+status: settled
+decisions: []
+<nonempty settled answer>
+
+## Done
+status: settled
+decisions: []
+<nonempty observable v1 acceptance>
+```
+
+`mode` is exactly `new | in-progress`. Each of the seven headings occurs exactly once in
+that order. A topic is complete only with `status: settled`, a `decisions: [...]` list,
+and nonempty answer content. Every listed id must exist in `decisions.md`; every
+unanswered behaviour/scope choice in the topic must be represented by one of those ids.
+An in-progress vision then adds exactly one `## Survey reality` and one
+`## Discrepancies` section, each with `status: settled`, decision ids, and nonempty content;
+the latter includes the discrepancy table described by `vision`.
+
+The parent may add prose or subheadings inside a topic, but may not rename, reorder, or
+duplicate the routing headings. Partial files simply omit later topics or mark the current
+one `status: open`. Only the validated ledger field says whether the interview is
+`absent`, `drafting`, or `complete`; this shape is the durable input checklist used for the
+one recoverable `drafting -> complete` transition, not a second phase marker.
+
 ## Planner draft
 
 A planner draft is the durable, complete candidate cut passed to the reconciler. It is
@@ -636,18 +699,30 @@ blocked_by: [D-001]
 
 ## Cut notes
 assumptions:
-  - rotation uses the existing configured expiry
+  - private helper follows the repository's existing naming convention
+decision_candidates: []
 exclusions:
   - device management remains in M-06
 seams:
   - middleware and endpoint are separated because they share no change-surface files
 ```
 
-The draft's `type` and `protocol` must exactly match the run's `protocol.md`. Every
+The draft's `type` and `protocol` must exactly match the run's `protocol.md`. Before
+writing, its planner reads every id in the protocol's `decisions` list from
+`decisions.md`, requires each record to be `decided`, and treats the recorded choice and
+rationale as input. A missing, duplicate, or open id blocks the run; conversation context
+never fills the gap. Every
 `D-nnn` repeats the complete final task contract: title, type, verification mode, local
 dependencies, goal, context contract, change surface, steps, check, and acceptance. `Cut
 notes` records the assumptions, exclusions, and disputed seams the user gate and
 reconciler need. A summary that omits those sections is not a draft artifact.
+
+An assumption is allowed here only when it is a **harmless implementation assumption**:
+an internal, reversible choice that preserves requested behaviour, scope, acceptance,
+data retention, error semantics, and public interfaces. Anything that changes one of
+those is a **behaviour/scope decision candidate**, not an assumption. Put it under
+`decision_candidates`; the parent resolves it before final reconciliation and abandons
+this run so a fresh run can carry the settled `DEC-nnn` to every planner.
 
 For a bug run, every complete draft marks exactly one proposed task
 `reservation: primary`. That local marker is not a second id: it tells the reconciler
@@ -908,6 +983,7 @@ not exist yet, so any task written now is fiction that will drift on contact.
 ```markdown
 ## DEC-007 · State management
 status: open              # open | decided
+source: vision            # vision | planning | T-nnn/eN
 options:
   - Zustand — light, minimal ceremony
   - Redux Toolkit — heavy, more structure, familiar to the team
@@ -916,16 +992,48 @@ decided: —
 rationale: —
 ```
 
+`source` is optional for parent-authored vision and planning records: `vision` identifies
+an interview decision and `planning` a behaviour/scope candidate promoted before final
+reconciliation. It is mandatory as `T-nnn/eN` for every newly promoted worker question
+from that exact per-attempt staging file. Only the task-attempt form is a uniqueness key:
+at most one durable decision may have a given `T-nnn/eN`, and its task and attempt must
+match the staged record, return envelope, and ledger. A staged worker record contains
+`raised_by` and `source_attempt` instead of `source`; the parent adds the latter during
+allocation. A legacy or parent-authored decision without `source` remains valid and may
+be named explicitly in a run protocol, but it is never a task-attempt deduplication key;
+the parent does not invent a backfill.
+
 **Gate: no milestone may be generated that depends on an `open` decision.** This is what
 converts "make suggestions, never assumptions" from a personality instruction into a
 checkable property. Recommendations are encouraged; silently adopting one is not.
 
 Workers use the same format to ask questions mid-task — but they write it to
-**`.rune/decisions/open/T-nnn.md`**, not to `decisions.md`, and they **do not assign an
-id**. They add `raised_by: T-nnn`, stop with `status: question`, and keep the worktree.
+**`.rune/decisions/open/T-nnn-eN.md`**, not to `decisions.md`, and they **do not assign an
+id**. The filename's `T-nnn` and `eN` must equal their `raised_by: T-nnn` and
+`source_attempt: eN` fields. They stop with
+`status: question`, and keep the worktree. Their short return contains exactly
+`decision: pending-id` and the absolute `decision_artifact:` staging path; a worker never
+predicts the parent's future id.
 
-The parent then assigns the `DEC-nnn`, moves the record into `decisions.md`, deletes the
-open file, and sets the task `awaiting`.
+The worker builds a complete sibling candidate and installs that exact per-attempt path
+with atomic no-replace semantics. An existing path is recovery evidence, never a file to
+overwrite. A late earlier attempt has a different filename and therefore cannot replace a
+later attempt's question.
+
+The parent is the sole allocator. It validates every staged record against the task and
+current executor attempt, sorts simultaneously observed questions by numeric task id and
+then attempt, and allocates the next unused `DEC-nnn` in that deterministic order. It
+adds `source: T-nnn/eN` to the assigned record in a complete `decisions.md` replacement,
+then replaces the ledger row with `awaiting` and `decision:DEC-nnn`, and only then deletes
+the staging file.
+
+That order is the recovery interface. A crash before the decisions replacement leaves
+only staging. A crash after it reuses the existing record with the same unique `source`
+instead of allocating another id. A crash after the ledger replacement sees a matching
+`awaiting` row and deletes the consumed staging file. A duplicate `source`, mismatched
+task/attempt/path, or conflicting existing row is a stop condition; never guess. The
+single parent processes the sorted batch serially, so simultaneous worker returns cannot
+race either the id scan or the shared decisions replacement.
 
 Two reasons for the extra hop. Three executors run at once, so a shared append target
 races — and both would reach for the same next id. And a question that exists only in a

@@ -23,7 +23,7 @@ from that, and this list is exhaustive:
 - **Write** `<main_root>/.rune/ledger.md`, repairing the rows a dead session left behind.
 - **Write** a recovered worker question under its parent-assigned id in
   `<main_root>/.rune/decisions.md`, then **delete** only the consumed
-  `<main_root>/.rune/decisions/open/T-nnn.md` staging file.
+  `<main_root>/.rune/decisions/open/T-nnn-eN.md` staging file.
 - **Promote** a complete worker-authored report from an assigned `open/` staging path to
   its exact final path with a same-filesystem atomic no-replace operation. You never
   compose or edit report content.
@@ -84,7 +84,7 @@ the purpose of having resumed at all.
 <main_root>/.rune/PAUSED        · paused? when, why, was the tree left clean?
 <main_root>/.rune/sessions/     · newest session handoff — context the ledger does not carry
 <main_root>/.rune/rune.yml      · initialized? stale? oracle?
-<main_root>/.rune/vision.md     · exists? complete?
+<main_root>/.rune/vision.md     · which required topics are durably settled?
 <main_root>/.rune/decisions.md  · any status: open?
 <main_root>/.rune/milestones.md · exists? which is current?
 <main_root>/.rune/drafts/       · completed or interrupted decomposition runs?
@@ -153,6 +153,24 @@ start against a predecessor ledger.
 
 Only schemas 0 and 1 have migration paths. Migration is idempotent because a successful
 replacement is schema 2 and later runs validate it instead of migrating again.
+
+### Reconcile the vision phase
+
+Use only the validated ledger's `vision: absent | drafting | complete` field as phase.
+`absent` starts `rune:vision`; it does not infer progress from a stray file. For
+`drafting`, validate `ai-taskfmt`'s exact Vision-document headings, per-topic status,
+decision-id list, and nonempty content against `decisions.md`. Resume at the first open or
+missing required topic. If every required topic (and the two Mode B sections when
+applicable) validates because the session died after the final file write, replace only
+`vision: drafting` with `vision: complete`; do not re-ask
+the final question. `complete` never resumes the interview. A milestone graph beside any
+other phase, or a missing/unknown phase, is a stop condition.
+
+A legacy `drafting` vision without the routing fields never auto-completes. Preserve it,
+summarize its apparent settled content to the user once, and route to `vision` to confirm
+that mapping before the parent writes one complete canonical candidate. A legacy file
+whose ledger already says `complete` remains readable as settled content and is not
+rewritten merely for format. This avoids inventing completion while preserving old work.
 
 ## 2. Reconcile
 
@@ -319,11 +337,17 @@ Also check:
 - `retired` rows → validate their drift pointer and explicit `replaced_by` disposition,
   but never recover, claim, or resurrect them. Follow replacement chains only to report
   the current leaf tasks.
-- **`decisions/open/` files with no `awaiting` row** → a worker asked something and the
-  session died before it reached the user. Assign the `DEC-nnn`, move it into
-  `decisions.md`, set the task `awaiting`, store `decision:DEC-nnn`, point at the decision
-  record, preserve the handoff's resume token, and surface it. This is the self-healing path
-  and it is the whole reason those files exist.
+- **staged worker questions** → collect valid `decisions/open/T-nnn-eN.md` files, require
+  `raised_by` and `source_attempt` to match the task's current executor attempt, and sort
+  them by numeric task id then attempt. Process that stable order serially using
+  `ai-taskfmt`'s decision-allocation transaction. If no decision has that unique
+  `source: T-nnn/eN`, assign the next unused `DEC-nnn` and persist the complete decision
+  record first. Then set the task `awaiting`, store `decision:DEC-nnn`, point at that
+  record, preserve the handoff's resume token, and delete the staging file last. If a
+  matching source already exists, reuse its id; if the ledger already matches, only
+  delete the consumed staging file. This repairs crashes at every boundary without
+  duplicate ids, including several simultaneous questions. Any conflicting source,
+  attempt, path, or row stops recovery rather than guessing.
 
 ## 3. Determine phase and route
 
@@ -332,9 +356,10 @@ Also check:
 | `<main_root>/.rune/PAUSED` present | deliberately stopped | **ask first** — see below |
 | no `<main_root>/.rune/` | nothing started | `rune:init`, then `rune:vision` |
 | `rune.yml` only | ground mapped, no plan | `rune:vision` |
-| `vision.md` partial | interview interrupted | `rune:vision` — from the last settled section |
-| vision done, decisions `open` | blocked on the user | present the open decisions |
-| decisions done, no milestones | vision unfinished | `rune:vision` — generate milestones |
+| ledger `vision: absent` | interview not started | `rune:vision` — persist `drafting` before the first question |
+| ledger `vision: drafting` | interview interrupted | `rune:vision` — from the first unsettled topic |
+| ledger `vision: complete`, decisions `open` | blocked on the user | present the open decisions |
+| ledger `vision: complete`, decisions done, no milestones | graph pending | `rune:vision` — generate milestones |
 | task `diagnosing` | bug reproduction or planning interrupted | reconcile diagnosis, then `rune:work` |
 | protocol record or planner drafts, no registered tasks | planning interrupted | `rune:work` — allocate a fresh draft run |
 | milestones, none decomposed | ready to work | `rune:work` — decompose M-01 |
@@ -363,9 +388,10 @@ with it themselves rather than have an executor inherit it.
 
 ### Resuming a vision interview
 
-Do not restart it. Read `vision.md` for what is settled and `decisions.md` for what is
-open, then continue from the first unanswered topic. Re-asking questions the user already
-answered is the fastest way to lose their patience with the system.
+Do not restart it. Require ledger `vision: drafting`, read `vision.md` for what is settled
+and `decisions.md` for what is open, then continue from the first unanswered topic.
+Re-asking questions the user already answered is the fastest way to lose their patience
+with the system.
 
 Summarise what was settled in two or three lines so they can correct you, then carry on.
 

@@ -30,6 +30,12 @@ the milestone title, decides the protocol. A missing, relative, out-of-run, malf
 mismatched pointer is `plan: blocked` before any file is written. An investigation never
 reaches this skill for task decomposition.
 
+The protocol also contains `decisions: [...]`, including an explicit empty list. Read the
+absolute `decisions.md` pointer supplied with the run, resolve every listed id there, and
+require `status: decided`; these records are the durable settled inputs for every planner
+and reconciler. A missing, duplicate, open, or unlisted record that constrains the
+milestone/request blocks the run. Never substitute prompt text or conversation memory.
+
 A bug protocol also requires `reserved_task: T-nnn`, the exact reserved
 `worktree_path`, and an absolute diagnosis progress pointer. Confirm the progress file ends
 in `diagnosis: reproduced`, its commit ids exist on `task/T-nnn`, and the worktree is the
@@ -68,7 +74,8 @@ shared context.
 3. Use `ai-serena` to look at the actual symbols the milestone touches in the correct
    source checkout: the reserved worktree for a bug, `main_root` otherwise. Overview
    and signatures — not bodies, unless a specific decision depends on one.
-4. Confirm no `open` decision blocks this milestone. If one does, stop and surface it.
+4. Confirm no `open` decision blocks this milestone and that every applicable decided id
+   is listed in the protocol. If either check fails, stop and surface it.
 
 ## Which job you were given
 
@@ -105,6 +112,9 @@ For a drift replan, cover the current milestone outcome against the new code sta
 than editing the old contracts. The retiring files are evidence about the failed cut, not
 templates. Use only local `D-nnn` ids and state in `Cut notes` which retiring outcomes each
 proposed task replaces, including any old outcome that now needs no task.
+Put only harmless, reversible internal choices under `assumptions`. Put every discovered
+behaviour/scope ambiguity under `decision_candidates` with options and a recommendation;
+do not silently choose it.
 
 **Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
 are given the run's protocol pointer plus pointers to two or three completed draft
@@ -123,6 +133,9 @@ disagreed, that seam is the part of the milestone that is genuinely hard to divi
 it as the thing to get right, not a tie to break quickly. You are the only worker in the
 run allowed to write
 `<main_root>/.rune/tasks/`, and you still never write `<main_root>/.rune/ledger.md`.
+Refuse reconciliation if any draft has a nonempty `decision_candidates` list or any
+protocol decision is no longer decided. The parent must settle the choice and dispatch a
+fresh run; final task files are never written from pre-decision drafts.
 For a drift replan, also write the exact assigned `replacements.md` artifact per
 `ai-taskfmt`. Map every protocol `retiring` id exactly once to `none` or one or more new
 ids, require every new id to appear in the map, and fail closed if any non-retired

@@ -17,8 +17,9 @@ from that, and this list is exhaustive:
   `.gitignore` update are part of initialization.
 - **Read** coordination files under `<main_root>/.rune/`, and manifests small enough to
   name a command from.
-- **Write** `<main_root>/.rune/rune.yml`, the `<main_root>/.rune/` scaffolding, and one
-  line in `<main_root>/.gitignore`.
+- **Write** `<main_root>/.rune/rune.yml`, the canonical empty or bootstrap update to
+  `<main_root>/.rune/ledger.md`, the `<main_root>/.rune/` scaffolding, and one line in
+  `<main_root>/.gitignore`.
 - **Run** only the exact state probes and conditionally authorized lifecycle command named
   below.
 - **Talk to the user** — the report at the end.
@@ -153,7 +154,11 @@ record what came back:
 A `none` or a red baseline is a real result. Do not re-run anything yourself to check —
 that is the leak this dispatch exists to close, and the evidence is already on disk.
 
-### 5. Write `<main_root>/.rune/rune.yml`
+### 5. Persist initialized state
+
+Build the complete `<main_root>/.rune/rune.yml` candidate below, but do not install it
+yet. The ledger transition is persisted first so `rune.yml` can never claim initialization
+while the authoritative ledger still has `oracle: —`.
 
 ```yaml
 initialized: 2026-08-04
@@ -183,8 +188,10 @@ confidence:
 Ensure every entry in `ai-root`'s authoritative `rune-directory-manifest` exists. This is
 create-if-missing and idempotent: accept an existing real directory, never clear its
 contents, and stop on a symbolic link or non-directory at any required path. Only when no
-ledger exists, write this valid empty schema-2 ledger (fill the
-top-level values from the init result rather than leaving placeholders):
+ledger exists, write this valid empty schema-2 ledger (fill the top-level values from the
+init result rather than leaving placeholders). For a new project whose `vision` route
+already created the validated bootstrap, preserve it and replace only `oracle` and `main`
+from init's result; never reset `vision`:
 
 ```markdown
 # Ledger
@@ -208,7 +215,22 @@ main: green
 ```
 
 Validate the complete candidate per `ai-ledger` before writing it. On a re-run, validate
-and preserve an existing schema-2 ledger; a schema-0 or schema-1 ledger routes through
+and preserve an existing schema-2 ledger. The sole narrow exception is the pre-init vision
+bootstrap: `rune.yml` is absent, `oracle: —`, no task row exists, and every dispatch row is
+one of `ai-ledger`'s exact coordination-only pre-init graph/survey/commands shapes. Replace
+only its `oracle` and `main` values from the init result, preserving `vision` and those
+dispatch rows, then validate and replace the complete ledger once. Persist that validated
+ledger replacement **before** atomically installing the validated `rune.yml` candidate.
+
+If a crash lands the ledger but not `rune.yml`, the next init recognizes exactly this
+recovery state: `rune.yml` absent, schema-2 ledger with `oracle != —`, no Tasks, and only
+the allowed pre-init coordination rows. Re-run the bounded ground probes and idempotent
+survey/oracle discovery, preserve the vision phase and history, update `oracle`/`main` if
+ground truth changed, validate both complete candidates, persist the ledger first again,
+then install `rune.yml`. Do not reset to `oracle: —` or treat the missing file as a fresh
+ledger. Any task row or other dispatch shape makes this ambiguous and stops init.
+
+A schema-0 or schema-1 ledger routes through
 `continue` for migration, and init never resets task history. Run and
 planner-specific directories beneath `drafts/` are created only when `work` assigns a new
 decomposition run, writes its protocol record, and assigns distinct planner slots.
