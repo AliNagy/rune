@@ -28,7 +28,12 @@ stranger with an empty context.
   notes/T-nnn.progress   # diagnosis, step ticks, verification evidence, publications
   notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
   notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
+  notes/INV-nnn.md       # promoted investigation answer
+  notes/RES-nnn.md       # promoted external research answer
+  notes/open/INV-nnn.md  # complete investigation awaiting parent promotion
+  notes/open/RES-nnn.md  # complete research awaiting parent promotion
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
+  drift/open/DRF-nnn.md  # complete drift record awaiting parent promotion
   decisions/open/T-nnn.md # a worker's question, awaiting a DEC-nnn from the parent
   sessions/<stamp>.md    # session handoffs. written by `handoff`
   PAUSED                 # present only while work is stopped. written by `pause`
@@ -57,7 +62,7 @@ from the dispatch envelope below; it is never inferred from a worker's current d
 | source changes when complete | commits on its task branch |
 | planner drafts and reconciled task files | `<main_root>/.rune/` |
 | `notes/T-nnn.progress`, handoff notes | `<main_root>/.rune/` |
-| drift and decision records | `<main_root>/.rune/` |
+| staged drift, investigation, research, and decision records | `<main_root>/.rune/` |
 
 Coordination state has to be visible to the dispatcher, the verifier, and the next session
 *before* anything merges. Written inside a worktree it would appear only on merge — which
@@ -68,6 +73,14 @@ drift, `INV-` investigation, `RES-` research. Planning drafts use a separate loc
 namespace: `R-nnn` is a decomposition run under one milestone, `P-nn` is a planner slot
 assigned by the parent, and `D-nnn` identifies a proposed task only inside that planner's
 artifact. None of those local ids may appear as a final task id or ledger task row.
+
+The parent is the sole allocator for the `DRF-`, `INV-`, and `RES-` report spaces. Before
+dispatching work that may write one of those reports, it reserves the next unused id and
+binds it to one exact absolute staging path and one exact absolute final path in
+`## Dispatches`. An id is used if it appears in a final file, an `open/` staging file, or
+any `report-slot` row regardless of outcome. Gaps are permanent: an unused, blocked, or
+interrupted reservation is never recycled, because a late worker may still hold its
+staging pointer.
 
 A bug reservation burns its `T-nnn` as soon as its protocol record, ledger row, or progress
 file is written. Allocation treats an id found in **any** coordination artifact as used,
@@ -102,8 +115,9 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `notes/T-nnn.landing.md` | a worker on `ai-land` |
 | `decisions/open/T-nnn.md` | the worker holding T-nnn |
 | `notes/init-commands.md` | a worker on `ai-oracle` |
-| `notes/INV-nnn.md`, `notes/RES-nnn.md` | the worker that answered |
-| `drift/DRF-nnn.md` | the detector, or the one `ai-drift` record-only worker assigned that exact id |
+| `notes/open/INV-nnn.md`, `notes/open/RES-nnn.md` | the worker assigned that exact id and staging path |
+| `drift/open/DRF-nnn.md` | the detector or record-only worker assigned that exact id and staging path |
+| final `notes/INV-nnn.md`, `notes/RES-nnn.md`, `drift/DRF-nnn.md` | unchanged worker content, atomically promoted by the parent |
 
 ## The concurrency rule that generates this table
 
@@ -117,12 +131,13 @@ thing that makes each executor unique. Planner drafts apply the same rule with a
 run and planner slot because several planners are working on the same milestone and cannot
 use the task id to distinguish themselves yet.
 
-That rule is why `notes/T-nnn.progress`, `decisions/open/T-nnn.md`, and planner drafts are
-shaped the way they are. Parallel planners never share a destination: the parent assigns
-each one an exact `M-nn/R-nnn/P-nn.md` path before dispatch. The run's `protocol.md` is
-safe to share because the parent writes it once before any planner starts and every worker
-afterward is read-only with respect to it. Apply the rule to any new file before adding a
-row above.
+That rule is why `notes/T-nnn.progress`, `decisions/open/T-nnn.md`, report staging files,
+and planner drafts are shaped the way they are. Parallel report workers never choose a
+number or destination: the parent assigns both before dispatch, and each worker writes
+only its own `open/` path. Parallel planners similarly receive one exact
+`M-nn/R-nnn/P-nn.md` path. The run's `protocol.md` is safe to share because the parent
+writes it once before any planner starts and every worker afterward is read-only with
+respect to it. Apply the rule to any new file before adding a row above.
 
 Status lives in `ledger.md` and nowhere else. Never duplicate it into task frontmatter —
 two copies of a mutable fact diverge within a day and then neither can be trusted.
@@ -140,8 +155,9 @@ fields and its returned dispatch row. No worker starts between partial edits.
 
 The parent writes mutable coordination and user-owned planning state. Workers write the
 outputs that require delegated context — maps, planner drafts, reconciled task files,
-progress, and results. A parent about to write anything outside its rows has found a
-dispatch it skipped.
+progress, and results. The parent's only interaction with worker report content is the
+unchanged atomic no-replace `open/` → final promotion defined below. A parent about to
+compose or edit anything outside its rows has found a dispatch it skipped.
 
 `milestones.md` is the exception worth explaining: the parent owns the file, but it never
 composes it. A worker on `ai-decompose` writes the graph and the parent records it, for the
@@ -228,7 +244,40 @@ main_root:     /workspace/acme
 worktree_path: /workspace/acme/.rune/worktrees/T-014
 pointers:
   - /workspace/acme/.rune/tasks/T-014.md
+reports:
+  drift:
+    id: DRF-007
+    staging: /workspace/acme/.rune/drift/open/DRF-007.md
+    final: /workspace/acme/.rune/drift/DRF-007.md
 ```
+
+Every executor attempt receives one fresh drift-report reservation because drift is
+discovered inside that worker, after dispatch. Most attempts leave the slot unused; the
+parent records that outcome and never recycles the id. Spending numbers is cheaper than
+letting concurrent detectors race for one filename.
+
+Investigation and research use the same assignment shape without a worktree:
+
+```yaml
+follow:    ai-investigate
+task:      INV-004
+main_root: /workspace/acme
+reports:
+  investigation:
+    id: INV-004
+    staging: /workspace/acme/.rune/notes/open/INV-004.md
+    final: /workspace/acme/.rune/notes/INV-004.md
+  research:
+    id: RES-007
+    staging: /workspace/acme/.rune/notes/open/RES-007.md
+    final: /workspace/acme/.rune/notes/RES-007.md
+```
+
+The research slot is optional for a pure repository investigation, but when the parent
+cannot know whether outside evidence will be needed it reserves both and records the
+unused one on return. A direct `ai-research` dispatch receives only its `RES-` assignment.
+Before any such dispatch, the parent writes one pending report assignment per id to
+`## Dispatches`; that durable row is part of allocation, not an after-the-fact audit entry.
 
 Bug diagnosis uses the same task-bound envelope before the task-file pointer exists:
 
@@ -265,6 +314,32 @@ the job is.
 If a worker needs something not reachable from those pointers, that is a missing pointer,
 not a reason to paste text into the prompt or resolve a relative path from its current
 directory.
+
+### Report staging and promotion
+
+An assigned report worker writes only its exact `staging` path. It first validates the
+complete report in a collision-resistant sibling candidate unique to that dispatch, then
+uses a same-filesystem atomic **no-replace** install to create the staging path. The
+operation itself must fail if staging already exists; a check followed by an overwriting
+rename is not safe. The worker also refuses an existing final path. It returns the assigned
+id and staging pointer. It never scans for the next id and never writes the final path.
+
+The parent accepts only the id and staging path already recorded in the pending assignment.
+It validates the report's required shape and uses a same-filesystem atomic **no-replace**
+promotion from staging to final without changing the worker's content. The filesystem
+operation—not an earlier existence check—must refuse an occupied final path. Only then
+does it replace the pending outcome with `recorded`. If the report was not needed, it
+records `unused`; the id remains burned.
+
+If the platform cannot guarantee atomic no-replace creation or promotion on that
+filesystem, return blocked and preserve the assignment. Never fall back to an
+overwrite-capable rename, copy, or check-then-write sequence.
+
+Crash recovery follows the file order rather than guessing: a complete staging file is
+promoted to its assigned final path; an existing final file completes the pending row; two
+files, a mismatched path or id, or an artifact with no pending assignment is a stop
+condition. Because staging and final are on the same filesystem, the final path is either
+absent or a complete worker-authored report—never a partial copy.
 
 For decomposition, the one work id is hierarchical because the work has two phases. A
 planner gets one assigned slot such as `M-03/R-002/P-01`; the reconciler gets the enclosing
@@ -364,6 +439,9 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-bug` | `diagnosis: reproduced \| not_reproduced \| reclassified \| blocked` |
 | `ai-oracle` | `oracle: passing \| failing \| none` |
 | `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
+| `ai-investigate` | `investigation: answered \| blocked` |
+| `ai-research` | `research: answered \| blocked` |
+| `ai-drift` (separate dispatch) | `status: recorded \| quiesced \| refused` |
 
 Then whatever else that skill defines.
 

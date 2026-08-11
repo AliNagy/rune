@@ -8,9 +8,17 @@ description: Use when the request is a question rather than a change - why somet
 
 **Governing rule: read-only, and it terminates in an answer.**
 
-The dispatch includes absolute `main_root` and absolute pointers. Investigate that
-checkout, not the worker's starting directory, and resolve every coordination write
-against `main_root`.
+The dispatch includes absolute `main_root` plus a parent-assigned `INV-nnn` and exact
+absolute staging and final paths. It may also include a reserved `RES-nnn` assignment for
+outside evidence. A crash-recovery dispatch may instead include the already recorded RES
+final path as a read-only evidence pointer. Investigate that checkout, not the worker's
+starting directory, and resolve every coordination write against `main_root`. Never scan
+for the next report id or derive an output path yourself.
+
+Before reading source, require the investigation staging path to be
+`<main_root>/.rune/notes/open/INV-nnn.md`, the final path to be
+`<main_root>/.rune/notes/INV-nnn.md`, and both paths to use the assigned id and be absent.
+A missing, relative, mismatched, or occupied assignment is `investigation: blocked`.
 
 This protocol exists because a system that only knows how to make plans will turn "why is
 this slow?" into an implementation plan. That is the failure mode it prevents.
@@ -34,9 +42,17 @@ Read-only. `ai-serena` applies with full force — this protocol is where explor
 sprawl is most likely, because there is no change surface bounding you.
 
 If the question needs evidence from **outside** the repository — prior art, a spec
-detail, whether a library is maintained, what other teams found — load `ai-research` and
-follow it for that part. Do not improvise it. A remembered fact presented as a looked-up
-one is exactly the failure both protocols exist to prevent.
+detail, whether a library is maintained, what other teams found — use exactly one of:
+
+- the reserved `RES-nnn` id and paths: load `ai-research`, follow it for that part, and
+  finish its staging report before creating the INV staging candidate
+- a recovery `research_evidence` pointer to the already promoted assigned RES final:
+  validate its id and report shape, then read it without loading or re-running
+  `ai-research`
+
+Do not improvise research or allocate an id yourself. A remembered fact presented as a
+looked-up one is exactly the failure both protocols exist to prevent. If neither form was
+supplied, return `investigation: blocked` and name that missing pointer before searching.
 
 - Prefer measurement to reading. A profile, a timing, a query count, a row count beats an
   hour of reasoning about which code path looks expensive.
@@ -62,11 +78,17 @@ No worktree. No diff. When you are done the tree is exactly as you found it.
 
 ## 4. The answer
 
-Write to `<main_root>/.rune/notes/INV-nnn.md` and return a short summary.
+Write the complete answer only to the assigned
+`<main_root>/.rune/notes/open/INV-nnn.md` staging path. Validate it in a collision-resistant
+sibling candidate and atomically install it at staging with no-replace semantics; the
+operation must fail if staging exists, and the worker also refuses an existing final. The
+parent validates and atomically promotes the unchanged staging file to
+`<main_root>/.rune/notes/INV-nnn.md` after return.
 
 ```markdown
 # INV-004 · Why is dashboard load slow
 asked: 2026-08-04
+research: RES-007
 
 ## Answer
 Four sequential Postgres round trips in `src/api/dashboard.ts :: load`, each ~180ms on
@@ -90,7 +112,11 @@ constants will not.
 - Or parallelise them                          — smaller win, much smaller change
 ```
 
-Four sections are mandatory: **answer, evidence, confidence, what you did not check.**
+The `research` disposition is mandatory: use the assigned `RES-nnn`, `unused` when an
+assigned companion slot was not needed, or `not-assigned` when none was reserved. An INV
+report that names `RES-nnn` is complete only after that RES staging or final report
+validates. Four sections are mandatory: **answer, evidence, confidence, what you did not
+check.**
 
 The last two are what make an investigation trustworthy. An investigation that reports
 uniform certainty over a codebase it sampled is worse than one that names its blind spots
@@ -107,3 +133,23 @@ scoping and decision records those protocols require.
 
 The gap between "here is what I found" and "I have begun changing your codebase" is the
 entire purpose of this protocol. Do not close it on your own initiative.
+
+## Return (≤200 tokens)
+
+```yaml
+investigation: answered | blocked
+task: INV-004
+artifact: /workspace/acme/.rune/notes/open/INV-004.md # answered only
+research: answered | recorded | unused | blocked    # companion slot only
+research_task: RES-007                              # companion slot only
+research_artifact: /workspace/acme/.rune/notes/open/RES-007.md # answered; final path when recorded
+blocker: outside-evidence-unavailable                # blocked only
+summary: dashboard load is dominated by four sequential database queries
+```
+
+Report the investigation and companion-research outcomes independently so the parent can
+settle both reservations. `recorded` is only for recovery with a supplied RES final
+pointer. If nested research blocks, return both outcomes as `blocked` and the same
+objective blocker; if research succeeds but the investigation later blocks, return its RES
+artifact as `answered` and only the INV outcome as `blocked`. Return only assigned ids and
+paths. Never write a self-selected number or any final report path.

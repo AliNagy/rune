@@ -21,6 +21,9 @@ from that, and this list is exhaustive:
   exception outside this route's reconciliation records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/ledger.md`, repairing the rows a dead session left behind.
+- **Promote** a complete worker-authored report from an assigned `open/` staging path to
+  its exact final path with a same-filesystem atomic no-replace operation. You never
+  compose or edit report content.
 - **Delete** `<main_root>/.rune/PAUSED` when the user confirms a resume. You never create it — that
   is `pause`.
 - **Talk to the user** — the status report, and the question if one is owed.
@@ -53,6 +56,8 @@ the purpose of having resumed at all.
 <main_root>/.rune/drafts/       · completed or interrupted decomposition runs?
 <main_root>/.rune/ledger.md     · task statuses, drift records
 <main_root>/.rune/notes/        · handoff notes
+<main_root>/.rune/notes/open/   · assigned INV/RES reports awaiting promotion
+<main_root>/.rune/drift/open/   · assigned DRF reports awaiting promotion
 ```
 
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
@@ -94,13 +99,15 @@ whitespace or its old placeholder comment follows the heading.
   their unioned unfinished reverse-dependency closure, and allocate one migration
   `DRF-nnn`. Before dispatching,
   append or recover the one pending `## Dispatches` assignment that binds that id to its
-  exact output path, then dispatch `ai-drift` in record-only mode with the amended task
-  pointers and the pre-migration ledger. The record names the selected origin, every other
+  exact staging and final paths, then dispatch `ai-drift` in record-only mode with the
+  assignment, amended task pointers, and pre-migration ledger. The staging record names
+  the selected origin, every other
   amended task and the closure, and all amended task files as evidence; it does not
   interpret amendment prose.
 - If that worker or session dies, keep the predecessor ledger and its pending assignment;
-  the next `continue` reuses the same id and path. Once the record validates, the single
-  schema-2 candidate adds its `quiescing` drift entry, sets every inactive affected row to
+  the next `continue` reuses the same id and paths. Once staging validates, atomically
+  promote it to the assigned final path. The single schema-2 candidate then marks the slot
+  recorded, adds its `quiescing` drift entry, and sets every inactive affected row to
   `drifted` with that DRF pointer and `resume_at: replan`, maps `worktree: —` to
   `discarded`, and preserves absolute worktrees for the quiescing pass. Active-looking
   rows are stale in a fresh session and are reconciled under the freeze, never resumed
@@ -117,6 +124,47 @@ replacement is schema 2 and later runs validate it instead of migrating again.
 
 Per `ai-ledger`. The critical step, and the one that is easy to skip because
 everything *looks* fine.
+
+### Reconcile report assignments first
+
+Before task status, reconcile every pending or blocked `DRF-`, `INV-`, and `RES-`
+report-slot row. The row's id and exact staging/final paths are authoritative. A blocked
+row keeps both paths and its reason; it remains burned and is surfaced rather than ignored.
+Only after its objective unblock condition is proven may a standalone report job move
+back to pending and reuse the same assignment. An executor's blocked slot never moves to
+a later attempt, which receives a fresh id and paths.
+
+For pending rows:
+
+- complete staging exists and final is absent → validate the required report shape,
+  atomically promote staging to final with no-replace semantics, then mark the row
+  `recorded`
+- final exists and staging is absent → validate final and mark the row `recorded`; the
+  prior session died after promotion
+- neither exists, but the paired worker has a durable non-report outcome → mark the slot
+  `unused`
+- neither exists and a standalone `ai-drift` record-only, `ai-investigate`, or
+  `ai-research` dispatch can be reconstructed entirely from durable pointers → re-dispatch
+  that report job with the same id and paths, never a new reservation
+- neither exists for an executor attempt → settle that slot only while reconciling the
+  stopped attempt below; never pass it to a new executor attempt, which gets a fresh slot
+- both exist, an id or path differs, a report is malformed, or a staging/final file has no
+  pending assignment → stop and report the first exact inconsistency; burn the id and do
+  not guess which file wins
+
+Reconcile paired investigation reports in dependency order. A complete INV report must
+contain `research: RES-nnn`, `research: unused`, or `research: not-assigned`. When it names
+RES, validate and record that exact companion before promoting INV. When it says `unused`,
+mark the assigned RES slot unused only after both RES paths are absent. If RES is already
+recorded while INV is still pending, re-dispatch the reconstructible investigation with
+the same INV assignment and the RES final as read-only `research_evidence`; do not pass a
+writable RES assignment or repeat the search. If the original question cannot be rebuilt
+from durable pointers, mark INV blocked and surface the preserved RES instead of guessing.
+
+For a recorded `INV-` or `RES-` report, finish the pending worker row and report its final
+pointer; these reports never create task rows. For a recorded `DRF-`, consume the causal
+record through the ordinary drift-freeze rules below. Report promotion is complete before
+any ledger pointer names the final artifact.
 
 Reconcile every `quiescing` entry under `## Drift` before the ordinary status rules below.
 Its frozen ids must not resume their old lifecycle: consume durable worker returns only as
@@ -155,9 +203,10 @@ session. For each:
    an empty diff.
 2. **Handoff note present?** The executor stopped deliberately. Follow its
    `worktree: kept|discarded` instruction and set the complete state it implies —
-   `pending` plus its resume token for budget; `drifted`, drift blocker, and `replan` for
-   drift; `blocked` plus its external blocker, finding pointer, and resume token for a
-   recorded external condition. A blocked handoff must include the lowercase `blocker`
+   `pending` plus its resume token for budget; for drift, require that this attempt's
+   assigned DRF staging file was promoted above, then set `drifted`, its final drift
+   pointer, blocker, and `replan`; `blocked` plus its external blocker, finding pointer,
+   and resume token for a recorded external condition. A blocked handoff must include the lowercase `blocker`
    slug, `blocker_reason`, observable `unblocks_when`, a schema-safe `resume_at`, and its
    worktree disposition. If any are missing, treat the handoff as unusable and continue
    through step 3; never write an invalid blocked row or optimistically set `pending`.
@@ -165,8 +214,8 @@ session. For each:
    `worktree_path`, check only whether the worktree's diff is
    empty and whether the task branch is ahead of its merge base with main — both are
    bounded state probes, not source reads:
-   - empty diff, branch ahead → keep it and set `pending`, `resume_at: publish`. The executor may have died
-     between `git commit` and writing the publication block; a fresh executor inspects the
+   - empty diff, branch ahead → keep it and set `pending`, `resume_at: publish`. The
+     executor may have died between `git commit` and writing the publication block; a fresh executor inspects the
      committed range and either publishes that `HEAD` or resumes the task. For a diagnosed
      bug, `diagnosis_commit` alone is only the starting baseline and must never be published.
    - empty diff, branch not ahead → discard, set `pending`, `resume_at: fresh`. Nothing lost.
@@ -174,8 +223,12 @@ session. For each:
      `main_root`, exact `worktree_path`, and absolute task/progress pointers.
      It maps the diff onto the task's declared steps, decides whether the work is
      salvageable, names the resume point, and writes the handoff the dead executor never
-     did. Apply its verdict — `salvage`, `discard`, or `partial` — copy its schema token to
-     `resume_at`, and point `latest_finding` at the handoff.
+     did. Before dispatch, mark the stopped executor attempt's absent DRF slot `unused`;
+     recovery never inherits it. Apply its verdict — `salvage`, `discard`, or `partial` —
+     copy its schema token to `resume_at`, and point `latest_finding` at the handoff. If a
+     discard also returns `premise_drift: true`, instead reserve a fresh DRF report slot
+     and dispatch `ai-drift` in record-only mode from the task and recovery handoff. Promote
+     that report and apply the ordinary drift freeze before leaving `in_progress`.
 
    Do not inspect the diff yourself. Reading it is exactly the code-reading the dispatcher
    is forbidden, and a torn worktree is expensive to read.
@@ -187,10 +240,10 @@ Also check:
   delete the merged task branch too
 - `verifying` rows whose verifier never returned → first check for a durable block matching
   the row's current `v`. If it is `unverified` for `evidence` or `acceptance`, recover the
-  pending record-only drift assignment: validate an existing assigned DRF and apply the
-  freeze transition, or re-dispatch `ai-drift` with the same id and path when the file is
-  absent. Never allocate a second DRF for the same verdict. Consume every other verdict
-  with `work`'s complete mapping (including `failures++` only for `fail`, the finding
+  pending record-only drift assignment: reconcile its assigned staging/final pair and
+  apply the freeze transition, or re-dispatch `ai-drift` with the same id and paths when
+  both files are absent. Never allocate a second DRF for the same verdict. Consume every
+  other verdict with `work`'s complete mapping (including `failures++` only for `fail`, the finding
   pointer, and the returned dispatch row). If no verdict exists, increment `v`, persist,
   and re-dispatch that attempt against the row's exact `worktree_path`; never create a
   fresh verifier checkout
@@ -199,9 +252,10 @@ Also check:
   below five, increment it, persist, and
   re-dispatch that attempt against the same verified artifact and exact worktree. At `l5`,
   stop and surface the exhausted landing ceiling rather than creating attempt six
-- completed record-only drift records not yet reflected in `## Drift` → validate their
-  assigned task/finding inputs, then atomically add the exact quiescing closure and block
-  inactive rows; a pending assignment with no file is re-dispatched to the same path
+- completed record-only drift records not yet reflected in `## Drift` → require their
+  report-slot row to be `recorded`, validate the assigned task/finding inputs, then
+  atomically add the exact quiescing closure and block inactive rows; a pending assignment
+  with neither path is re-dispatched to the same id and paths
 - `blocked` rows whose finding is missing, unreadable, or lacks the blocker reason and
   observable unblock condition → keep them blocked, report the damaged durable record,
   and do not redispatch; never infer that elapsed time cleared the condition

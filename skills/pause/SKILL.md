@@ -35,6 +35,8 @@ before handing the repo to someone else.
   exception outside this route's pause and ledger records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/PAUSED`, and `ledger.md` to settle the rows you drained.
+- **Promote** a complete assigned report staging file to its exact final path with one
+  same-filesystem atomic no-replace operation. You never compose or edit report content.
 - **Talk to the user** — the report, and the confirmation before `abandon`.
 - **Dispatch subagents**, naming the skill each one must follow.
 
@@ -85,12 +87,15 @@ state, say so explicitly and say what is dangling.
 3. Apply the mode:
    - **drain** — wait for each in-flight worker. A completed `ai-bug` diagnosis leaves its
      reservation `diagnosing`, clean worktree kept, and planning for the next session; do
-     not begin decomposition while pausing. For completed executors, atomically set
-     `verifying`, increment `v`, and **dispatch `ai-verify`** against each ledger-recorded
+     not begin decomposition while pausing. Consume each executor's reserved drift-report
+     slot exactly as `work` does: non-drift outcomes mark it unused; a drifted outcome is
+     recorded only after its assigned staging file is atomically promoted, and it never
+     advances to verification. For completed `done` executors, atomically set `verifying`,
+     increment `v`, and **dispatch `ai-verify`** against each ledger-recorded
      `worktree_path`; after a pass, set `landing`, increment `l`, and **dispatch `ai-land`**
      one task at a time against that same path. Pass each recorded attempt. Then stop. You
-     neither merge nor run the checks yourself. A task the lander could not land goes back to `pending` with its
-     worktree kept; a drain does not force work in on the way out.
+     neither merge nor run the checks yourself. A task the lander could not land goes back
+     to `pending` with its worktree kept; a drain does not force work in on the way out.
    - **stop** — signal active workers to write durable state and stop. Executors write
      handoffs and return to `pending` with their finding pointers and resume tokens; an
      `ai-bug` worker appends its partial diagnosis and
@@ -99,11 +104,15 @@ state, say so explicitly and say what is dangling.
      worktree `discarded`, blocker `—`, and resume `fresh`. For a
      `diagnosing` reservation, preserve its progress record, remove the provisional row,
      and burn the id.
-4. Confirm no worker is live and no task is left `in_progress` or `landing`. A completed
+4. Settle report slots only after the paired worker is confirmed stopped. Promote and
+   record a complete assigned staging report; if both assigned paths are absent, mark the
+   slot `unused`. A mismatched, malformed, or duplicate artifact stays `blocked` for
+   `continue`; never recycle its id or discard its evidence during `abandon`.
+5. Confirm no worker is live and no task is left `in_progress` or `landing`. A completed
    reproduced reservation may remain `diagnosing` for planning after resume. A paused
    ledger with a task still marked in progress is a lie about the state of the world, same
    as after a crash.
-5. Report.
+6. Report.
 
 ## Report
 

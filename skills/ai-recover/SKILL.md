@@ -63,7 +63,7 @@ So:
 |---|---|---|
 | 1 | any changed file is outside the declared change surface | **discard** |
 | 2 | the diff contradicts itself, or you cannot say what it was trying to do | **discard** |
-| 3 | the task's premise looks false in light of the diff | **discard** + write a drift record |
+| 3 | the task's premise looks false in light of the diff | **discard** + request a drift record |
 | 4 | fewer than 20 changed lines | **discard** |
 | 5 | a `red_then_green` or `green_baseline` task has relevant edits but lacks its required pre-change evidence | **partial** |
 | 6 | any declared step is fully or partly applied | **salvage**, resume at the first unfinished step |
@@ -99,6 +99,7 @@ original behavior.
 ```
 task: T-016
 verdict: salvage | discard | partial
+premise_drift: true              # only when rule 3 matched
 applied: steps 1-2 complete, step 3 partly (rotate() exists, not wired into handle())
 containment: clean            # or: touched src/api/routes.ts, outside surface
 verification: red_then_green
@@ -113,6 +114,10 @@ Return `step:N` for `salvage`, `evidence:<the task's mode>` for `partial`, and `
 `discard`. Put explanatory prose such as "restore the base, observe red, then reapply" in
 the handoff's `next` field, not in `resume_at`; the parent copies the token into the ledger
 without interpreting prose.
+
+When rule 3 matches, put the false premise and affected task evidence in the handoff and
+return `premise_drift: true`. Do not allocate or write a `DRF-` file. The parent reserves a
+fresh report slot and dispatches `ai-drift` in record-only mode from those durable pointers.
 
 ## What not to do
 

@@ -30,6 +30,8 @@ rushed and lossy, which defeats the point.
   exception outside this route's handoff records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/vision.md`, `decisions.md`, and `sessions/<stamp>.md`.
+- **When draining in-flight work**, use `pause`'s exact ledger-settlement and assigned
+  report-promotion permissions; do not compose or edit report content.
 - **Talk to the user** — the paste block at the end.
 - **Dispatch subagents**, naming the skill each one must follow.
 

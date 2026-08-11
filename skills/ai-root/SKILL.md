@@ -32,7 +32,8 @@ This protocol may inspect the two root entries, inspect Rune coordination artifa
 to establish ownership, and run the bounded `git worktree list --porcelain` probe. It may
 rename the legacy coordination directory, update structured Rune pointers, maintain the
 one worktree ignore entry, and create or remove its migration marker, lock, and exact
-atomic-write candidates.
+atomic-write candidates. Inside a resolved canonical root it may also create the exact
+`notes/open/` and `drift/open/` report-staging directories defined below.
 
 It does not read source code, inspect task-worktree contents, run project commands, or
 change anything outside those coordination paths and the exact `.gitignore` entry.
@@ -52,6 +53,16 @@ Apply these cases in order:
 A root entry that is a symbolic link or is not a directory is unsafe. A coordination
 artifact that is a symbolic link, a symlinked `worktrees/` directory, or a symlinked or
 non-file `.gitignore` is also unsafe. Stop without following or replacing it.
+
+## Canonical report-staging layout
+
+Before returning any existing, newly initialized, or migrated canonical root, ensure the
+exact directories `<main_root>/.rune/notes/open/` and
+`<main_root>/.rune/drift/open/` exist. Create missing `notes/`, `drift/`, or `open/`
+directories idempotently. If any component already exists as a symlink or non-directory,
+stop and report that exact path; never follow, replace, or merge it. This is the layout
+upgrade for repositories created before report staging existed, so every `resolve` caller
+gets safe destinations without a separate schema migration.
 
 ## Establish legacy ownership
 

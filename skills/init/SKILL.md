@@ -149,7 +149,8 @@ confidence:
 ```
 
 Scaffold the rest of `<main_root>/.rune/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
-`drift/`, and, only when no ledger exists, this valid empty schema-2 ledger (fill the
+`notes/open/`, `drift/`, `drift/open/`, and, only when no ledger exists, this valid empty
+schema-2 ledger (fill the
 top-level values from the init result rather than leaving placeholders):
 
 ```markdown

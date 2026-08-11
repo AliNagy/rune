@@ -19,6 +19,9 @@ from that, and this list is exhaustive:
 - **Write** `<main_root>/.rune/ledger.md`, and **append** the drain result to
   `<main_root>/.rune/PAUSED` if the flag
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
+- **Promote** a complete worker-authored `DRF-`, `INV-`, or `RES-` staging file to the
+  exact final path already reserved in `ledger.md`, using a same-filesystem atomic
+  no-replace operation. You never compose or edit report content.
 - **Create** one immutable
   `<main_root>/.rune/drafts/<milestone>/R-nnn/protocol.md` before dispatching that
   decomposition run. For a bug, create it before diagnosis and include the reserved task
@@ -133,8 +136,24 @@ Then load the matching protocol:
 | refactor | `ai-refactor` | confirm a characterization net exists |
 | investigation | `ai-investigate` | read-only, terminates in an answer |
 
-**Investigation exits here.** It produces a written answer, no tasks, no ledger entries.
-Do not continue into planning — that gap is the entire point of the classification.
+**Investigation exits here.** Before dispatch, allocate the next unused `INV-nnn` and one
+exact staging/final path pair per `ai-taskfmt`. Also reserve a `RES-nnn` pair when outside
+evidence may be needed; if that cannot be known cheaply, reserve it and let the worker
+return it unused. Record every reservation as a pending `report-slot` row before the
+worker starts, then dispatch `ai-investigate` with those assignments. A pure outside-repo
+question may dispatch `ai-research` with only its `RES-` assignment.
+
+Accept `answered` only when every returned id and staging pointer matches its pending row.
+Validate each complete staging artifact and atomically promote it to the assigned final
+path with no-replace semantics, then mark that report slot `recorded`. Settle the INV and
+optional RES rows independently from the worker's two explicit outcomes: mark an unused
+companion slot `unused` only after proving both paths absent, and mark each blocked slot
+`blocked` with its reason. Do not promote or recycle a blocked slot. A crash after
+promotion is repaired by `continue` from the pending row and final file. When RES is
+answered, promote and record it before INV, then require the INV report's mandatory
+`research:` disposition to name that same RES id. When it is unused, require the INV report
+to say `research: unused`. Investigation creates no task row and does not continue into
+planning — that gap is the entire point of the classification.
 
 Protocols may reclassify once they see real code. Accept it and reroute; correcting early
 is cheap.
@@ -420,9 +439,13 @@ discarded with its worktree, and parallel executors cannot tread on each other.
 
 Claim each task before dispatch in one ledger replacement: allocate or preserve its exact
 absolute worktree, set `in_progress`, increment `e`, clear `blocker`, and set
-`resume_at: recover`. Validate and persist that complete row, then dispatch. If the
-dispatch never returns, `continue` can see both that an attempt happened and that recovery
-is required.
+`resume_at: recover`. In that same replacement allocate the next unused `DRF-nnn` and add
+its pending `report-slot` row with exact absolute
+`drift/open/DRF-nnn.md -> drift/DRF-nnn.md` paths. Validate and persist the complete task
+claim and report assignment, then dispatch with that reservation. If the dispatch never
+returns, `continue` can see both that an attempt happened, which drift destination it
+owned, and that recovery is required. A non-drift return marks the slot `unused`; its id
+is never recycled.
 
 Executors report ≤200 tokens:
 
@@ -436,6 +459,7 @@ summary: rotate() implemented and wired; required verification evidence recorded
 base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
 drift: DRF-003          # if any
+artifact: /workspace/acme/.rune/drift/open/DRF-003.md # drifted only
 decision: DEC-012       # if status is question
 blocker: service-down   # blocked only; parent stores external:service-down
 resume_at: step:3       # budget, blocked, or question
@@ -450,7 +474,7 @@ Consume every outcome in one validated ledger update:
 | `budget` | set `pending`, preserve the absolute worktree, point `latest_finding` at the handoff, set the returned pending resume token |
 | `blocked` | set `blocked`, keep the absolute worktree or mark it `discarded` exactly as returned, store `external:<slug>`, and point at the handoff containing `blocker_reason`, `unblocks_when`, and the compatible resume token |
 | `question` | after parent id allocation set `awaiting`, `decision:DEC-nnn`, the decision pointer, and the returned resume token |
-| `drifted` | require `worktree: discarded`; set `drifted`, `drift:DRF-nnn`, the drift pointer, `resume_at: replan`, and keep `replaced_by: —` until replan succeeds |
+| `drifted` | require the assigned id, staging pointer, and `worktree: discarded`; validate and atomically promote staging to final before setting `drifted`, `drift:DRF-nnn`, the final drift pointer, `resume_at: replan`, and keeping `replaced_by: —` until replan succeeds |
 
 For `done`, the commit ids are routing data, not the durable record — the executor wrote
 the same publication to `<main_root>/.rune/notes/T-nnn.progress`. Do not read the
@@ -459,6 +483,16 @@ land before the verifier is dispatched.
 
 The status meanings and row validity rules remain owned by `ai-ledger`; the table above is
 this route's atomic action for each returned outcome.
+
+For every executor status other than `drifted`, first prove both assigned report paths are
+absent, then replace that attempt's pending drift report slot with `unused DRF-nnn` in the
+same ledger candidate that consumes the outcome. A `blocked` return with
+`blocker: report-assignment`, or any unexpected report file on a non-drift outcome, marks
+the slot `blocked` and enters `continue` instead. For `drifted`, promote first and replace
+it with `recorded DRF-nnn: <absolute final>`. If final exists but
+the row is still pending, validate it and finish the ledger update; if both staging and
+final exist, either path mismatches, or neither report exists for a drifted return, stop
+and enter `continue` rather than allocating another id.
 
 Before applying that table, check the ledger's `## Drift` freeze set. A return for a
 frozen task is consumed only by *Replanning after drift*: it may supply durable evidence,
@@ -601,16 +635,17 @@ possible judge of its own work.
   `reason: artifact` goes to `pending` with the worktree kept and `resume_at: publish`; a
   fresh executor must publish one clean immutable range. `reason: evidence`
   or `acceptance` is a task-contract finding, but the verifier cannot write its causal
-  record. Keep the row `verifying`, allocate one unused `DRF-nnn`, and append a dispatch
-  row binding that verifier attempt to the exact drift output path. Dispatch `ai-drift`
-  in record-only mode with the task and verifier pointers. When the record returns, use
+  record. Keep the row `verifying`, allocate one unused `DRF-nnn`, and append a pending
+  report-slot row binding that verifier attempt to its exact staging and final drift
+  paths. Dispatch `ai-drift` in record-only mode with the assignment plus task and verifier
+  pointers. When the staging record returns, validate and atomically promote it, then use
   it as the evidence for one update that adds the exact unfinished dependency closure to
   the ledger drift freeze, sets the originating row and every inactive affected row to
   the causal drift blocker with `resume_at: replan`, and points `latest_finding` at the
   DRF. The DRF in turn preserves the verifier block as its evidence. Then quiesce the set
   before decomposition. If the record dispatch dies, leave the valid `verifying` row and
-  its frozen verifier verdict in place; `continue` reuses the assigned id and path rather
-  than allocating another.
+  its frozen verifier verdict in place; `continue` reuses the assigned id and both paths
+  rather than allocating another.
   `reason: oracle` sets `blocked`, `external:oracle-unavailable`, the verifier finding, and
   `resume_at: verify`; stop the batch until the check is available again.
 
