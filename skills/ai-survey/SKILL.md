@@ -114,7 +114,11 @@ oracle candidate: npm test (vitest)
 completeness: 3 stubs, 1 orphan module (billing), 1 contradiction (dual user model)
 confidence: high on api/auth, low on worker/ (sparse, few tests)
 flags: billing/ appears abandoned mid-implementation
+serena_probe: src/server.ts#Server/start
 ```
 
 Report low confidence where you have it. A surveyor that claims uniform certainty over a
 codebase it sampled is worse than one that says which corners it did not reach.
+`serena_probe` names one repo-relative source file and one full exact symbol name path that
+this survey resolved with Serena. Return `serena_probe: unavailable` when Serena did not
+resolve one; never invent a path merely to make init's confirmation pass.

@@ -30,15 +30,36 @@ before handing the repo to someone else.
 
 **You stop the loop and leave the tree safe to walk away from.** This list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Run** only the exact bounded state probes named below.
 - **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's pause and ledger records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/PAUSED`, and `ledger.md` to settle the rows you drained.
+- **Delete** `<main_root>/.rune/PAUSED` only when an already-paused user explicitly asks
+  this route to resume.
 - **Promote** a complete assigned report staging file to its exact final path with one
   same-filesystem atomic no-replace operation. You never compose or edit report content.
 - **Talk to the user** — the report, and the confirmation before `abandon`.
 - **Dispatch subagents**, naming the skill each one must follow.
+
+## Permitted commands and probes
+
+This is the complete command interface for the parent route.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
+```
+
+The probe returns exactly one line. `ai-root` may run only its own separately bounded
+migration probe while this route follows it. Worker state is read from durable returns and
+coordination files, not process-list commands.
+
+### Mutating lifecycle commands
+
+`none` — verification and landing are dispatched; `ai-drift` abandon mode owns discard of
+each exact unpublished task worktree and branch.
 
 ## Coordination-root preflight
 
@@ -100,10 +121,12 @@ state, say so explicitly and say what is dangling.
      handoffs and return to `pending` with their finding pointers and resume tokens; an
      `ai-bug` worker appends its partial diagnosis and
      leaves the reservation `diagnosing`. Keep the worktrees.
-   - **abandon** — discard in-flight worktrees, reset executable tasks to `pending` with
-     worktree `discarded`, blocker `—`, and resume `fresh`. For a
+   - **abandon** — after confirmation and after each active worker is confirmed stopped,
+     dispatch one `ai-drift` worker in `abandon` mode for each exact ledger-recorded
+     worktree. Only an `abandoned` return permits resetting an executable task to
+     `pending` with worktree `discarded`, blocker `—`, and resume `fresh`. For a
      `diagnosing` reservation, preserve its progress record, remove the provisional row,
-     and burn the id.
+     and burn the id after the same cleanup return.
 4. Settle report slots only after the paired worker is confirmed stopped. Promote and
    record a complete assigned staging report; if both assigned paths are absent, mark the
    slot `unused`. A mismatched, malformed, or duplicate artifact stays `blocked` for

@@ -25,15 +25,37 @@ rushed and lossy, which defeats the point.
 
 **You move what this conversation knows onto disk, then get out.** This list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Run** only the exact bounded state probes named below.
 - **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's handoff records.
 - **Read** `<main_root>/.rune/` coordination files.
-- **Write** `<main_root>/.rune/vision.md`, `decisions.md`, and `sessions/<stamp>.md`.
+- **Write** `<main_root>/.rune/vision.md`, `decisions.md`, `ledger.md` while draining, and
+  `sessions/<stamp>.md`.
+- **Delete** only an earlier `sessions/<stamp>.md` written by this same session after the
+  replacement handoff is complete and validated.
 - **When draining in-flight work**, use `pause`'s exact ledger-settlement and assigned
   report-promotion permissions; do not compose or edit report content.
 - **Talk to the user** — the paste block at the end.
 - **Dispatch subagents**, naming the skill each one must follow.
+
+## Permitted commands and probes
+
+This is the complete command interface for the parent route.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
+```
+
+The probe returns exactly one line. `ai-root` may run only its own separately bounded
+migration probe while this route follows it. Drain state comes from the ledger and worker
+returns.
+
+### Mutating lifecycle commands
+
+`none` — a drain dispatches verification and landing exactly as `pause` does; handoff
+files are normal coordination-file operations, not Git lifecycle commands.
 
 ## Coordination-root preflight
 

@@ -12,13 +12,16 @@ The execution loop. Triage → diagnose bugs → plan → dispatch → verify �
 **You exist to tell the user what is happening.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Run** only the exact bounded state probes named below.
 - **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's ledger and protocol records.
 - **Read** `<main_root>/.rune/` coordination files — enough to report status accurately.
 - **Write** `<main_root>/.rune/ledger.md`, and **append** the drain result to
   `<main_root>/.rune/PAUSED` if the flag
   appears mid-run. You never create or delete that file — `pause` and `continue` do.
+- **Write** the parent-assigned result of a worker question to
+  `<main_root>/.rune/decisions.md`, then **delete** only that worker's consumed
+  `<main_root>/.rune/decisions/open/T-nnn.md` staging file.
 - **Promote** a complete worker-authored `DRF-`, `INV-`, or `RES-` staging file to the
   exact final path already reserved in `ledger.md`, using a same-filesystem atomic
   no-replace operation. You never compose or edit report content.
@@ -29,6 +32,25 @@ from that, and this list is exhaustive:
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
+
+## Permitted commands and probes
+
+This is the complete command interface for the parent route.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
+```
+
+The probe returns exactly one line. `ai-root` may run only its own separately bounded
+migration probe while this route follows it. Every source, diff, verification, oracle,
+merge, and cleanup operation is a named worker dispatch.
+
+### Mutating lifecycle commands
+
+`none` — `ai-execute` creates task worktrees, `ai-land` merges and cleans landed work, and
+`ai-drift` discards unpublished work. The parent never runs their Git commands.
 
 ## Coordination-root preflight
 

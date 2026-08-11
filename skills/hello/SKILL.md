@@ -14,10 +14,12 @@ enough state to route correctly, route, and get out of the way.
 
 This list is exhaustive, and it is the shortest in Rune:
 
-- **Run** `git rev-parse --show-toplevel` and the bounded probes owned by `ai-root`.
+- **Run** only the exact bounded state probes named below.
 - **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
   exception for this otherwise read-only route.
 - **Read** the `<main_root>/.rune/` files named in step 1. Nothing else.
+- **Inspect** at most 20 top-level entry names, excluding Git and Rune coordination roots,
+  only to distinguish an empty project from one containing code.
 - **Talk to the user** — one question if the route is genuinely ambiguous.
 - **Route** to another skill.
 
@@ -25,6 +27,24 @@ This list is exhaustive, and it is the shortest in Rune:
 recoverable storage migration before you read state; it is the sole exception. Every
 other route earns its context by doing something; you earn yours by handing over early and
 leaving it empty for whoever you hand to.
+
+## Permitted commands and probes
+
+This is the complete command interface for the parent route.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
+find <main_root> -mindepth 1 -maxdepth 1 ! -name .git ! -name .rune ! -name .agent -print | head -20
+```
+
+The first returns exactly one line; the second returns at most 20 entry names. `ai-root`
+may run only its own separately bounded migration probe while this route follows it.
+
+### Mutating lifecycle commands
+
+`none` — this route writes nothing; any `ai-root` migration is internal to that skill.
 
 ## Coordination-root preflight
 
@@ -42,6 +62,7 @@ Cheap reads only. Never source code.
 <main_root>/.rune/PAUSED        · is work stopped?
 <main_root>/.rune/rune.yml      · initialized?
 <main_root>/.rune/vision.md     · is there a plan?
+<main_root>/.rune/decisions.md  · any decision still open?
 <main_root>/.rune/milestones.md · how far along?
 <main_root>/.rune/ledger.md     · anything in flight or waiting on the user?
 <main_root>/.rune/sessions/     · a recent session handoff?

@@ -35,9 +35,11 @@ because the situation seems to call for one.
 
 - `main_root` — the absolute orchestration checkout where merging and coordination writes happen
 - `worktree_path` — the exact absolute task worktree used by execution and verification
-- `attempt` — the positive landing attempt already incremented in schema-2 ledger state
+- `attempt` — the positive landing attempt already incremented in schema-2 ledger state;
+  required for `land` and `drift-observe`, omitted for `cleanup`
 - optional `mode` — defaults to `land`; `drift-observe` is allowed only when the task is
-  in a ledger drift freeze and the parent supplies its causal `DRF-nnn` pointer
+  in a ledger drift freeze and the parent supplies its causal `DRF-nnn` pointer; `cleanup`
+  is allowed only for a registered orphan found by `continue`
 - the task id and its task branch
 - `<main_root>/.rune/tasks/T-nnn.md` — the change surface, for judging whether a failure is even this
   task's to answer for
@@ -47,13 +49,17 @@ because the situation seems to call for one.
 - `<main_root>/.rune/rune.yml` — the oracle command and its known-red baseline
 - `<main_root>/.rune/notes/T-nnn.landing.md` — earlier landing attempts, if this is a retry
 
+The task, progress, verification, oracle, and landing-record pointers are required only for
+`land` and `drift-observe`. Cleanup receives only `main_root`, the exact existing
+`worktree_path`, task id, and exact full branch ref returned by `continue`'s bounded probe.
+
 All paths must be absolute. When `worktree_path` exists, confirm it is the registered task
 worktree in the same repository as `main_root`; never discover a replacement by scanning
 nearby worktrees. A missing path is allowed only for step 2's already-landed recovery.
 Run every main-tree Git command with `git -C <main_root>` and every task-tree probe with
 `git -C <worktree_path>`. The harness's starting directory is irrelevant.
 
-**Read the landing record first when it exists.** You are stateless — every dispatch starts
+**In `land` or `drift-observe`, read the landing record first when it exists.** You are stateless — every dispatch starts
 empty — so that file tells you what earlier attempts observed. The dispatch's `attempt` is
 authoritative: every existing block number must be unique and lower. Gaps are dead
 dispatches that wrote no outcome; a duplicate or later number is `refused`, not permission
@@ -61,7 +67,8 @@ to invent another attempt.
 
 ## Sequence
 
-Fixed order. Do not reorder, do not skip.
+For `cleanup`, skip this sequence and use the cleanup interface below. For `land` and
+`drift-observe`, this is fixed order: do not reorder or skip it.
 
 **1. Check the main tree is clean outside `.rune/`.** Run
 `git -C <main_root> status --porcelain` — anything
@@ -189,6 +196,24 @@ the merge back and do not call the task failed. Return `landed` with `cleanup: p
 record what remains; `continue` can remove the orphan later. Otherwise return
 `cleanup: complete`.
 
+## Cleanup mode
+
+`cleanup` is a narrow worktree-lifecycle interface, not a landing attempt. It receives
+only `main_root`, the exact registered `worktree_path`, task id, and exact task branch; it
+does not receive an attempt or permission to merge. Require the path to equal
+`<main_root>/.rune/worktrees/<task>`, belong to the same repository, be registered for the
+named branch, and have an empty `git status --porcelain`. Require the branch tip to be an
+ancestor of main `HEAD`. A missing or failed check returns `landing: refused` and changes
+nothing.
+
+When every check passes, run only the step 8 worktree removal and safe `branch -d`. A
+failed worktree removal returns `landing: refused`, `main: green`, the exact retained path,
+and `cleanup: pending`. After successful worktree removal, return `landing: cleaned`,
+`main: green`, the exact former path, and `cleanup: complete | branch-pending`. Failure to
+delete the already-merged branch is `branch-pending`, not a reason to recreate the path or
+change main. This mode writes no landing attempt block and never touches source,
+coordination content, or the container directory.
+
 ## The landing record
 
 `<main_root>/.rune/notes/T-nnn.landing.md` — your state file, and the counterpart to the executor's
@@ -280,12 +305,29 @@ cleanup: complete | pending   # only for landed
 `not_landed` is valid only for `mode: drift-observe`; the record and return name the
 causal drift id. Normal landing never emits it.
 
+Cleanup has its own complete envelope because no artifact was landed or recorded:
+
+```
+task: T-014
+landing: cleaned | refused
+main: green
+worktree_path: /workspace/acme/.rune/worktrees/T-014
+branch: refs/heads/task/T-014
+summary: clean merged orphan removed | exact refusal reason
+cleanup: complete | branch-pending | pending
+```
+
+`refused` keeps the registered worktree and uses `cleanup: pending`. `cleaned` means the
+worktree was removed; `branch-pending` may leave only the already-merged branch. Cleanup
+omits `attempt`, `verified_commit`, `escalate`, and `detail`.
+
 `main` is not decoration — it is the parent's dispatch gate. It must not send new work into
 a tree you have just told it is red.
 
-Keep the task's worktree in every outcome except a `landed` result whose cleanup completed.
-The fix goes back into that worktree, and discarding it throws away work that passed
-verification for the sake of a publication or merge problem.
+Keep the task's worktree for every normal outcome except `landed` with
+`cleanup: complete`. In cleanup mode, `refused` keeps it and `cleaned` proves it was
+removed. The fix goes back into a retained worktree; discarding it for a publication or
+merge problem would throw away verified work.
 
 ## What you are not
 

@@ -26,7 +26,7 @@ record to its assigned staging path plus the handoff below, and discards its own
 Every executor attempt receives a fresh report reservation before it starts. If no drift
 is found, the parent marks that slot unused; the worker never repurposes it.
 
-Two bounded modes reuse the same ownership rules without claiming to have discovered new
+Four bounded modes reuse the same ownership rules without claiming to have discovered new
 source facts:
 
 - **record-only** receives the same assigned id, staging and final paths, one or more
@@ -44,6 +44,21 @@ source facts:
   `status: quiesced`, the task id, causal drift id, and `worktree: discarded`. If the task
   commit is reachable from main, or cleanup cannot prove the source is unpublished, stop
   and return `status: refused`; a `landing` task must be reconciled by `ai-land` instead.
+- **abandon** receives a task id and the ledger's exact absolute `worktree_path` after
+  `pause` has confirmed the active worker stopped and the user accepted the loss. Prove
+  the path is the registered task checkout and its tip is not reachable from main, then
+  discard only that worktree and task branch. Write no drift record or handoff and return
+  `status: abandoned`, the task id, and `worktree: discarded`. A reachable commit,
+  mismatched path, or failed cleanup is `status: refused`; never delete landed work.
+- **discard-empty** receives a task id, the exact registered `worktree_path` and task
+  branch, plus `main_root`, after `continue` found a dead executor with an empty diff and
+  no commits ahead of main. Re-prove that the worker is stopped, the path and branch match
+  the task, `git status --porcelain` is empty, and the branch has zero commits after its
+  merge-base with current main. Then remove only that worktree and use safe `branch -d`.
+  Return `status: discarded`, `worktree: discarded`, and
+  `cleanup: complete | branch-pending`. Any failed precondition or failed worktree removal
+  is `status: refused` and leaves the registered path intact. This mode writes no report or
+  handoff and never accepts a non-empty or ahead checkout.
 
 Each mode is one dispatch and one sole writer. A record writer first validates a complete
 collision-resistant sibling candidate, then atomically installs it at the exact staging

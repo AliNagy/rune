@@ -19,6 +19,8 @@ from that, and this list is exhaustive:
   name a command from.
 - **Write** `<main_root>/.rune/rune.yml`, the `<main_root>/.rune/` scaffolding, and one
   line in `<main_root>/.gitignore`.
+- **Run** only the exact state probes and conditionally authorized lifecycle command named
+  below.
 - **Talk to the user** — the report at the end.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
   `ai-taskfmt` says which skill does which job.
@@ -27,19 +29,39 @@ from that, and this list is exhaustive:
 command that is not one of the **bounded state probes named below**. Unbounded output is
 exactly what this skill exists to keep out of the session everything else starts from.
 
-The probes you may run, and nothing else:
+## Permitted commands and probes
 
-```
+This is the complete command interface for the parent route. Replace placeholders with
+the already-resolved absolute value; do not add flags or substitute a broader command.
+
+### State probes
+
+```rune-commands
+git rev-parse --show-toplevel
 git status --porcelain | head -20
 git rev-parse HEAD
-git rev-parse --show-toplevel
-git worktree list --porcelain
+git worktree list --porcelain | awk '/^worktree / { n++ } END { print n }'
+serena.activate_project(project="<main_root>")
+serena.find_symbol(relative_path="<probe_file>", name_path="<exact_name_path>", include_body=false)
 ```
 
-plus Serena `activate_project` and a single symbol query to confirm the language server is
-up. Each returns a fixed number of lines whatever the project's size — see *Bounded state
-probes* in `ai-taskfmt`. Anything else, including any build or test command, is a
-dispatch.
+The Git bounds are, in order: exactly one line, at most 20 lines, exactly one line, and
+exactly one count line. Serena activation returns one status. The survey supplies one
+repo-relative `probe_file` and one full, exact `name_path`; `find_symbol` uses the fixed
+parameters above and must return zero or one signature-only symbol. More than one result
+is a failed probe, not permission to broaden or repeat it. Anything else, including any
+build or test command, is a dispatch.
+
+### Mutating lifecycle commands
+
+```rune-commands
+git -C <main_root> init --quiet
+```
+
+This is permitted only after `git rev-parse --show-toplevel` proves no repository exists
+and the user explicitly accepts initialization. It emits no normal output. Coordination
+creation and the `.gitignore` update are file operations; migration is internal to
+`ai-root`, and Git task lifecycle belongs to task-bound workers.
 
 ## When it runs
 
@@ -58,7 +80,7 @@ inspect until the stack is chosen. Vision knows this and orders it correctly.
 First resolve `main_root`, keep it constant, and capture the working-tree baseline before
 any repository write or coordination read:
 
-```
+```rune-commands
 git rev-parse --show-toplevel       # stable main_root for dispatches and coordination
 git status --porcelain | head -20   # clean, or the user must accept the dirt
 ```
@@ -69,26 +91,31 @@ diagnostic you report before doing anything else.
 
 After it succeeds, finish the remaining bounded probes:
 
-```
+```rune-commands
 git rev-parse HEAD
-git worktree list --porcelain
+git worktree list --porcelain | awk '/^worktree / { n++ } END { print n }'
 ```
 
 These four, and nothing else. The `head -20` is the bound: a repo with 500 dirty files is
 itself the finding, and you only need to know it is not clean.
 
 Rune isolates every executor in a worktree, so a repo that is not under git loses its
-rollback story. If there is no git, say so plainly and offer to `git init` — this is the
-first thing to fix, before anything else.
+rollback story. If there is no git, use the harness workspace root as `main_root`, say so
+plainly, and offer the exact `git -C <main_root> init --quiet` lifecycle command above.
+Run it only on a clear yes. A newly initialized repository has no `HEAD`, so stop after
+success and ask the user to create its initial commit; do not restart step 1 or run
+`git rev-parse HEAD` against an unborn branch. The next init invocation begins normally
+after that commit exists. A decline stops init before `ai-root`.
 
 Uncommitted changes are not fatal but must be surfaced: they will show up in every task's
 `git diff` and corrupt the record of what each task actually changed.
 
 ### 2. Serena
 
-`activate_project` on the repo root. Confirm the language server comes up and one symbol
-query returns. A cold or broken language server silently degrades every downstream agent
-into whole-file reading, which is precisely what the budget cannot absorb.
+Run the exact `serena.activate_project` operation above. The signature-only symbol probe
+runs after the survey supplies its fixed file and full name path. A cold or broken
+language server silently degrades every downstream agent into whole-file reading, which
+is precisely what the budget cannot absorb.
 
 Record whether it worked. If Serena is unavailable, note it — `ai-serena` fallbacks
 apply and the effective budget per task drops considerably.
@@ -97,6 +124,11 @@ apply and the effective budget per task drops considerably.
 
 Dispatch a subagent that follows `ai-survey` with `main_root` and absolute output pointers.
 It writes `<main_root>/.rune/map.md` and Serena memories, and returns a ≤300 token digest.
+Require that return to include `serena_probe: <repo-relative-file>#<full-name-path>` for one
+symbol it resolved while surveying, or `serena_probe: unavailable`. For a supplied probe,
+run the exact `serena.find_symbol` operation above once and record whether it returned that
+one signature. Do not choose another symbol or retry with fuzzy matching. If unavailable
+or unsuccessful, record Serena as degraded and continue with `ai-serena` fallbacks.
 
 ### 4. Commands and the oracle
 
@@ -148,9 +180,10 @@ confidence:
   oracle: high
 ```
 
-Scaffold the rest of `<main_root>/.rune/` per `ai-taskfmt`: `drafts/`, `tasks/`, `notes/`,
-`notes/open/`, `drift/`, `drift/open/`, and, only when no ledger exists, this valid empty
-schema-2 ledger (fill the
+Ensure every entry in `ai-root`'s authoritative `rune-directory-manifest` exists. This is
+create-if-missing and idempotent: accept an existing real directory, never clear its
+contents, and stop on a symbolic link or non-directory at any required path. Only when no
+ledger exists, write this valid empty schema-2 ledger (fill the
 top-level values from the init result rather than leaving placeholders):
 
 ```markdown

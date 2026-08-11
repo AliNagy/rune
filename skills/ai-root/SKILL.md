@@ -29,14 +29,25 @@ exists. Every caller keeps `main_root` constant after this protocol returns.
 ## Allowed actions
 
 This protocol may inspect the two root entries, inspect Rune coordination artifacts needed
-to establish ownership, and run the bounded `git worktree list --porcelain` probe. It may
+to establish ownership, and run the bounded registered-legacy-worktree probe below. It may
 rename the legacy coordination directory, update structured Rune pointers, maintain the
 one worktree ignore entry, and create or remove its migration marker, lock, and exact
 atomic-write candidates. Inside a resolved canonical root it may also create the exact
-`notes/open/` and `drift/open/` report-staging directories defined below.
+canonical directories defined below.
 
 It does not read source code, inspect task-worktree contents, run project commands, or
 change anything outside those coordination paths and the exact `.gitignore` entry.
+
+Its complete command interface is one state probe and no Git lifecycle mutation:
+
+```rune-commands
+git -C <main_root> worktree list --porcelain | awk -v legacy="<main_root>/.agent" '/^worktree / { path=substr($0,10); if (path==legacy || index(path, legacy "/")==1) { n++; if (n<=20) print path } } END { print "matching_worktrees=" n }'
+```
+
+This reads every registration but returns at most 20 matching paths plus one count line.
+Any positive count stops migration; a count above 20 is reported with the first 20 paths.
+Filesystem creation, atomic rename, and exact cleanup below are protocol file operations,
+not additional shell commands granted to its public caller.
 
 ## Resolution states
 
@@ -54,15 +65,42 @@ A root entry that is a symbolic link or is not a directory is unsafe. A coordina
 artifact that is a symbolic link, a symlinked `worktrees/` directory, or a symlinked or
 non-file `.gitignore` is also unsafe. Stop without following or replacing it.
 
-## Canonical report-staging layout
+## Canonical directory layout
 
-Before returning any existing, newly initialized, or migrated canonical root, ensure the
-exact directories `<main_root>/.rune/notes/open/` and
-`<main_root>/.rune/drift/open/` exist. Create missing `notes/`, `drift/`, or `open/`
-directories idempotently. If any component already exists as a symlink or non-directory,
-stop and report that exact path; never follow, replace, or merge it. This is the layout
-upgrade for repositories created before report staging existed, so every `resolve` caller
-gets safe destinations without a separate schema migration.
+This is the one authoritative directory manifest. Entries are normalized relative paths
+under `<main_root>/.rune/`; no other skill repeats or extends this list.
+
+```rune-directory-manifest
+drafts/
+tasks/
+notes/
+notes/open/
+drift/
+drift/open/
+decisions/
+decisions/open/
+sessions/
+worktrees/
+```
+
+The scaffold operation has these machine-checked semantics:
+
+```rune-scaffold-semantics
+create_missing=true
+preserve_existing_directory=true
+preserve_existing_content=true
+reject_symlink=true
+reject_non_directory=true
+never_clear=true
+never_remove_container=true
+```
+
+Before returning any existing, newly initialized, or migrated canonical root, ensure every
+manifest entry exists. Create missing directories idempotently and never clear an existing
+one. If any component already exists as a symlink or non-directory, stop and report that
+exact path; never follow, replace, or merge it. This is the layout upgrade for repositories
+created by earlier Rune versions, so every `resolve` caller gets safe destinations without
+a separate schema migration.
 
 ## Establish legacy ownership
 
@@ -88,9 +126,9 @@ foreign `.agent/` directory look like Rune state.
 
 ## Protect registered worktrees
 
-Before renaming, inspect `git worktree list --porcelain`. If Git registers a worktree
-exactly at the legacy root or anywhere below it, stop and list every path. Renaming its
-parent would strand Git metadata and possibly live work.
+Before renaming, run the exact bounded probe above. If Git registers a worktree exactly at
+the legacy root or anywhere below it, stop, report the total, and list the returned paths.
+Renaming its parent would strand Git metadata and possibly live work.
 
 Do not remove or prune those worktrees. The user must finish, preserve, relocate, or
 remove them explicitly before retrying. A real but unregistered `worktrees/` directory is
