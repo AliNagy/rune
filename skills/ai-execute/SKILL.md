@@ -254,13 +254,13 @@ so the progress file is authoritative and the return repeats the ids for routing
 
 ## Return (≤200 tokens)
 
-```
+```rune-return
+work: T-nnn
+summary: <one line, plain words>
 status: done | drifted | budget | blocked | question
-task: T-nnn
-attempt: 2
 worktree: kept | discarded        # done always means kept until ai-land cleans it
 worktree_path: /workspace/acme/.rune/worktrees/T-nnn
-summary: <one or two lines>
+attempt: 2
 base_commit: a3f91c2       # required for status: done
 artifact_commit: 4a91c02   # required for status: done
 drift: DRF-nnn        # if any

@@ -37,10 +37,13 @@ and the ambiguity you exist to resolve is the exact thing that contamination des
 Follow `ai-serena`. Look at the minimum that settles the question — usually a symbol
 overview and one or two signatures. Do not explore. Do not diagnose. Do not design a fix.
 
-Return exactly:
+Return exactly, within the canonical 200-token budget:
 
-```
+```rune-return
+work: request-1
+summary: existing behavior is wrong in SessionMiddleware.handle
 type: bug | feature | refactor | investigation
+worktree: none
 evidence: <what you observed, with a file or symbol reference>
 shape: <one line on likely size and where it lands>
 milestone: <id if it fits an existing scope, else none, else conflicts with M-nn>

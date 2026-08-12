@@ -46,6 +46,17 @@ For a drift replan, the reservation must be a fresh id outside the protocol's `r
 set, and the diagnosis pointer and branch must belong to that fresh id. The old task's
 diagnosis is historical context only; reject any attempt to transfer it into a replacement.
 
+The one exception is a completed-legacy-mitigation repair protocol. It declares
+`repair: completed_legacy_mitigation`, `legacy_mitigation: T-nnn`,
+`reserved_root_cause: T-mmm`, and the assigned absolute task and repair paths. It
+deliberately omits `reserved_task`: the completed legacy task and its progress/verification
+evidence are historical diagnosis input, while the parent has already allocated the new
+root-cause identity. The reconciler must echo and use that id; it never allocates another.
+Reject
+this mode unless the supplied ledger shows that old task `done`, its immutable file has
+`type: bug` and legacy `kind: mitigation`, and the pending `mitigation-repair` row binds
+the exact run, old id, and artifact path.
+
 Milestone-graph work from `rune:vision` is the only job here without a protocol pointer;
 it creates milestones rather than executable tasks.
 
@@ -79,7 +90,7 @@ shared context.
 
 ## Which job you were given
 
-You are dispatched for one of three jobs, and never more than one at a time. The assigned
+You are dispatched for one of four jobs, and never more than one at a time. The assigned
 work id and pointers say which job it is; conversation context is never an input.
 
 **Milestone graph** (from `rune:vision`) — read `vision.md`, `decisions.md`, and where they
@@ -116,6 +127,24 @@ Put only harmless, reversible internal choices under `assumptions`. Put every di
 behaviour/scope ambiguity under `decision_candidates` with options and a recommendation;
 do not silently choose it.
 
+**Completed mitigation repair** (from `rune:continue`) — the work id names the fresh run
+bound by the pending ledger assignment. Read the repair protocol, legacy task, its durable
+evidence, and milestone acceptance. Write exactly one new immutable `type: bug`,
+`remediation: root_cause`, `root_cause_followup: none` task in the same milestone and the
+exact assigned `mitigation-repair.md` artifact from `ai-taskfmt`; never edit the old task.
+Install the reserved task first and repair artifact second with atomic no-replace writes.
+On a recovery dispatch, a valid existing reserved task is immutable input: do not overwrite
+it; validate it and create only the missing repair artifact. An existing repair artifact
+without the task, or either output with mismatched ids or pointers, returns blocked without
+writing another output.
+The new task must address the causal defect left open by the mitigation and carry its own
+valid verification contract. Write both complete artifacts before returning
+`plan: reconciled`; if the evidence cannot support a root-cause contract, return
+`plan: blocked`, write neither task nor repair artifact, and return a lowercase `blocker`,
+stable single-token-or-pointer `detail`, and objective `unblocks_when`. Do not read or write
+the ledger, reuse or allocate a final id, create
+a planner draft, or turn this relationship into replacement lineage.
+
 **Reconcile** (from `rune:work`) — the work id names one run such as `M-03/R-002`, and you
 are given the run's protocol pointer plus pointers to two or three completed draft
 artifacts from distinct planner slots under that exact run. First fail closed if a pointer
@@ -145,16 +174,21 @@ code and recording that result in each disposition. Do not edit or delete an old
 
 Every return is ≤200 tokens:
 
-```
+```rune-return
+work: M-03/R-002/P-01       # planner; M-03/R-002 for reconciler
+summary: ids, one-line titles, and dependency edges; or the blocking pointer
 plan: drafted | reconciled | blocked | graph
-task: M-03/R-002/P-01       # planner; M-03/R-002 for reconciler
+worktree: none
 artifact: /workspace/acme/.rune/drafts/M-03/R-002/P-01.md # milestones.md for graph
 artifacts: <main_root>/.rune/tasks/T-021.md, <main_root>/.rune/tasks/T-022.md
 replacement_artifact: <main_root>/.rune/drafts/M-03/R-004/replacements.md # replan only
-summary: ids, one-line titles, and dependency edges; or the blocking pointer
+repair_artifact: <main_root>/.rune/drafts/M-03/R-005/mitigation-repair.md # repair only
 ```
 
 Nothing longer belongs in the return — the complete cuts and final contracts are on disk.
+Graph work and ordinary planning/reconciliation return `worktree: none`. A confirmed-bug
+planner or reconciler that received the reserved diagnosis checkout instead returns
+`worktree: kept` plus that exact `worktree_path`; it never discards diagnosis evidence.
 
 ## You may be one of several
 
@@ -269,7 +303,8 @@ Before writing files, check each task against the generic contract:
 - Is there exactly one outcome, and is it checkable?
 - Does the change surface fit in five files?
 - Is there a `forbidden` list, and does it have reasons?
-- Do `type` and `verification` form one allowed pair from `ai-taskfmt`?
+- Do `type`, `remediation`, `root_cause_followup`, and `verification` form one allowed
+  task contract from `ai-taskfmt`?
 - Does the check name an executable command, assertion, and mode-specific before/after result?
 - For `red_then_green`, does it say why the check fails before the change?
 - For `green_baseline`, are tests and fixtures absent from the change surface?
@@ -279,7 +314,9 @@ Then run the loaded protocol's checks:
 
 - **Bug / `ai-bug`:** the task is grounded in the already-observed reproduction; the
   reproduction becomes the regression test; boundary cases appear in acceptance; and a
-  mitigation is explicit and has a root-cause follow-up. The exact diagnosis check and
+  mitigation uses `remediation: mitigation` and links a local `root_cause_followup` whose
+  target uses `remediation: root_cause`. The reconciler maps that local link to final ids
+  and writes both immutable files before registering either. The exact diagnosis check and
   commit are supplied, exactly one proposed task is `reservation: primary`, and that task
   owns the check and root-cause fix. No confirmed reproduction means no task.
 - **Feature / `ai-feature`:** the scope boundary and exclusions are present; every

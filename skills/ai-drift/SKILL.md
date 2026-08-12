@@ -41,14 +41,14 @@ source facts:
   absolute `worktree_path`. Wait until the task's prior worker is confirmed stopped, then
   discard that worktree and task branch without copying or landing their source state.
   Write no new drift record. Preserve every coordination artifact and return
-  `status: quiesced`, the task id, causal drift id, and `worktree: discarded`. If the task
+  `status: quiesced`, `work: T-nnn`, causal drift id, and `worktree: discarded`. If the task
   commit is reachable from main, or cleanup cannot prove the source is unpublished, stop
   and return `status: refused`; a `landing` task must be reconciled by `ai-land` instead.
 - **abandon** receives a task id and the ledger's exact absolute `worktree_path` after
   `pause` has confirmed the active worker stopped and the user accepted the loss. Prove
   the path is the registered task checkout and its tip is not reachable from main, then
   discard only that worktree and task branch. Write no drift record or handoff and return
-  `status: abandoned`, the task id, and `worktree: discarded`. A reachable commit,
+  `status: abandoned`, `work: T-nnn`, and `worktree: discarded`. A reachable commit,
   mismatched path, or failed cleanup is `status: refused`; never delete landed work.
 - **discard-empty** receives a task id, the exact registered `worktree_path` and task
   branch, plus `main_root`, after `continue` found a dead executor with an empty diff and
@@ -66,6 +66,9 @@ path with no-replace semantics. The operation must fail if staging already exist
 worker also refuses an existing final path; the parent promotes a complete staging file
 instead of re-dispatching. A retry after a crash receives the same assigned paths or the same
 registered worktree; it never allocates another drift id or guesses a nearby checkout.
+Every mode also returns the canonical one-line `summary`; record-only uses
+`worktree: none`, and every task-checkout mode returns its exact `worktree_path` with
+`kept | discarded`.
 
 ## The tripwire
 
@@ -131,15 +134,15 @@ historical evidence. Only task source state is discarded.
 
 Then return to the parent (≤200 tokens):
 
-```
+```rune-return
+work: T-016
+summary: handle() has two call sites; T-016 assumed one. T-018/T-019 also affected.
 status: drifted
-task: T-016
+worktree: discarded
+worktree_path: /workspace/acme/.rune/worktrees/T-016
 attempt: 2
 drift: DRF-003
 artifact: /workspace/acme/.rune/drift/open/DRF-003.md
-worktree: discarded
-worktree_path: /workspace/acme/.rune/worktrees/T-016
-summary: handle() has two call sites; T-016 assumed one. T-018/T-019 also affected.
 ```
 
 The parent accepts only the assigned id and staging pointer, validates the record, then
@@ -149,12 +152,13 @@ file.
 
 A separate record-only dispatch returns the same interface with its own outcome:
 
-```yaml
+```rune-return
+work: T-016
+summary: immutable task evidence requires replanning
 status: recorded
-task: T-016
+worktree: none
 drift: DRF-003
 artifact: /workspace/acme/.rune/drift/open/DRF-003.md
-summary: immutable task evidence requires replanning
 ```
 
 ## Stopping for budget
@@ -214,17 +218,17 @@ rationale: -
 Then write your handoff, **keep** the worktree — the work so far is usually fine, it is
 just blocked — and return:
 
-```
+```rune-return
+work: T-017
+summary: expired sessions - delete or flag? blocked until decided
 status: question
-task: T-017
-attempt: 2
 worktree: kept
 worktree_path: /workspace/acme/.rune/worktrees/T-017
+attempt: 2
 decision: pending-id
 decision_artifact: /workspace/acme/.rune/decisions/open/T-017-e2.md
 resume_at: step:2
 detail: /workspace/acme/.rune/notes/T-017.md
-summary: expired sessions - delete or flag? blocked until decided
 ```
 
 Give a recommendation every time. "I don't know, you decide" wastes the round trip; the

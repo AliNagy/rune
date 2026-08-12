@@ -58,9 +58,13 @@ merge, and cleanup operation is a named worker dispatch.
 ## Coordination-root preflight
 
 Before any coordination read or dispatch, resolve `main_root` once with
-`git rev-parse --show-toplevel`, then follow `ai-root` with that absolute root and
-`mode: resolve`. Stop and report any failure it returns. Resolve every `.rune/...` read
+`git rev-parse --show-toplevel`, then follow `ai-root` with `work: coordination-root`,
+that absolute root, and `mode: resolve`. Stop and report any failure it returns. Resolve every `.rune/...` read
 against the returned root and carry the same `main_root` in every dispatch.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 **Anything not on that list is a dispatch.** Writing any other file, running any command,
 reading any source file — each one is a subagent's job, without exception and without a
@@ -82,6 +86,10 @@ Two consequences are load-bearing:
 
 - Every subagent returns **≤200 tokens**. Anything longer goes to disk; you read it only
   if you must act on it.
+- Validate every return through `ai-taskfmt`'s common envelope before its outcome table:
+  assigned `work`, one-line `summary`, one primary outcome, and
+  `worktree: none | kept | discarded` with a path exactly when required. Apply the
+  deterministic legacy `task` normalization only to historical returns.
 - You **re-read `ledger.md` from disk** between dispatches. Never carry ledger state in
   context — a stale in-memory copy is how you dispatch a task someone already finished.
 - Validate schema 2 on every read and every candidate replacement, per `ai-ledger`. An
@@ -143,10 +151,16 @@ three triage dispatches, run concurrently. Never hand one triage agent a
 list, even when the issues sound related: "sounds related" is a hypothesis, and batching
 them destroys the independence needed to test it.
 
+Assign each request a batch-local `work: request-N` token and require the return to echo
+it; the token routes concurrent triage results but never enters the global task-id space.
+
 Each returns:
 
-```
+```rune-return
+work: request-1
+summary: existing behavior is wrong in SessionMiddleware.handle
 type: bug | feature | refactor | investigation
+worktree: none
 evidence: SessionMiddleware.handle exists and is called; rotate() returns null (stub)
 shape: single fix in src/auth — reproduction likely straightforward
 milestone: M-03 (fits scope) | none | conflicts with M-03 scope
@@ -199,9 +213,22 @@ After triage returns `bug`:
    `attempts: d1/e0/v0/l0`, zero failures, no finding or blocker, and
    `resume_at: diagnose`, `replaced_by: —`. This reserves identity and claims diagnosis;
    no task spec exists and the row is not executable.
-4. Dispatch one `ai-bug` worker with that task id, `attempt: 1`, `main_root`, `worktree_path`, and
+4. Dispatch one `ai-bug` worker with `work: T-nnn`, `attempt: 1`, `main_root`,
+   `worktree_path`, and
    absolute protocol and `notes/T-nnn.progress` pointers. The worker creates or validates
    the exact worktree before writing the reproduction check.
+
+```rune-dispatch
+follow: ai-bug
+work: T-nnn
+attempt: 1
+main_root: /workspace/acme
+worktree_path: /workspace/acme/.rune/worktrees/T-nnn
+pointers:
+  protocol: /workspace/acme/.rune/drafts/M-03/R-002/protocol.md
+  progress: /workspace/acme/.rune/notes/T-nnn.progress
+```
+
 5. Act on its durable result:
    - `reproduced` — require a clean kept worktree, `diagnosis_base_commit`, and
      `diagnosis_commit`; clear any blocker, set `resume_at: plan:<this run>`, and continue
@@ -277,7 +304,10 @@ Use this exact two-phase protocol:
    reconciler maps the selected `reservation: primary` task to the protocol's already-used
    `T-nnn`; it allocates ids only for any additional tasks.
 6. Accept `plan: reconciled` only with final task paths, one-line titles, and dependency
-   edges. Then register exactly those tasks in `<main_root>/.rune/ledger.md` in one
+   edges. Parse every canonical task contract before registration. A mitigation must link
+   a different final task in the same batch and milestone whose immutable contract is a
+   root-cause bug; both files must exist and validate before either row is registered.
+   Then register exactly those tasks in `<main_root>/.rune/ledger.md` in one
    validated parent update. New rows start `pending`, `d0/e0/v0/l0`, zero failures, no
    finding or blocker, `resume_at: fresh`, `replaced_by: —`, and no worktree. For a bug,
    update the existing
@@ -342,8 +372,9 @@ contracts:
    this reproduced reservation to `pending` instead of adding a second row for it.
 4. Accept reconciliation only when every returned task path is new and the replacement
    artifact maps every retiring id exactly once to `none` or new ids, maps every new id at
-   least once, and leaves no live dependency on a retiring id. Never overwrite or delete
-   any old task file.
+   least once, leaves no live dependency on a retiring id, and every mitigation links a
+   validated same-milestone root-cause task in the replacement set. Never overwrite or
+   delete any old task file.
 5. After every new file exists, perform the one ledger transaction from `ai-ledger`: add
    the new `pending` rows (or finalize the fresh reproduced bug reservation) and move all
    old rows to terminal `retired` with their immediate `replaced_by` values. If validation
@@ -496,13 +527,13 @@ is never recycled.
 
 Executors report ≤200 tokens:
 
-```
+```rune-return
+work: T-014
+summary: rotate() implemented and wired; required verification evidence recorded
 status: done | drifted | budget | blocked | question
-task: T-014
-attempt: 2
 worktree: kept | discarded        # done requires kept until ai-land cleans it
 worktree_path: /workspace/acme/.rune/worktrees/T-014
-summary: rotate() implemented and wired; required verification evidence recorded
+attempt: 2
 base_commit: a3f91c2       # required for done; repeated from the progress file
 artifact_commit: 4a91c02   # required for done; the task branch HEAD
 drift: DRF-003          # if any
@@ -590,6 +621,11 @@ one did it.
 
 Five normal outcomes (`not_landed` exists only for drift-observe recovery):
 
+Consume post-merge oracle evidence without translation: `landed` requires
+`oracle_result: passing | none`; `reverted` requires `oracle_result: failing`. `none` is valid only when
+`rune.yml` has no project oracle. A contradictory or legacy `pass | fail` value is a
+malformed landing return, not a synonym the parent guesses at.
+
 | `landing:` | What happened | What you record |
 |---|---|---|
 | `landed` | exact verified commit merged, oracle passed | `done`, blocker `—`, resume `—`, worktree `merged` or cleanup-pending absolute path |
@@ -649,7 +685,7 @@ invisible.
 written an open decision record and stopped.
 
 The record arrives in `<main_root>/.rune/decisions/open/T-nnn-eN.md` with no id. Require
-the path, `raised_by`, `source_attempt`, returned task, and persisted executor attempt to
+the path, `raised_by`, `source_attempt`, returned `work`, and persisted executor attempt to
 match. **Assign the
 `DEC-nnn`, move it into `decisions.md`, and delete the open file.** That hop is yours
 because id allocation cannot be done safely by three concurrent workers.

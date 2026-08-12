@@ -82,6 +82,31 @@ T-014 done · rotate refresh tokens
 Next: T-015, the refresh endpoint.
 ```
 
+If the task is a mitigation, join the ledger row to the immutable task fields and keep the
+temporary nature visible until the linked root-cause task is done:
+
+```
+T-020 done · stop duplicate refresh attempts (mitigation)
+
+- immediate retry storm is contained
+- root cause remains scheduled: T-021, pending
+
+Next: T-021, remove the refresh race at its source.
+```
+
+Report the relationship as `mitigation T-020 → root-cause T-021`; never call the cause
+fixed, omit the linked status, or count the mitigation as completing that follow-up.
+For a completed legacy `kind: mitigation` task whose immutable bytes predate the canonical
+fields, perform the same join through exactly one linked `mitigation-repair` dispatch row
+and its matching immutable repair artifact. Use the artifact's `root_cause_followup`; do
+not duplicate it into a mutable task column or infer it from titles. A pending, missing,
+duplicate, or invalid repair is reported as repair work and prevents a completed-milestone
+claim.
+For a blocked repair, show the reserved root-cause id as unregistered, the stable `detail`,
+and the exact `unblocks_when` condition. Never describe it as queued or automatically
+retrying; a new dispatch is permitted only after that durable condition is observed and
+the parent changes the same reservation back to pending.
+
 ## Reporting a milestone
 
 ```

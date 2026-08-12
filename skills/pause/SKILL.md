@@ -68,10 +68,15 @@ each exact unpublished task worktree and branch.
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
-follow `ai-root` with that absolute root and `mode: initialize` before setting the flag or
+follow `ai-root` with `work: coordination-root`, that absolute root, and
+`mode: initialize` before setting the flag or
 reading state. Stop and report any failure it returns. Resolve every coordination path
 against the returned root. Verification and landing dispatches must carry `main_root`, the
 task's exact absolute `worktree_path` from the ledger, and absolute pointers.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 **Anything not on that list is a dispatch** — including the verification and the checks in
 the drain below. You do not run them; you dispatch them and record what comes back.

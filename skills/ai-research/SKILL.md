@@ -326,11 +326,12 @@ initiative.
 
 ## 12. Return (≤200 tokens)
 
-```yaml
-research: answered | blocked
-task: RES-007
-artifact: /workspace/acme/.rune/notes/open/RES-007.md # answered only
+```rune-return
+work: RES-007
 summary: two unresolved advisories make the package unsafe for untrusted input
+research: answered | blocked
+worktree: none
+artifact: /workspace/acme/.rune/notes/open/RES-007.md # answered only
 ```
 
 Return only the assigned id and staging pointer. Never write the final report path or

@@ -136,18 +136,19 @@ entire purpose of this protocol. Do not close it on your own initiative.
 
 ## Return (≤200 tokens)
 
-```yaml
+```rune-return
+work: INV-004
+summary: dashboard load is dominated by four sequential database queries
 investigation: answered | blocked
-task: INV-004
+worktree: none
 artifact: /workspace/acme/.rune/notes/open/INV-004.md # answered only
-research: answered | recorded | unused | blocked    # companion slot only
+companion_research: answered | recorded | unused | blocked # companion slot only
 research_task: RES-007                              # companion slot only
 research_artifact: /workspace/acme/.rune/notes/open/RES-007.md # answered; final path when recorded
 blocker: outside-evidence-unavailable                # blocked only
-summary: dashboard load is dominated by four sequential database queries
 ```
 
-Report the investigation and companion-research outcomes independently so the parent can
+Report the investigation outcome and conditional `companion_research` result independently so the parent can
 settle both reservations. `recorded` is only for recovery with a supplied RES final
 pointer. If nested research blocks, return both outcomes as `blocked` and the same
 objective blocker; if research succeeds but the investigation later blocks, return its RES

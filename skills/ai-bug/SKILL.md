@@ -11,12 +11,19 @@ description: Use when something that used to work no longer does, or a request i
 Bug diagnosis is task-bound even though the immutable task specification does not exist
 yet. The parent reserves the task identity first and dispatches all of these:
 
-- `task: T-nnn`
-- `attempt: N`, matching the diagnosis counter already persisted by the parent
-- absolute `main_root`
-- absolute `worktree_path` at `<main_root>/.rune/worktrees/T-nnn`
-- the run's absolute `protocol.md` pointer, whose `reserved_task` matches `task`
-- the absolute `<main_root>/.rune/notes/T-nnn.progress` pointer
+```rune-dispatch
+follow: ai-bug
+work: T-nnn
+attempt: N
+main_root: /workspace/acme
+worktree_path: /workspace/acme/.rune/worktrees/T-nnn
+pointers:
+  protocol: /workspace/acme/.rune/drafts/M-03/R-002/protocol.md
+  progress: /workspace/acme/.rune/notes/T-nnn.progress
+```
+
+`attempt` matches the diagnosis counter already persisted by the parent, and the
+protocol's `reserved_task` must match `work`.
 
 Reject a missing, relative, or mismatched input. Never infer the repository from the
 worker's starting directory, read the ledger, allocate another id, or create an anonymous
@@ -90,8 +97,15 @@ consists of tolerating bad state rather than preventing it, you have found a sym
 
 Sometimes a symptom fix is the right call — production is down and the root cause sits
 three modules away. That is legitimate, but it must be **explicit**: mark the task
-`kind: mitigation`, and file a follow-up task for the cause. Never let a mitigation be
-recorded as a fix.
+`remediation: mitigation`, link `root_cause_followup` to a separate root-cause bug task,
+and preserve both in the reconciled cut. Never let a mitigation be recorded as a fix or
+accepted without that durable follow-up. Legacy `kind: mitigation` means the same thing
+during recovery; it must never be normalized to a root-cause fix.
+
+Choosing temporary containment over the cause changes scope. Unless the request already
+settles it, record it as a planning decision candidate; the parent resolves that choice
+before final reconciliation. Diagnosis may recommend mitigation, but it does not silently
+authorize one.
 
 ## 3. The reproduction becomes the test
 
@@ -129,8 +143,11 @@ not a regression test.
 Most bugs are **one task**. Diagnosis is the expensive half and it is already done by the
 time the task is written; the change itself is usually small and local.
 
-Cut a second task only when the root cause fix and the mitigation are genuinely separate
-work, or when the cause spans subsystems.
+Cut a second task when a mitigation is accepted: the mitigation task names the other
+task's final id in `root_cause_followup`, and that target is the `remediation: root_cause`
+bug task. Also cut separately when the cause spans subsystems. The reserved primary task
+owns the reproduction and root-cause fix; a mitigation uses another id and never replaces
+that primary contract.
 
 Acceptance for a bug task:
 
@@ -153,7 +170,8 @@ Triage guesses from a sentence. You have now looked at the code. Two common corr
   to surface, then a feature or refactor.
 
 Say so plainly and reroute. Reclassifying early is cheap; discovering it three tasks in
-is not. Append `diagnosis: reclassified` plus `type: feature | refactor | investigation`
+is not. Append `diagnosis: reclassified` plus
+`reclassified_as: feature | refactor | investigation`
 to the progress file, discard the reserved worktree and branch, and return the id to the
 parent as burned. A change-producing route receives a fresh decomposition run; it never
 recycles the abandoned task id or rewrites the old protocol record. An investigation exits
@@ -161,15 +179,16 @@ without a run, as usual.
 
 ## Return (≤200 tokens)
 
-```text
+```rune-return
+work: T-nnn
+summary: failing check and root cause, missing reproduction input, reclassification, or blocker
 diagnosis: reproduced | not_reproduced | reclassified | blocked
-task: T-nnn
-attempt: 1
 worktree: kept | discarded
 worktree_path: /workspace/acme/.rune/worktrees/T-nnn
+attempt: 1
 progress: /workspace/acme/.rune/notes/T-nnn.progress
-summary: failing check and root cause, missing reproduction input, reclassification, or blocker
-type: feature | refactor | investigation  # reclassified only
+reclassified_as: feature | refactor | investigation  # reclassified only
+remediation: root_cause | mitigation      # reproduced bug only
 blocker: repository-access                # blocked only
 diagnosis_base_commit: a3f91c2            # reproduced only
 diagnosis_commit: b7a03d4                 # reproduced only

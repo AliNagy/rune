@@ -14,10 +14,15 @@ program. Migration callers serialize themselves with the exact lock described be
 
 The caller supplies:
 
-```text
+```rune-dispatch
+follow: ai-root
+work: coordination-root
 main_root: absolute orchestration-checkout path
 mode: resolve | initialize
 ```
+
+Reject a new call that omits `work: coordination-root` or supplies legacy `task`; callers
+use the same fixed token and validate that the return echoes it.
 
 On success, return the absolute `<main_root>/.rune` path and whether migration was
 `none`, `completed`, or `resumed`. On ambiguity or an unsafe filesystem state, stop with a
@@ -231,10 +236,15 @@ write leaves the old target intact and only a lock-protected sibling temp.
 
 ## Return
 
-```text
-root: /absolute/main/.rune
-migration: none | completed | resumed
+```rune-return
+work: coordination-root
+summary: canonical coordination root resolved; migration state reported
+migration: none | completed | resumed | blocked
+worktree: none
+root: /absolute/main/.rune # omitted only when blocked
+detail: exact conflicting path and safe next action # blocked only
 ```
 
-On failure, return no root. Report the exact conflicting, ambiguous, linked, or registered
-path and the safe user action required before another attempt.
+On failure, return `migration: blocked` and no root. Put the exact conflicting, ambiguous,
+linked, or registered path and the safe user action required before another attempt in
+`summary` and `detail`.

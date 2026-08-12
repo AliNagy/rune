@@ -86,9 +86,14 @@ git rev-parse --show-toplevel       # stable main_root for dispatches and coordi
 git status --porcelain | head -20   # clean, or the user must accept the dirt
 ```
 
-Then follow `ai-root` with the absolute `main_root` and `mode: initialize`. It creates a
+Then follow `ai-root` with `work: coordination-root`, the absolute `main_root`, and
+`mode: initialize`. It creates a
 fresh `.rune/`, migrates recognizable legacy state when safe, or fails closed with a
 diagnostic you report before doing anything else.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 After it succeeds, finish the remaining bounded probes:
 
@@ -123,9 +128,22 @@ apply and the effective budget per task drops considerably.
 
 ### 3. Survey
 
-Dispatch a subagent that follows `ai-survey` with `main_root` and absolute output pointers.
-It writes `<main_root>/.rune/map.md` and Serena memories, and returns a ≤300 token digest.
-Require that return to include `serena_probe: <repo-relative-file>#<full-name-path>` for one
+Dispatch a subagent that follows `ai-survey` with `work: survey`, `main_root`, and absolute
+output pointers.
+
+```rune-dispatch
+follow: ai-survey
+work: survey
+main_root: /workspace/acme
+pointers:
+  map: /workspace/acme/.rune/map.md
+```
+
+It writes `<main_root>/.rune/map.md` and Serena memories, and returns a digest within the
+canonical ≤200-token worker budget.
+Accept only `survey: mapped`; `survey: blocked` stops initialization with its summary.
+Require a mapped return to include
+`serena_probe: <repo-relative-file>#<full-name-path>` for one
 symbol it resolved while surveying, or `serena_probe: unavailable`. For a supplied probe,
 run the exact `serena.find_symbol` operation above once and record whether it returned that
 one signature. Do not choose another symbol or retry with fuzzy matching. If unavailable
@@ -138,10 +156,18 @@ yourself.** Build and test output is unbounded — a failing suite is tens of th
 tokens — and this is the session every other route starts from, so it is the worst
 possible place to absorb them.
 
-Pass it `main_root`, absolute pointers, and the candidates you can name from the survey
-digest and manifests. It runs each one on that clean checkout, writes the full output to
+Pass it `work: init/commands`, `main_root`, absolute pointers, and the candidates you can
+name from the survey digest and manifests. It runs each one on that clean checkout, writes the full output to
 `<main_root>/.rune/notes/init-commands.md`, and returns a
 per-command verdict with durations plus the oracle result, in ≤200 tokens.
+
+```rune-dispatch
+follow: ai-oracle
+work: init/commands
+main_root: /workspace/acme
+pointers:
+  output: /workspace/acme/.rune/notes/init-commands.md
+```
 
 The rule it enforces on your behalf, per `ai-oracle`: **run it, do not infer it.** Then
 record what came back:
@@ -170,10 +196,10 @@ serena:
   active: true
   language_server: typescript-language-server
 commands:
-  build:     { cmd: npm run build,     status: ok,   duration_s: 22 }
-  test:      { cmd: npm test,          status: ok,   duration_s: 34 }
-  lint:      { cmd: npm run lint,      status: fail, note: 14 pre-existing errors }
-  typecheck: { cmd: npx tsc --noEmit,  status: ok,   duration_s: 11 }
+  build:     { cmd: npm run build,     status: passing, duration_s: 22 }
+  test:      { cmd: npm test,          status: passing, duration_s: 34 }
+  lint:      { cmd: npm run lint,      status: failing, note: 14 pre-existing errors }
+  typecheck: { cmd: npx tsc --noEmit,  status: passing, duration_s: 11 }
 oracle:
   command: npm test
   status: passing
@@ -184,6 +210,17 @@ confidence:
   conventions: medium      # sampled 4 files
   oracle: high
 ```
+
+These enums are exact. Each `commands.<name>.status` is
+`passing | failing | unavailable`; `oracle.status` is `passing | failing | none`. Copy the
+transient `ai-oracle` verdicts without translating `passing` to `ok` or `failing` to
+`fail`. `unavailable` means that candidate command could not be run, while `none` is
+reserved for the absence of any project oracle.
+
+When an existing manifest uses the legacy command statuses, normalize only the exact map
+`ok -> passing`, `fail -> failing`, and `none found -> unavailable`. Validate the complete
+candidate, then atomically replace `rune.yml` once under this parent's existing ownership.
+Unknown command or oracle values stop initialization; never widen the map by analogy.
 
 Ensure every entry in `ai-root`'s authoritative `rune-directory-manifest` exists. This is
 create-if-missing and idempotent: accept an existing real directory, never clear its
@@ -210,7 +247,7 @@ main: green
 ## Drift
 
 ## Dispatches
-| phase | followed | for | outcome |
+| phase | followed | work | outcome |
 |---|---|---|---|
 ```
 

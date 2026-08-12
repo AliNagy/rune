@@ -105,12 +105,17 @@ agent pulls on demand.
 
 ## Return to caller
 
-Keep it under 300 tokens. The map is on disk; do not repeat it.
+Keep it at or below the canonical 200-token worker budget. The map is on disk; do not
+repeat it.
 
-```
+```rune-return
+work: survey
+summary: seven modules mapped; billing is incomplete and auth confidence is high
+survey: mapped | blocked
+worktree: none
 stack: TypeScript/Fastify/Postgres
 modules: 7 mapped
-oracle candidate: npm test (vitest)
+oracle_candidate: npm test (vitest)
 completeness: 3 stubs, 1 orphan module (billing), 1 contradiction (dual user model)
 confidence: high on api/auth, low on worker/ (sparse, few tests)
 flags: billing/ appears abandoned mid-implementation

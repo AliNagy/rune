@@ -49,10 +49,14 @@ may run only its own separately bounded migration probe while this route follows
 ## Coordination-root preflight
 
 Resolve `main_root` once from the harness workspace root or the bounded probe
-`git rev-parse --show-toplevel`. Before any coordination read, follow `ai-root` with that
-absolute `main_root` and `mode: resolve`. Stop and report any failure it returns. Resolve
+`git rev-parse --show-toplevel`. Before any coordination read, follow `ai-root` with
+`work: coordination-root`, that absolute `main_root`, and `mode: resolve`. Stop and report any failure it returns. Resolve
 every `.rune/...` path below against the returned root. Never route from a task
 worktree's relative `.rune/` directory.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 ## 1. Read the state
 

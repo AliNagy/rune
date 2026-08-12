@@ -45,16 +45,17 @@ main: green
 - DRF-003 (from T-016) retired: T-016 — replacements: T-020, T-021
 
 ## Dispatches
-| phase       | followed      | for               | outcome                         |
+| phase       | followed      | work              | outcome                         |
 |-------------|---------------|-------------------|---------------------------------|
-| survey      | ai-survey     | —                 | map.md written                  |
-| commands    | ai-oracle     | —                 | oracle: npm test                |
+| plan-graph  | ai-decompose  | vision/graph      | graph: /workspace/acme/.rune/milestones.md |
+| survey      | ai-survey     | survey            | map.md written                  |
+| commands    | ai-oracle     | init/commands     | oracle: npm test                |
 | diagnose    | ai-bug        | T-013             | reproduced @ b7a03d4           |
 | plan-draft  | ai-decompose  | M-03/R-002/P-01   | draft: P-01.md                  |
 | plan-draft  | ai-decompose  | M-03/R-002/P-02   | draft: P-02.md                  |
 | reconcile   | ai-decompose  | M-03/R-002        | T-014..T-017 written            |
-| report-slot | ai-drift      | T-014/e2          | unused DRF-006                  |
-| report-slot | ai-drift      | T-016/e1          | recorded DRF-003: /workspace/acme/.rune/drift/DRF-003.md |
+| report-slot | ai-drift      | T-014             | unused DRF-006                  |
+| report-slot | ai-drift      | T-016             | recorded DRF-003: /workspace/acme/.rune/drift/DRF-003.md |
 | report-slot | ai-investigate| INV-004           | recorded INV-004: /workspace/acme/.rune/notes/INV-004.md |
 | execute     | ai-execute    | T-014             | done @ 4a91c02                  |
 | verify      | ai-verify     | T-014             | pass @ 4a91c02                  |
@@ -95,9 +96,9 @@ not `complete` is a stop condition.
 
 For an empty project that runs vision before init, `oracle: —` is valid only while
 `rune.yml` is absent, Tasks is empty, and Dispatches is empty or contains only these exact
-coordination-only pre-init rows: `plan-graph | ai-decompose | vision | graph: <absolute
-milestones path>`, `survey | ai-survey | — | map.md written`, and
-`commands | ai-oracle | — | oracle: <command>`. `vision` creates that canonical bootstrap
+coordination-only pre-init rows: `plan-graph | ai-decompose | vision/graph | graph: <absolute
+milestones path>`, `survey | ai-survey | survey | map.md written`, and
+`commands | ai-oracle | init/commands | oracle: <command>`. `vision` creates that canonical bootstrap
 and logs its graph worker as `plan-graph`; `init` may then log survey/command
 discovery before it replaces only `oracle` and `main` from ground truth, preserving the
 vision phase and all rows. No diagnose, plan-draft, reconcile, execute, verify, land, or
@@ -152,6 +153,36 @@ that some readers ignore.
 - `resume_at` is the next durable action: `—`, `diagnose`, `plan:M-nn/R-nnn`, `fresh`,
   `recover`, `step:N`, `evidence:<mode>`, `publish`, `verify`, `land`, or `replan`.
   Details belong in the artifact named by `latest_finding`; this field stays a stable token.
+
+Immutable classification stays in `tasks/T-nnn.md` rather than becoming another mutable
+ledger column. Before registering a reconciled batch, and whenever recovery validates its
+rows, join each row to that task's canonical `type`, `remediation`, and
+`root_cause_followup` fields. A mitigation link is valid only when the target is a
+different task in the same milestone with `type: bug`, `remediation: root_cause`, and no
+further follow-up. The target must exist in both the task set and ledger; registering one
+side without the other is invalid.
+
+Ledger-backed reports render that join explicitly as
+`mitigation T-nnn → root-cause T-mmm` and report the root-cause row's current status. A
+landed mitigation never makes its linked task `done`, removes it from the queue, or counts
+as milestone completion. This keeps mutable routing in one table while making temporary
+risk visible without duplicating immutable task metadata.
+
+For pre-field immutable tasks, use `ai-taskfmt`'s deterministic reader normalization.
+Legacy `kind: mitigation` without a durable follow-up is recovery work: unfinished
+closures enter drift re-decomposition. A completed mitigation is valid only through
+`ai-taskfmt`'s repair overlay: exactly one `mitigation-repair` dispatch row must be
+in one of its parsed pending, linked, or blocked shapes. Every shape retains the fresh run,
+legacy id, reserved root id, and exact protocol, task, and repair paths. The ids and paths
+must be unique across all task files, protocols, and repair rows; each reservation is
+permanently burned. A linked row's immutable repair artifact and registered target must
+agree and satisfy the same different-id, same-milestone, root-cause constraints. That
+joined relationship supplies the normalized old task's follow-up without adding mutable
+classification columns or editing its bytes. Pending and blocked repairs prevent milestone
+completion and ordinary task dispatch. Blocked also requires lowercase `blocker`, stable
+`detail`, and objective `unblocks_when`, and remains unchanged until that condition is
+observed. A missing, duplicate, or mismatched repair stops validation. Never silently
+normalize that marker to `root_cause`.
 
 Every live task worktree value is an absolute path. The parent allocates
 `<main_root>/.rune/worktrees/T-nnn`, writes it into the row before dispatching the first
@@ -222,6 +253,13 @@ deliberate exception: before dispatch, write a `report-slot` row that binds the 
 unused id to both its absolute `open/` staging path and final path. This reservation is
 the allocator's durable claim and makes concurrent workers use different sole-writer
 destinations.
+
+The third column is exactly `work`, and its value equals the canonical dispatch
+envelope's `work` token and the worker's echoed return. New rows never use a `for` header,
+`task` field, `—` stand-in, or an attempt-suffixed substitute. Schema-0/1 and early
+schema-2 ledgers may have the historical `for` header; `continue` deterministically
+renames only that header and maps the three coordination-only stand-ins to
+`vision/graph`, `survey`, and `init/commands` during its one validated migration.
 
 Use one of these exact outcome shapes:
 
@@ -326,7 +364,13 @@ because time passed.
 
 ### Blocked executor returns
 
-An executor return maps `in_progress -> blocked` only when its `task` and `attempt` match
+Before any outcome mapping, validate `ai-taskfmt`'s common return envelope. `work` must
+equal the dispatch row's assigned token, `summary` and the worker-specific outcome are
+present, and `worktree` plus `worktree_path` agree. Historical `task` is normalized only
+under the explicit one-field compatibility rule; a return with both ids or neither is
+malformed and cannot transition the row.
+
+An executor return maps `in_progress -> blocked` only when its `work` and `attempt` match
 the claimed row and it supplies a lowercase blocker slug, schema-safe `resume_at`, absolute
 handoff pointer, and valid `worktree: kept | discarded` disposition. The handoff must
 contain both `blocker_reason` and observable `unblocks_when`. In one validated replacement,
@@ -379,6 +423,11 @@ declares its surface, so compare the lists.
 
 **The landing procedure lives in `work`; the merge itself lives in `ai-land`.** Here, only
 what a landing does to a row:
+
+Validate its conditional oracle evidence at the canonical enum seam first: `landed`
+requires `passing | none`, `reverted` requires `failing`, and `none` is permitted only for
+a manifest with no configured oracle. Stored and transient verdicts are never translated
+through `pass`, `fail`, or `ok`.
 
 | `ai-land` returned | Row |
 |---|---|
