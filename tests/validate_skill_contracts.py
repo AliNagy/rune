@@ -36,6 +36,7 @@ RETURN_SCHEMAS: dict[str, dict[str, set[str]]] = {
     "ai-recover": {"verdict": {"salvage", "discard", "partial"}},
     "ai-research": {"research": {"answered", "blocked"}},
     "ai-root": {"migration": {"none", "completed", "resumed", "blocked"}},
+    "ai-size": {"sizing": {"pass", "split", "blocked"}},
     "ai-survey": {
         "survey": {"mapped", "amended", "unchanged", "conflict", "blocked"}
     },
@@ -58,12 +59,13 @@ PRIMARY_OUTCOME_FIELDS = {
 EXPECTED_RETURN_EXAMPLES = {
     "ai-bug": 1, "ai-decompose": 1, "ai-drift": 3, "ai-execute": 1,
     "ai-investigate": 1, "ai-land": 2, "ai-oracle": 1, "ai-recover": 1,
-    "ai-research": 1, "ai-root": 1, "ai-survey": 2, "ai-taskfmt": 2,
+    "ai-research": 1, "ai-root": 1, "ai-size": 1, "ai-survey": 2, "ai-taskfmt": 2,
     "ai-triage": 1, "ai-verify": 1, "ai-verify-finding": 1, "work": 2,
 }
 EXPECTED_DISPATCH_EXAMPLES = {
     "ai-bug": 1,
     "ai-root": 1,
+    "ai-size": 1,
     "ai-survey": 1,
     "ai-taskfmt": 4,
     "ai-verify-finding": 1,
@@ -1965,6 +1967,220 @@ def check_mitigation_contracts() -> None:
             fail(f"mitigation lifecycle coverage is incomplete: {token}")
 
 
+SIZING_VERDICTS = {"pass", "split", "blocked"}
+
+
+@dataclass
+class SizingState:
+    """A task is registered unsized and only a durable pass makes it claimable."""
+
+    rows: dict[str, str] = field(default_factory=dict)
+    records: dict[str, list[str]] = field(default_factory=dict)
+    dispatched: dict[str, str] = field(default_factory=dict)
+    blockers: dict[str, str] = field(default_factory=dict)
+    replaced_by: dict[str, list[str]] = field(default_factory=dict)
+    planners: set[str] = field(default_factory=set)
+    splits: dict[str, int] = field(default_factory=dict)
+
+
+def register_task(state: SizingState, task: str) -> None:
+    if task in state.rows:
+        raise ValueError("task registered twice")
+    state.rows[task] = "unsized"
+
+
+def claim_for_execution(state: SizingState, task: str) -> None:
+    if state.rows.get(task) != "pending":
+        raise ValueError(f"claimed a task that is {state.rows.get(task)}, not pending")
+
+
+def dispatch_sizer(state: SizingState, task: str, agent: str) -> None:
+    if state.rows.get(task) != "unsized":
+        raise ValueError("sizing dispatched against a row that is not unsized")
+    if agent in state.planners:
+        raise ValueError("a planner from this run was sent to size its own task")
+    state.dispatched[task] = agent
+
+
+def record_sizing(state: SizingState, task: str, verdict: str) -> None:
+    if task not in state.dispatched:
+        raise ValueError("a verdict appeared with no sizer dispatched")
+    if verdict not in SIZING_VERDICTS:
+        raise ValueError(f"unknown sizing verdict: {verdict}")
+    state.records.setdefault(task, []).append(verdict)
+
+
+def apply_sizing(state: SizingState, task: str) -> str:
+    blocks = state.records.get(task)
+    if not blocks:
+        raise ValueError("applied a sizing outcome with no durable record")
+    verdict = blocks[-1]
+    state.dispatched.pop(task, None)
+    if verdict == "pass":
+        state.rows[task] = "pending"
+        state.blockers.pop(task, None)
+    elif verdict == "blocked":
+        state.blockers[task] = "sizing:surface-file-missing"
+    else:
+        state.splits[task] = state.splits.get(task, 0) + 1
+    return verdict
+
+
+def replan_split(state: SizingState, task: str, replacements: list[str]) -> None:
+    if state.records.get(task, [None])[-1] != "split":
+        raise ValueError("retired a task that was not split")
+    if not replacements:
+        raise ValueError("a split produced no replacement work")
+    state.rows[task] = "retired"
+    state.replaced_by[task] = list(replacements)
+    for replacement in replacements:
+        register_task(state, replacement)
+
+
+def recover_sizing(state: SizingState, task: str) -> str:
+    if state.rows.get(task) != "unsized":
+        return "nothing"
+    blocks = state.records.get(task)
+    if not blocks:
+        return "redispatch"
+    if blocks[-1] == "pass":
+        return "apply-pass"
+    if blocks[-1] == "split":
+        return "re-decompose"
+    return "report-blocked"
+
+
+def check_sizing_gate() -> None:
+    sizer = read("skills/ai-size/SKILL.md")
+    if "user-invocable: false" not in sizer:
+        fail("the sizing reviewer is user-invocable")
+    for token in (
+        "You have no task worktree",
+        "Do not start the task",
+        "When in doubt, split",
+        "Headroom is the point",
+        "Do not estimate a token count",
+        "must be **actionable**",
+        "Never edit the task",
+        'There is no "pass with concerns"',
+    ):
+        if token not in sizer:
+            fail(f"sizing contract is incomplete: {token}")
+    if "150k" not in sizer:
+        fail("sizing contract never names the window it is protecting")
+
+    ledger = read("skills/ai-ledger/SKILL.md")
+    required = section(ledger, "Required fields by status")
+    if "| `unsized` |" not in required:
+        fail("unsized has no required-field row")
+    transitions = section(ledger, "Status transitions")
+    for token in (
+        "unsized ─pass────> pending",
+        "reproduced + reconciled─> unsized",
+        "Never executable",
+    ):
+        if token not in transitions:
+            fail(f"ledger does not gate dispatch on sizing: {token}")
+
+    work = read("skills/work/SKILL.md")
+    gate = section(work, "Sizing the new tasks", 3)
+    for token in ("`ai-size`", "Never send a planner", "registered `unsized` and sized"):
+        if token not in gate:
+            fail(f"work's sizing gate is incomplete: {token}")
+    if "New rows start `unsized`" not in work:
+        fail("work still registers new tasks straight into the executable queue")
+    if "A task is eligible when it is `pending`" not in work:
+        fail("batch selection does not exclude unsized rows")
+    if "`unsized` rows" not in read("skills/continue/SKILL.md"):
+        fail("continue cannot recover an interrupted sizing review")
+
+    state = SizingState(planners={"planner-1", "planner-2"})
+    register_task(state, "T-014")
+    register_task(state, "T-018")
+    for task in ("T-014", "T-018"):
+        try:
+            claim_for_execution(state, task)
+        except ValueError:
+            pass
+        else:
+            fail("an unsized task was dispatchable")
+    if recover_sizing(state, "T-014") != "redispatch":
+        fail("an unsized row with no record was not redispatched")
+    try:
+        apply_sizing(state, "T-014")
+    except ValueError:
+        pass
+    else:
+        fail("a row moved out of unsized with no durable verdict")
+    try:
+        dispatch_sizer(state, "T-014", "planner-1")
+    except ValueError:
+        pass
+    else:
+        fail("the run's own planner was allowed to size its task")
+
+    dispatch_sizer(state, "T-014", "fresh-a")
+    try:
+        record_sizing(state, "T-014", "probably-fine")
+    except ValueError:
+        pass
+    else:
+        fail("an invented sizing verdict was accepted")
+    record_sizing(state, "T-014", "pass")
+    if recover_sizing(state, "T-014") != "apply-pass":
+        fail("a durable pass was not applied on recovery")
+    try:
+        claim_for_execution(state, "T-014")
+    except ValueError:
+        pass
+    else:
+        fail("a recorded pass made a row claimable before the ledger moved")
+    apply_sizing(state, "T-014")
+    claim_for_execution(state, "T-014")
+
+    dispatch_sizer(state, "T-018", "fresh-b")
+    record_sizing(state, "T-018", "split")
+    if apply_sizing(state, "T-018") != "split" or state.rows["T-018"] != "unsized":
+        fail("a split silently left the row executable")
+    if recover_sizing(state, "T-018") != "re-decompose":
+        fail("a split was not routed back through decomposition")
+    try:
+        replan_split(state, "T-018", [])
+    except ValueError:
+        pass
+    else:
+        fail("a split retired a task with no replacement work")
+    replan_split(state, "T-018", ["T-022", "T-023"])
+    if state.rows["T-018"] != "retired" or state.replaced_by["T-018"] != ["T-022", "T-023"]:
+        fail("a split did not retire its oversized row with lineage")
+    for replacement in ("T-022", "T-023"):
+        if state.rows[replacement] != "unsized":
+            fail("a replacement skipped the gate its predecessor failed")
+        try:
+            claim_for_execution(state, replacement)
+        except ValueError:
+            pass
+        else:
+            fail("a replacement was dispatchable without being sized")
+
+    dispatch_sizer(state, "T-022", "fresh-c")
+    record_sizing(state, "T-022", "blocked")
+    apply_sizing(state, "T-022")
+    if state.rows["T-022"] != "unsized" or "sizing:" not in state.blockers["T-022"]:
+        fail("a blocked sizing verdict did not durably hold the row")
+    if recover_sizing(state, "T-022") != "report-blocked":
+        fail("a blocked sizing review was retried instead of reported")
+
+    twice = SizingState()
+    register_task(twice, "T-030")
+    for round_ in ("first", "second"):
+        dispatch_sizer(twice, "T-030", f"fresh-{round_}")
+        record_sizing(twice, "T-030", "split")
+        apply_sizing(twice, "T-030")
+    if twice.splits["T-030"] < 2:
+        fail("repeated splits are not counted, so work cannot stop and ask")
+
+
 FINDING_VERDICTS = {"confirmed", "refuted", "inconclusive"}
 
 
@@ -2798,6 +3014,7 @@ def main() -> None:
     check_mitigation_contracts()
     check_measured_thresholds_and_amend()
     check_findings_pipeline()
+    check_sizing_gate()
     check_playbook()
     check_documented_skill_counts()
     check_scaffold_behavior()

@@ -66,7 +66,7 @@ The direct commands still exist if you prefer them:
 | Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-The twenty `ai-*` skills load themselves when they're needed and stay out of your
+The twenty-one `ai-*` skills load themselves when they're needed and stay out of your
 slash-command list.
 
 Typical first run on an existing project:
@@ -135,7 +135,7 @@ You invoke one skill; it loads the others.
 
 Rune is 26 skills, but only seven can be called by name — `hello`, `init`, `vision`,
 `work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-twenty are marked as not user-invocable. The agent loads them itself when the situation
+twenty-one are marked as not user-invocable. The agent loads them itself when the situation
 calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
 sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
 
@@ -216,6 +216,14 @@ that breaks those checks is rolled straight back out, with the reason written do
 main tree is never left broken while the records claim otherwise. Milestones
 are planned in full, but tasks only when it's time to build them: a task has to name real
 files, and for a milestone three steps out those files don't exist yet.
+
+**Task size is checked, not assumed.** A task is capped at five files and one outcome, but
+five files in one module and five files across three subsystems are not the same job, and
+the planner holding the whole milestone is the least able to tell them apart. So every new
+task is registered as *unsized* and read cold by a fresh agent, which answers one question:
+could one executor finish this — understanding, code, tests, handoff — with room left over?
+Only a pass makes it dispatchable. Too big comes back with the seam named and gets re-cut,
+and the replacements are sized too, because a second cut can also be wrong.
 
 **A guess is not a finding.** Agents notice things they weren't asked about — a bug two
 files over, a test passing for the wrong reason. Those arrive already phrased as facts,

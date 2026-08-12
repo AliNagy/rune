@@ -365,6 +365,14 @@ Also check:
   If the schema-2 transaction is already present, validate the complete old-to-new map and
   treat the run as finished. A fresh reproduced bug reservation may be finalized only when
   its diagnosis evidence and replacement task file both validate for that same new id.
+- `unsized` rows → the task file exists but no fresh worker has said one executor could
+  finish it. Read `notes/T-nnn.sizing.md`. No record, or no verdict block for the current
+  attempt, means the sizer died: redispatch `ai-size` for that one task after proving the
+  prior worker stopped. A recorded `pass` whose row never moved is a crash between the
+  verdict and the ledger — apply it now. A recorded `split` routes to re-decomposition; a
+  recorded `blocked` keeps the row and its blocker and is reported, not retried, until the
+  named condition is observed. Never claim, dispatch, or promote an `unsized` row to
+  `pending` on any evidence other than a durable `pass`, and never size it yourself.
 - `retired` rows → validate their drift pointer and explicit `replaced_by` disposition,
   but never recover, claim, or resurrect them. Follow replacement chains only to report
   the current leaf tasks.
