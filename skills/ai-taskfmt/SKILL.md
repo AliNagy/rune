@@ -705,8 +705,9 @@ is exactly `rune-commands`. The route's `Permitted commands and probes` section 
 allowlist: a `rune-commands` line later in the procedure must match one admitted command
 verbatim after stripping its explanatory trailing comment. Shell commands in unlabeled,
 `text`, `bash`, `sh`, or other fences are invalid; those fences are examples or data only.
-Static validation rejects an unknown command—including `rm`, `mv`, or a newly introduced
-shell executable—instead of silently deciding it was prose.
+An unknown command—including `rm`, `mv`, or a newly introduced shell executable—is
+rejected rather than quietly read as prose. Nothing automates that comparison; the
+allowlist exists so it is a lookup instead of a judgement call.
 
 ### Why there are no agents
 
