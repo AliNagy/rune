@@ -1,6 +1,6 @@
 ---
 name: init
-description: Use when starting Rune on a repository for the first time, or re-running after the codebase has changed substantially. Establishes the pass/fail oracle, verifies build and test commands, maps modules and conventions, flags danger zones, and scaffolds .rune/.
+description: Use when starting Rune on a repository for the first time, or re-running once recorded setup measures stale against the current commit. Establishes the pass/fail oracle, verifies build and test commands, maps modules and conventions, flags danger zones, and scaffolds .rune/.
 ---
 
 # rune:init
@@ -42,12 +42,17 @@ git rev-parse --show-toplevel
 git status --porcelain | head -20
 git rev-parse HEAD
 git worktree list --porcelain | awk '/^worktree / { n++ } END { print n }'
+git -C <main_root> cat-file -e <recorded_commit>^{commit}
+git -C <main_root> rev-list --count <recorded_commit>..HEAD
+git -C <main_root> diff --name-only <recorded_commit>..HEAD | wc -l
 serena.activate_project(project="<main_root>")
 serena.find_symbol(relative_path="<probe_file>", name_path="<exact_name_path>", include_body=false)
 ```
 
-The Git bounds are, in order: exactly one line, at most 20 lines, exactly one line, and
-exactly one count line. Serena activation returns one status. The survey supplies one
+The Git bounds are, in order: exactly one line, at most 20 lines, exactly one line, one
+count line, a silent existence test, one count line, and one count line. Serena activation
+returns one status. The last three run only for the staleness rule below, against the
+commit `rune.yml` recorded. The survey supplies one
 repo-relative `probe_file` and one full, exact `name_path`; `find_symbol` uses the fixed
 parameters above and must return zero or one signature-only symbol. More than one result
 is a failed probe, not permission to broaden or repeat it. Anything else, including any
@@ -68,11 +73,42 @@ creation and the `.gitignore` update are file operations; migration is internal 
 
 - First use of Rune on a repo
 - `rune:vision` finds no `.rune/rune.yml` and triggers it automatically
-- Re-run after major change, or when `rune.yml` is stale (commit differs substantially
-  from the recorded one)
+- Re-run when setup has gone stale, measured by the rule below
 
 For a **new project with no code**, init runs *after* vision — there is nothing to
 inspect until the stack is chosen. Vision knows this and orders it correctly.
+
+### When setup is stale
+
+Stale is measured, never judged, so two sessions looking at the same repository reach the
+same answer. Compare the `commit` recorded in `rune.yml` against `HEAD` using the last
+three state probes above.
+
+Setup is stale when **any one** of these is true:
+
+| Measure | Stale at |
+|---|---|
+| the recorded commit | it no longer resolves in this repository |
+| commits since it | 50 or more |
+| files changed since it | 25 or more |
+| the recorded oracle command | no longer present in the project manifests |
+
+Under every threshold, setup is current. There is no middle verdict and no judgement call
+about how big a change felt.
+
+Record what you measured, so the next reader inherits the numbers instead of re-deriving
+them. This block is part of the `rune.yml` candidate below:
+
+```yaml
+staleness:
+  checked: 2026-08-04
+  commits_since: 0
+  files_changed_since: 0
+  verdict: current        # current | stale
+```
+
+A `stale` verdict is a recommendation, never an automatic re-run. Show the numbers and let
+the user decide.
 
 ## Procedure
 
@@ -209,6 +245,11 @@ confidence:
   map: high
   conventions: medium      # sampled 4 files
   oracle: high
+staleness:
+  checked: 2026-08-04
+  commits_since: 0
+  files_changed_since: 0
+  verdict: current
 ```
 
 These enums are exact. Each `commands.<name>.status` is

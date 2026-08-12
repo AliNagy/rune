@@ -78,7 +78,10 @@ Check `<main_root>/.rune/rune.yml`.
   `vision: absent` immediately after `ai-root` scaffolds the coordination root. Validate
   it before creation. This is the only pre-init bootstrap; init later fills the oracle and
   preserves the phase and history.
-- **Present but stale** → mention it, offer a re-run, proceed if the user declines.
+- **Present, with `staleness.verdict: stale`** → say the recorded numbers, offer a re-run
+  of `rune:init`, and proceed if the user declines. That verdict comes from init's measured
+  rule; do not re-measure it here and do not soften or override it with your own
+  impression of how much the codebase has moved.
 
 After the ground is ready, validate schema 2 per `ai-ledger`. Before asking the first
 interview question or writing either interview file, replace `vision: absent` with

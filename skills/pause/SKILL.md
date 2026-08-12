@@ -1,6 +1,6 @@
 ---
 name: pause
-description: Use when you want work to stop - now, at the end of the current task, or before anything else starts. Lets in-flight tasks finish and merge cleanly rather than abandoning them mid-edit, then holds until you resume. Also use to check whether work is currently paused.
+description: Use when you want work to stop - at the end of the current task, or before anything else starts. Lets in-flight tasks finish and merge cleanly rather than abandoning them mid-edit, then holds until you resume. Also use to check whether work is currently paused.
 ---
 
 # pause
@@ -18,13 +18,28 @@ minute is almost always cheaper.
 | Mode | What happens to in-flight work | Use when |
 |---|---|---|
 | **drain** (default) | Finishes active diagnosis or execution; completed tasks verify and merge. Then stops. | Almost always |
-| **stop** | Active workers write durable state and stop where they are. Worktrees kept. | You need the machine or your attention back now |
 | **abandon** | In-flight worktrees discarded, tasks reset to queued. | The current batch is going somewhere wrong |
 
 `abandon` throws away real work. Say what will be lost and confirm before doing it.
 
 If nothing is running, pause still applies — it becomes a *don't start* flag. Useful
 before handing the repo to someone else.
+
+### Why there is no "stop now"
+
+Rune dispatches a worker and waits for its return. There is no channel back to one that is
+already running: no handle to address, no acknowledgement, no way to know a signal arrived.
+A mode that claimed to interrupt live workers would be promising something neither Claude
+Code nor OpenCode can deliver.
+
+What actually happens is the same either way. The flag goes down first, so nothing new
+starts the moment you run pause. Whatever is already running has two honest endings:
+
+- **wait for it** — `drain`, usually the shorter of the two
+- **throw it away** — `abandon`, which loses that task's work and needs your confirmation
+
+If a worker dies with the session instead of returning, that is not a pause mode either.
+`/rune:continue` reconciles it on the next run.
 
 ## What you may do
 
@@ -129,10 +144,6 @@ state, say so explicitly and say what is dangling.
      one task at a time against that same path. Pass each recorded attempt. Then stop. You
      neither merge nor run the checks yourself. A task the lander could not land goes back
      to `pending` with its worktree kept; a drain does not force work in on the way out.
-   - **stop** — signal active workers to write durable state and stop. Executors write
-     handoffs and return to `pending` with their finding pointers and resume tokens; an
-     `ai-bug` worker appends its partial diagnosis and
-     leaves the reservation `diagnosing`. Keep the worktrees.
    - **abandon** — after confirmation and after each active worker is confirmed stopped,
      dispatch one `ai-drift` worker in `abandon` mode for each exact ledger-recorded
      worktree. Only an `abandoned` return permits resetting an executable task to
