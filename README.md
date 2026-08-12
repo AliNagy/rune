@@ -66,7 +66,7 @@ The direct commands still exist if you prefer them:
 | Move to a fresh session before context fills | `/rune:handoff` |
 | Pick up in a fresh session | `/rune:continue` |
 
-The nineteen `ai-*` skills load themselves when they're needed and stay out of your
+The twenty `ai-*` skills load themselves when they're needed and stay out of your
 slash-command list.
 
 Typical first run on an existing project:
@@ -104,10 +104,16 @@ Everything worth keeping lives in `.rune/`:
   notes/open/             assigned investigation/research reports awaiting atomic promotion
   drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
   drift/open/             assigned drift reports awaiting atomic promotion
+  findings/FND-nnn.md    things noticed in passing, after a second agent checked them
+  findings/open/         unchecked claims, and verified records awaiting promotion
   decisions/open/        per-task-attempt questions awaiting parent-assigned decision ids
   sessions/              session handoffs for fresh-context recovery
   worktrees/             disposable task checkouts; ignored by Git
 ```
+
+Rune also writes a short block into your `CLAUDE.md`, between `<!-- rune:begin -->` and
+`<!-- rune:end -->`, so an agent opening the project knows which command to reach for and
+how to talk to you. Everything outside those markers is left alone.
 
 **Commit it.** The vision, decisions, milestones, and ledger are project knowledge worth
 versioning and reviewing — they're written to be read by people, not just agents.
@@ -129,7 +135,7 @@ You invoke one skill; it loads the others.
 
 Rune is 26 skills, but only seven can be called by name — `hello`, `init`, `vision`,
 `work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-nineteen are marked as not user-invocable. The agent loads them itself when the situation
+twenty are marked as not user-invocable. The agent loads them itself when the situation
 calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
 sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
 
@@ -210,6 +216,15 @@ that breaks those checks is rolled straight back out, with the reason written do
 main tree is never left broken while the records claim otherwise. Milestones
 are planned in full, but tasks only when it's time to build them: a task has to name real
 files, and for a milestone three steps out those files don't exist yet.
+
+**A guess is not a finding.** Agents notice things they weren't asked about — a bug two
+files over, a test passing for the wrong reason. Those arrive already phrased as facts,
+from an agent that glanced at the code for a few seconds while thinking about something
+else. So it writes the claim down, says plainly how little it actually looked, and carries
+on. A fresh agent that never saw the work then checks it and records confirmed, refuted, or
+inconclusive. Only confirmed ones reach you, and even those become work only if you say so.
+Refuted claims are kept on purpose, so the same wrong observation isn't raised again in
+three months.
 
 **A wrong plan stays legible.** Drift never patches or overwrites a task specification.
 The obsolete unfinished task becomes a terminal retired row, fresh replacement work gets

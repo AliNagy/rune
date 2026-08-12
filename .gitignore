@@ -1,3 +1,4 @@
 node_modules/
 .rune/
 *.log
+__pycache__/

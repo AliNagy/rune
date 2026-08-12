@@ -42,6 +42,9 @@ RETURN_SCHEMAS: dict[str, dict[str, set[str]]] = {
     "ai-taskfmt": {"status": {"done", "drifted", "budget", "blocked", "question"}},
     "ai-triage": {"type": {"bug", "feature", "refactor", "investigation"}},
     "ai-verify": {"verdict": {"pass", "fail", "unverified"}},
+    "ai-verify-finding": {
+        "finding": {"confirmed", "refuted", "inconclusive"}
+    },
     "work": {
         "status": {"done", "drifted", "budget", "blocked", "question"},
         "type": {"bug", "feature", "refactor", "investigation"},
@@ -56,13 +59,14 @@ EXPECTED_RETURN_EXAMPLES = {
     "ai-bug": 1, "ai-decompose": 1, "ai-drift": 3, "ai-execute": 1,
     "ai-investigate": 1, "ai-land": 2, "ai-oracle": 1, "ai-recover": 1,
     "ai-research": 1, "ai-root": 1, "ai-survey": 2, "ai-taskfmt": 2,
-    "ai-triage": 1, "ai-verify": 1, "work": 2,
+    "ai-triage": 1, "ai-verify": 1, "ai-verify-finding": 1, "work": 2,
 }
 EXPECTED_DISPATCH_EXAMPLES = {
     "ai-bug": 1,
     "ai-root": 1,
     "ai-survey": 1,
     "ai-taskfmt": 4,
+    "ai-verify-finding": 1,
     "handoff": 1,
     "init": 2,
     "vision": 2,
@@ -1961,6 +1965,300 @@ def check_mitigation_contracts() -> None:
             fail(f"mitigation lifecycle coverage is incomplete: {token}")
 
 
+FINDING_VERDICTS = {"confirmed", "refuted", "inconclusive"}
+
+
+@dataclass
+class FindingsState:
+    """Claim -> fresh verifier -> promoted record -> claim deleted, and every crash between."""
+
+    claims: set[str] = field(default_factory=set)
+    reservations: dict[str, str] = field(default_factory=dict)
+    finders: dict[str, str] = field(default_factory=dict)
+    task_agents: dict[str, set[str]] = field(default_factory=dict)
+    dispatched: dict[str, str] = field(default_factory=dict)
+    staged: dict[str, str] = field(default_factory=dict)
+    promoted: dict[str, str] = field(default_factory=dict)
+    ledger: dict[str, str] = field(default_factory=dict)
+    next_id: int = 7
+
+
+def raise_claim(state: FindingsState, claim: str, finder: str) -> None:
+    if claim in state.claims:
+        raise ValueError("claim path already exists; no-replace staging violated")
+    if not re.fullmatch(r"T-\d{3}-e\d+-\d+", claim):
+        raise ValueError("claim path is not attempt-scoped and collision-free")
+    state.claims.add(claim)
+    state.finders[claim] = finder
+    state.task_agents.setdefault(claim.split("-e", 1)[0], set()).add(finder)
+
+
+def reserve_finding(state: FindingsState, claim: str) -> str:
+    if claim not in state.claims:
+        raise ValueError("reserved an id for a claim that does not exist")
+    if claim in state.reservations:
+        return state.reservations[claim]
+    finding = f"FND-{state.next_id:03d}"
+    state.next_id += 1
+    state.reservations[claim] = finding
+    return finding
+
+
+def dispatch_finding_verifier(state: FindingsState, claim: str, agent: str) -> None:
+    finding = state.reservations.get(claim)
+    if finding is None:
+        raise ValueError("verifier dispatched before its reservation")
+    # One rule, not two: the finder is simply the most obvious agent that worked the task.
+    if agent in state.task_agents.get(claim.split("-e", 1)[0], set()):
+        raise ValueError("verifier already carries context from the claim's task")
+    state.dispatched[finding] = agent
+
+
+def stage_finding_verdict(state: FindingsState, finding: str, verdict: str) -> None:
+    if finding not in state.dispatched:
+        raise ValueError("verdict staged without a dispatched verifier")
+    if verdict not in FINDING_VERDICTS:
+        raise ValueError(f"unknown finding verdict: {verdict}")
+    state.staged[finding] = verdict
+
+
+def promote_finding(state: FindingsState, finding: str) -> None:
+    verdict = state.staged.get(finding)
+    if verdict is None:
+        raise ValueError("promoted a finding with no staged record")
+    state.promoted[finding] = verdict
+    state.ledger[finding] = verdict
+
+
+def delete_consumed_claim(state: FindingsState, claim: str) -> None:
+    finding = state.reservations.get(claim)
+    if finding is None or finding not in state.promoted:
+        raise ValueError("claim deleted before its record was promoted")
+    state.claims.discard(claim)
+
+
+def recover_finding(state: FindingsState, claim: str) -> str:
+    finding = state.reservations.get(claim)
+    if finding is None:
+        return "reserve"
+    if finding in state.promoted:
+        return "delete-claim"
+    if finding in state.staged:
+        return "promote"
+    return "redispatch"
+
+
+def check_findings_pipeline() -> None:
+    taskfmt = read("skills/ai-taskfmt/SKILL.md")
+    # section() is not fence-aware and this contract embeds a markdown example, so slice
+    # it between its own heading and the next real one.
+    findings = taskfmt[
+        taskfmt.index("### Findings — a claim is not a fact") : taskfmt.index(
+            "### The published task artifact"
+        )
+    ]
+    for token in (
+        "a claim until a fresh subagent confirms it",
+        "findings/open/T-nnn-eN-K.md",
+        "status: unverified",
+        "Why I did not check it",
+        "ai-verify-finding",
+        "Only `confirmed` is actionable",
+    ):
+        if token not in findings:
+            fail(f"findings contract is incomplete: {token}")
+    for path in (
+        "findings/open/T-nnn-eN-K.md",
+        "findings/open/FND-nnn.md",
+        "findings/FND-nnn.md",
+    ):
+        if path not in taskfmt:
+            fail(f"canonical layout omits a findings path: {path}")
+
+    verifier = read("skills/ai-verify-finding/SKILL.md")
+    if "user-invocable: false" not in verifier:
+        fail("the finding verifier is user-invocable")
+    for token in (
+        "you were not\nthere",
+        "You change no source",
+        "Try to prove it wrong first",
+        "What would change this",
+        "Never soften a refutation",
+    ):
+        if token not in verifier:
+            fail(f"finding verifier contract is incomplete: {token!r}")
+
+    execute = section(read("skills/ai-execute/SKILL.md"), "When you notice something that is not your task")
+    for token in ("that is **drift**", "do not fix it", "findings/open/T-nnn-eN-K.md"):
+        if token not in execute:
+            fail(f"executor does not separate findings from drift: {token}")
+
+    work_findings = section(read("skills/work/SKILL.md"), "When a worker raises a finding", 3)
+    for token in (
+        "fresh\n   subagent following `ai-verify-finding`",
+        "You do not act on a confirmed",
+        "only after its record is promoted",
+        "An unverified claim is not something",
+    ):
+        if token not in work_findings:
+            fail(f"work's findings loop is incomplete: {token!r}")
+
+    ledger = read("skills/ai-ledger/SKILL.md")
+    if "Findings block nothing" not in ledger:
+        fail("ledger does not state that findings are records, not routing state")
+    if "ai-verify-finding" not in ledger:
+        fail("ledger dispatch log has no finding-check phase")
+    report = read("skills/ai-report/SKILL.md")
+    for token in ("Only report a finding that came back `confirmed`", "Do not report refuted"):
+        if token not in report:
+            fail(f"report contract does not gate unverified findings: {token}")
+    if "unverified findings" not in read("skills/continue/SKILL.md"):
+        fail("continue cannot recover an interrupted finding")
+
+    state = FindingsState()
+    raise_claim(state, "T-014-e2-1", finder="executor-7")
+    raise_claim(state, "T-014-e2-2", finder="executor-7")
+    # An earlier attempt on the same task, by a different agent than the finder.
+    state.task_agents["T-014"].add("executor-3")
+    try:
+        raise_claim(state, "T-014-e2-1", finder="executor-7")
+    except ValueError:
+        pass
+    else:
+        fail("a second claim overwrote an existing staging path")
+    try:
+        raise_claim(state, "T-014-1", finder="executor-7")
+    except ValueError:
+        pass
+    else:
+        fail("claim path without an attempt was accepted")
+
+    if recover_finding(state, "T-014-e2-1") != "reserve":
+        fail("an unreserved claim was not routed to allocation")
+    first = reserve_finding(state, "T-014-e2-1")
+    if reserve_finding(state, "T-014-e2-1") != first:
+        fail("recovery allocated a second id for one claim")
+    second = reserve_finding(state, "T-014-e2-2")
+    if first == second:
+        fail("two claims shared one finding id")
+
+    for bad_agent, label in (
+        ("executor-7", "the finder itself"),
+        ("executor-3", "another agent that worked the same task"),
+    ):
+        try:
+            dispatch_finding_verifier(state, "T-014-e2-1", bad_agent)
+        except ValueError:
+            pass
+        else:
+            fail(f"finding verification was dispatched to {label}")
+    try:
+        stage_finding_verdict(state, first, "confirmed")
+    except ValueError:
+        pass
+    else:
+        fail("a verdict was staged with no verifier dispatched")
+
+    dispatch_finding_verifier(state, "T-014-e2-1", "fresh-1")
+    if recover_finding(state, "T-014-e2-1") != "redispatch":
+        fail("a dispatched-but-unfinished verification did not redispatch")
+    try:
+        stage_finding_verdict(state, first, "probably")
+    except ValueError:
+        pass
+    else:
+        fail("an invented finding verdict was accepted")
+    try:
+        delete_consumed_claim(state, "T-014-e2-1")
+    except ValueError:
+        pass
+    else:
+        fail("a claim was deleted before its record existed")
+
+    stage_finding_verdict(state, first, "confirmed")
+    if recover_finding(state, "T-014-e2-1") != "promote":
+        fail("a staged verdict was not promoted on recovery")
+    if first in state.ledger:
+        fail("an unpromoted finding reached the ledger")
+    promote_finding(state, first)
+    if recover_finding(state, "T-014-e2-1") != "delete-claim":
+        fail("a promoted finding did not clean up its claim")
+    delete_consumed_claim(state, "T-014-e2-1")
+
+    dispatch_finding_verifier(state, "T-014-e2-2", "fresh-2")
+    stage_finding_verdict(state, second, "refuted")
+    promote_finding(state, second)
+    delete_consumed_claim(state, "T-014-e2-2")
+    if state.ledger != {first: "confirmed", second: "refuted"}:
+        fail("a refuted finding was discarded instead of recorded")
+    if state.claims:
+        fail("consumed claims survived their promoted records")
+
+
+def check_playbook() -> None:
+    init = read("skills/init/SKILL.md")
+    blocks = [block for info, block in fenced_blocks(init) if info == "rune-playbook"]
+    if len(blocks) != 1:
+        fail(f"expected one canonical playbook, found {len(blocks)}")
+    playbook = blocks[0]
+    if not playbook.lstrip().startswith("<!-- rune:begin -->") or not playbook.rstrip().endswith(
+        "<!-- rune:end -->"
+    ):
+        fail("the playbook is not delimited by the markers init replaces between")
+    for token in (
+        "/rune:hello",
+        "/rune:work",
+        "/rune:continue",
+        "no jargon",
+        "No walls of text",
+        "a fresh subagent check it",
+        "unverified claim",
+    ):
+        if token not in playbook:
+            fail(f"playbook does not carry a required instruction: {token}")
+
+    # The playbook preaches brevity, so it is held to it.
+    lines = playbook.strip().splitlines()
+    if len(lines) > 60:
+        fail(f"the playbook is a wall of text at {len(lines)} lines")
+    overlong = [line for line in lines if len(line) > 92]
+    if overlong:
+        fail(f"playbook line is too wide to read comfortably: {overlong[0]!r}")
+
+    for token in (
+        "the marked `rune` block in `<main_root>/CLAUDE.md`",
+        "Everything outside them belongs to the user",
+    ):
+        if token not in init:
+            fail(f"init does not bound its CLAUDE.md write: {token}")
+    if "the `rune` block in `CLAUDE.md` | the parent, only on `rune:init`" not in read(
+        "skills/ai-taskfmt/SKILL.md"
+    ):
+        fail("CLAUDE.md has no single writer in the ownership table")
+
+
+def check_documented_skill_counts() -> None:
+    words = {
+        17: "seventeen", 18: "eighteen", 19: "nineteen", 20: "twenty",
+        21: "twenty-one", 22: "twenty-two",
+    }
+    ai_skills = len(list((ROOT / "skills").glob("ai-*/SKILL.md")))
+    public = len(PUBLIC_ROUTES)
+    if ai_skills not in words:
+        fail(f"add a number word for {ai_skills} ai-* skills")
+    word = words[ai_skills]
+    for relative, expected in (
+        ("README.md", (f"The {word} `ai-*` skills", f"{word} are marked as not user-invocable")),
+        ("docs/opencode.md", (f"the {word} `rune-ai-*` skills",)),
+    ):
+        markdown = read(relative)
+        for token in expected:
+            if token not in markdown:
+                fail(f"{relative}: documented skill count drifted from {ai_skills}: {token!r}")
+    if len(list((ROOT / "skills").glob("*/SKILL.md"))) - ai_skills != public:
+        fail("public route list disagrees with the non-ai skill directories")
+
+
 @dataclass
 class SurveyMap:
     """The parts of map.md an amendment can reach, plus a write-collision guard."""
@@ -2499,6 +2797,9 @@ def main() -> None:
     check_pre_reconciliation_decision_gate()
     check_mitigation_contracts()
     check_measured_thresholds_and_amend()
+    check_findings_pipeline()
+    check_playbook()
+    check_documented_skill_counts()
     check_scaffold_behavior()
     print("skill contracts and scaffold behavior: ok")
 

@@ -44,6 +44,10 @@ main: green
 ## Drift
 - DRF-003 (from T-016) retired: T-016 — replacements: T-020, T-021
 
+## Findings
+- FND-007 (from T-014/e2) confirmed: purge sweeps permanent sessions when the flag is on
+- FND-008 (from T-014/e2) refuted: the retry loop is bounded by maxAttempts three frames up
+
 ## Dispatches
 | phase       | followed      | work              | outcome                         |
 |-------------|---------------|-------------------|---------------------------------|
@@ -57,6 +61,7 @@ main: green
 | report-slot | ai-drift      | T-014             | unused DRF-006                  |
 | report-slot | ai-drift      | T-016             | recorded DRF-003: /workspace/acme/.rune/drift/DRF-003.md |
 | report-slot | ai-investigate| INV-004           | recorded INV-004: /workspace/acme/.rune/notes/INV-004.md |
+| find-check  | ai-verify-finding | FND-007       | confirmed FND-007: /workspace/acme/.rune/findings/FND-007.md |
 | execute     | ai-execute    | T-014             | done @ 4a91c02                  |
 | verify      | ai-verify     | T-014             | pass @ 4a91c02                  |
 | land        | ai-land       | T-014             | landed @ 4a91c02                |
@@ -199,6 +204,18 @@ lander proves its commit already reached green main, making that task `done`. Th
 replacement transaction changes the entry to `retired: ... — replacements: ...` only
 after every remaining frozen row is inactive and its worktree is `discarded`. A crash
 therefore cannot erase the fact that a late worker return must be quarantined.
+
+`## Findings` is the opposite kind of section: a record, never routing state. An entry has
+the exact form `- FND-nnn (from T-nnn/eN) confirmed | refuted | inconclusive: <one line>`,
+and it appears only once the verified record has been promoted to `findings/FND-nnn.md`.
+An unverified claim under `findings/open/` has no entry here, because it is not yet
+anything.
+
+Findings block nothing. They do not freeze rows, gate milestone completion, or make a task
+dispatchable or undispatchable, and a `confirmed` entry is not a task — it becomes one
+only if the user asks for it and decomposition writes it. `refuted` entries stay
+permanently: the value of the section is as much in the claims that turned out to be
+wrong as the ones that did not.
 
 `N` is the number of frozen ids in that entry and `M` the milestone's unfinished tasks
 measured before the freeze. Both are written once, by the same update that creates the

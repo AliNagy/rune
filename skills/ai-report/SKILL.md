@@ -122,6 +122,25 @@ Worth knowing
 - Test suite grew by 11 tests. Still ~40s.
 ```
 
+## Reporting a finding
+
+Only report a finding that came back `confirmed`. A claim still waiting on its verifier is
+not yet news, and telling the user about it makes them act on something nobody has checked.
+
+```
+Also found, and checked
+- Permanent sessions get swept by the purge job, but only when allowPermanent is on.
+  It's off by default, so this probably isn't biting you. Not fixed — want a task for it?
+```
+
+Three things that block belongs on: what it is, whether it actually affects them, and that
+nothing was done about it. Then ask, because turning a finding into work is the user's
+call.
+
+Do not report refuted findings. Somebody guessed wrong and a second agent caught it, which
+is the system working; the user does not need the transcript. They stay in the ledger for
+whoever wonders about the same thing later.
+
 ## Asking a question
 
 Lead with it. Give the options and a recommendation, then stop.

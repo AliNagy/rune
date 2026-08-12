@@ -20,6 +20,10 @@ from that, and this list is exhaustive:
 - **Write** `<main_root>/.rune/rune.yml`, the canonical empty or bootstrap update to
   `<main_root>/.rune/ledger.md`, the `<main_root>/.rune/` scaffolding, and one line in
   `<main_root>/.gitignore`.
+- **Write** the marked `rune` block in `<main_root>/CLAUDE.md`, and nothing else in that
+  file. You replace the block between its markers, or append it if no markers exist.
+  Everything outside them belongs to the user and is never read for content, reformatted,
+  reordered, or removed.
 - **Run** only the exact state probes and conditionally authorized lifecycle command named
   below.
 - **Talk to the user** — the report at the end.
@@ -314,6 +318,70 @@ planner-specific directories beneath `drafts/` are created only when `work` assi
 decomposition run, writes its protocol record, and assigns distinct planner slots.
 
 Add `.rune/worktrees/` to `<main_root>/.gitignore` if worktrees will live inside the repo.
+
+### 6. Write the playbook into CLAUDE.md
+
+Rune is installed per project, so the project's own `CLAUDE.md` is where an agent finds out
+how to use it. Write this block there, verbatim, between its markers:
+
+```rune-playbook
+<!-- rune:begin -->
+## Rune
+
+Rune runs planned work here: it cuts a request into small tasks, does each one in its own
+worktree, and has a second agent check it before it lands. State lives in `.rune/` — plain
+files, in git, yours to edit.
+
+### Which command
+
+| You want to | Run |
+|---|---|
+| know where things stand | `/rune:hello` |
+| decide what this project is for | `/rune:vision` |
+| build, fix, or change something | `/rune:work` |
+| pick up after a break or a crash | `/rune:continue` |
+| stop cleanly | `/rune:pause` |
+| move to a fresh session | `/rune:handoff` |
+
+Unsure? `/rune:hello` picks for you. On OpenCode the names use a dash: `/rune-hello`.
+
+### How to talk to me
+
+Short, plain, and no jargon. I am a person reading this between other things.
+
+- Lead with the answer. Do not narrate what you are about to do.
+- "The tests pass", not "the oracle is green". "The plan was wrong about X", not "DRF-003
+  invalidated the closure".
+- No walls of text. If it needs more than a screen, put it in a file and tell me where.
+- Ids like T-014 are labels, not explanations.
+- Say what you did and what is left. Skip the reasoning unless I ask for it.
+
+### If you notice something I did not ask about
+
+A bug two files over. A test that passes for the wrong reason. Do not tell me, and do not
+fix it.
+
+Write it down as an unverified claim, then have **a fresh subagent check it** before it
+counts as anything. The agent that noticed it is the worst possible judge of whether it is
+real — it saw the thing for four seconds while thinking about something else, and a
+plausible guess reads exactly like a fact.
+
+Tell me only after it has been checked, and say what checking found:
+
+> Also found and checked: the purge job sweeps permanent sessions, but only when
+> allowPermanent is on, and that defaults off. Not fixed — want a task for it?
+
+An unchecked claim is a guess. Passing it to me makes me act on it.
+<!-- rune:end -->
+```
+
+**Only the block is yours.** If `CLAUDE.md` has the markers, replace what is between them.
+If it does not, append the block. If the file does not exist, create it with only the
+block. Everything outside the markers is the user's, and it is not read for content,
+reformatted, reordered, or removed — a project's `CLAUDE.md` usually holds instructions
+somebody wrote by hand and would be angry to lose.
+
+Writing the block is idempotent: a second init replaces it with the same bytes.
 
 ## Report
 

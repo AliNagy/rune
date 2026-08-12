@@ -396,6 +396,14 @@ Also check:
   delete the consumed staging file. This repairs crashes at every boundary without
   duplicate ids, including several simultaneous questions. Any conflicting source,
   attempt, path, or row stops recovery rather than guessing.
+- **unverified findings** → collect `findings/open/T-nnn-eN-K.md` claims and sort them by
+  numeric task id, attempt, then `K`. A claim whose `FND-nnn` record is already promoted
+  and recorded is a crash between promotion and cleanup: delete the claim and stop there.
+  A claim with a reserved id but no promoted record is redispatched to
+  `ai-verify-finding` with the same id and paths, after proving the prior worker stopped.
+  A claim with no reservation gets one now. Never verify a claim yourself, never delete
+  one that has no promoted record, and never treat an unverified claim as true while
+  reporting what you found — it is a claim precisely because nobody has checked it.
 
 ## 3. Determine phase and route
 
