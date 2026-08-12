@@ -23,6 +23,7 @@ stranger with an empty context.
   drafts/M-nn/R-nnn/protocol.md # immutable type/protocol selection for one run
   drafts/M-nn/R-nnn/P-nn.md # one complete, immutable cut from one planner
   drafts/M-nn/R-nnn/replacements.md # replan-only old -> new task lineage
+  drafts/M-nn/R-nnn/mitigation-repair.md # completed legacy mitigation -> root-cause task
   tasks/T-nnn.md         # immutable task specification; never edited or deleted
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # diagnosis, step ticks, verification evidence, publications
@@ -110,6 +111,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `drafts/M-nn/R-nnn/protocol.md` | the parent, once before that run is dispatched |
 | `drafts/M-nn/R-nnn/P-nn.md` | the planner assigned that exact run and slot |
 | `drafts/M-nn/R-nnn/replacements.md` | the single reconciler for that replan run |
+| `drafts/M-nn/R-nnn/mitigation-repair.md` | the single reconciler for that mitigation-repair run |
 | `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` that creates it |
 | `notes/T-nnn.progress` | the worker holding T-nnn: `ai-bug` during diagnosis, then `ai-execute` |
 | `notes/T-nnn.md` | the worker holding T-nnn |
@@ -249,13 +251,16 @@ selection is a separate concern that does not belong in these files.
 ### The dispatch envelope — what a worker is given
 
 Every dispatch hands over the same shape. `main_root` is required for all workers;
+`work` is the dispatcher's immutable routing token and is echoed unchanged in the return;
+new dispatches never use a `task` field. A task-bound job simply uses its `T-nnn` as
+`work`, while non-task jobs use their assigned report, run, request, or fixed job token.
 `worktree_path` is required only for task-bound work and is omitted otherwise. Diagnosis,
 execution, verification, and landing also receive `attempt`, copied from the counter the
 parent incremented and persisted before dispatch:
 
-```
+```rune-dispatch
 follow:        ai-execute
-task:          T-014
+work:          T-014
 attempt:       2
 main_root:     /workspace/acme
 worktree_path: /workspace/acme/.rune/worktrees/T-014
@@ -268,6 +273,16 @@ reports:
     final: /workspace/acme/.rune/drift/DRF-007.md
 ```
 
+Pre-envelope historical assignments may contain `task: <value>`. A recovery reader may
+normalize that field to `work` only while consuming an already-durable pre-change dispatch
+or note. Canonical dispatch construction, examples, caller prompts, and new log rows reject
+`task` even when `work` is absent; compatibility is never permission to emit the old field.
+
+Every caller crosses the matching return seam before outcome routing: require the echoed
+`work` to equal this assignment, require a one-line `summary`, and validate
+`worktree: none | kept | discarded` plus its conditional path. Only after this common
+check may a route consume `status`, `verdict`, `plan`, or another worker-specific outcome.
+
 Every executor attempt receives one fresh drift-report reservation because drift is
 discovered inside that worker, after dispatch. Most attempts leave the slot unused; the
 parent records that outcome and never recycles the id. Spending numbers is cheaper than
@@ -275,9 +290,9 @@ letting concurrent detectors race for one filename.
 
 Investigation and research use the same assignment shape without a worktree:
 
-```yaml
+```rune-dispatch
 follow:    ai-investigate
-task:      INV-004
+work:      INV-004
 main_root: /workspace/acme
 reports:
   investigation:
@@ -298,9 +313,9 @@ Before any such dispatch, the parent writes one pending report assignment per id
 
 Bug diagnosis uses the same task-bound envelope before the task-file pointer exists:
 
-```yaml
+```rune-dispatch
 follow:        ai-bug
-task:          T-014
+work:          T-014
 attempt:       1
 main_root:     /workspace/acme
 worktree_path: /workspace/acme/.rune/worktrees/T-014
@@ -362,9 +377,9 @@ For decomposition, the one work id is hierarchical because the work has two phas
 planner gets one assigned slot such as `M-03/R-002/P-01`; the reconciler gets the enclosing
 run `M-03/R-002`. The exact output destination is still a pointer, not prompt payload:
 
-```
+```rune-dispatch
 follow:    ai-decompose
-task:      M-03/R-002/P-01
+work:      M-03/R-002/P-01
 main_root: /workspace/acme
 pointers:
   milestone: /workspace/acme/.rune/milestones.md#M-03
@@ -440,14 +455,30 @@ rewrites a record workers may already have read.
 
 ### The return envelope — what a worker hands back
 
-Two lines are shared by every worker:
+Every worker return crosses one canonical seam. These three fields are always present,
+whether the job changes source, reads source, or only coordinates files:
 
-```
-task:    T-014                # or the id it worked on; omit only if the job had none
+```rune-return
+work: T-014                   # assigned id, or the job token named by the dispatch
 summary: <one line, plain words>
+worktree: kept                # none | kept | discarded
+worktree_path: /workspace/acme/.rune/worktrees/T-014
+status: done                  # exactly one worker-specific outcome field
 ```
 
-Then **one outcome field, named and enumerated by that worker's own skill**:
+`work` is deliberately not named `task`: `T-014`, `INV-004`, `RES-007`,
+`M-03/R-002/P-01`, `request-1`, `survey`, `init/commands`, and `coordination-root` all fit
+it without inventing a task. The dispatcher assigns the value and the worker echoes it;
+workers never allocate or change the envelope's `work` token. Artifact and final-id
+ownership remains governed by each job's own contract. `summary` is exactly one
+plain-words line. `worktree`
+describes the source checkout after the worker returns: `none` when this job has no task
+checkout, `kept` when the supplied checkout still exists, and `discarded` only when the
+worker proved it absent or removed it under its own lifecycle interface. `worktree_path`
+is required with `kept` or `discarded` and forbidden with `none`.
+
+Then there is **exactly one primary outcome field, named and enumerated by that worker's own
+skill**:
 
 | The worker followed | Its outcome field |
 |---|---|
@@ -461,13 +492,18 @@ Then **one outcome field, named and enumerated by that worker's own skill**:
 | `ai-decompose` | `plan: graph \| drafted \| reconciled \| blocked` |
 | `ai-investigate` | `investigation: answered \| blocked` |
 | `ai-research` | `research: answered \| blocked` |
-| `ai-drift` (separate dispatch) | `status: recorded \| quiesced \| abandoned \| discarded \| refused` |
+| `ai-drift` | `status: drifted \| recorded \| quiesced \| abandoned \| discarded \| refused \| budget \| question` |
+| `ai-survey` | `survey: mapped \| blocked` |
+| `ai-root` | `migration: none \| completed \| resumed \| blocked` |
 
 Then whatever else that skill defines.
 
 `ai-execute` has one required conditional interface. `status: blocked` always adds:
 
-```yaml
+```rune-return
+work: T-014
+summary: package registry is unreachable; resume after service health is restored
+status: blocked
 worktree: kept
 worktree_path: /workspace/acme/.rune/worktrees/T-014
 blocker: registry-unreachable
@@ -481,17 +517,25 @@ observable fact makes another attempt safe. Neither may be "retry later" or anot
 restatement of `blocked`. The executor also returns the worktree disposition and a
 schema-safe resume token rather than forcing the parent to infer them.
 
-**Do not force one vocabulary across all of them.** A verifier's outcome genuinely is not
+**Do not force one outcome vocabulary across all of them.** A verifier's outcome genuinely is not
 an executor's outcome, and `ai-execute`'s values are the ones the ledger's state machine
 consumes by name. Collapsing them into a generic `ok | failed` would lose the transition
 and gain nothing.
 
-The same goes for fields. A worker handed a field it has nothing to say about will fill it
-anyway, and an invented value is worse than an absent one — `ai-triage` has no worktree,
-so it gets no worktree line.
+The same goes for conditional fields. A worker handed a field it has nothing to say about
+will fill it anyway, and an invented value is worse than an absent one. The common
+`worktree` field avoids that ambiguity with the explicit `none` value; only the conditional
+`worktree_path` is omitted.
 
-What *is* shared: the id, one plain-words summary, an enumerated outcome, and a hard
-**≤200 tokens**. Anything longer goes to disk and the summary points at it.
+What *is* shared: the dispatch-owned work id, one plain-words summary, one enumerated
+outcome, the source-checkout disposition, and a hard **≤200 tokens**. There are no per-job
+exceptions. Anything longer goes to disk and the summary points at it.
+
+Schema-2 coordination state may contain short returns from before this field was renamed.
+Recovery accepts legacy `task: <value>` only when `work` is absent, normalizes it in memory
+to `work`, and validates the rest of this envelope. A return containing both fields, or a
+legacy return without `summary`, is invalid. New dispatches and durable records always use
+`work`; migration never rewrites historical note bytes merely to modernize an example.
 
 An `ai-decompose` planner returning `plan: drafted` also returns exactly one `artifact:`
 path, and it must equal its assigned draft pointer. A reconciler returning
@@ -502,6 +546,39 @@ uses that map rather than inferring lineage from the task summaries. `artifacts:
 valid only for a drift replan whose map explicitly assigns every retiring task to `none`
 and whose reconciler confirms the milestone acceptance already holds. `plan: blocked`
 returns no invented paths and names the missing or contradictory pointer in `summary`.
+
+### Check-result vocabulary
+
+There are two canonical enums and one explicit mapping; producers and consumers do not
+invent synonyms:
+
+| Meaning | Canonical enum | Where it is used |
+|---|---|---|
+| an individual command was executed or unavailable | `passing \| failing \| unavailable` | each stored `rune.yml` `commands.<name>.status` and the transient `ai-oracle` command digest |
+| the configured project oracle's verdict or absence | `passing \| failing \| none` | stored `rune.yml` `oracle.status`, `ai-oracle`'s outcome, verifier evidence, and landing evidence |
+
+The intentional stored/transient mapping is identity: transient `passing`, `failing`, and
+`unavailable` command verdicts are stored unchanged; the selected oracle's transient
+`passing`, `failing`, or `none` is stored unchanged in `oracle.status`. `unavailable`
+belongs to a candidate command that could not run. `none` means no project oracle exists;
+it never means a configured command was skipped or its result was forgotten. Task-local
+acceptance remains `pass | fail` because those words score individual criteria rather than
+representing a command or project-oracle verdict.
+
+Post-merge landing uses the same oracle enum in `oracle_result`. `landed` returns
+`oracle_result: passing` (or `none` in degraded mode); `reverted` returns
+`oracle_result: failing` for the merge check even
+though rollback restored `main: green`. A fast-forward may reuse the verifier's identical
+tree verdict but still returns that canonical verdict. `refused`, `conflict`,
+`not_landed`, and cleanup returns omit `oracle`; a preflight `stuck` also omits it, while
+a rollback-red `stuck` returns `oracle_result: failing`.
+
+Existing `rune.yml` files may use the old command-only synonyms `ok | fail`. `init` owns
+their deterministic migration: `ok -> passing`, `fail -> failing`, and a recorded
+`none found -> unavailable`; the already-canonical oracle values remain unchanged. It
+validates the complete candidate and replaces the manifest once. An unknown value stops;
+no reader guesses. `continue` detects this legacy shape and routes through `init` rather
+than writing another owner's file.
 
 ### The published task artifact
 
@@ -661,6 +738,8 @@ protocol: ai-feature
 
 ## D-001 · Rotate refresh tokens inside session middleware
 type: feature
+remediation: not_applicable
+root_cause_followup: none
 verification: red_then_green
 blocked_by: []
 
@@ -693,6 +772,8 @@ after: must pass
 
 ## D-002 · Wire the refresh endpoint
 type: feature
+remediation: not_applicable
+root_cause_followup: none
 verification: red_then_green
 blocked_by: [D-001]
 ...
@@ -712,10 +793,11 @@ writing, its planner reads every id in the protocol's `decisions` list from
 `decisions.md`, requires each record to be `decided`, and treats the recorded choice and
 rationale as input. A missing, duplicate, or open id blocks the run; conversation context
 never fills the gap. Every
-`D-nnn` repeats the complete final task contract: title, type, verification mode, local
-dependencies, goal, context contract, change surface, steps, check, and acceptance. `Cut
-notes` records the assumptions, exclusions, and disputed seams the user gate and
-reconciler need. A summary that omits those sections is not a draft artifact.
+`D-nnn` repeats the complete final task contract: title, type, remediation,
+root-cause-follow-up link, verification mode, local dependencies, goal, context contract,
+change surface, steps, check, and acceptance. `Cut notes` records the assumptions,
+exclusions, and disputed seams the user gate and reconciler need. A summary that omits
+those sections is not a draft artifact.
 
 An assumption is allowed here only when it is a **harmless implementation assumption**:
 an internal, reversible choice that preserves requested behaviour, scope, acceptance,
@@ -784,6 +866,23 @@ through retirement and fresh re-decomposition. A `done` legacy task stays done a
 whole file is frozen as the historical contract that was actually executed. No role may
 append another amendment before, during, or after migration.
 
+Older immutable tasks also predate `remediation`. Normalize them only in the reader:
+
+- a non-bug task without the field becomes `remediation: not_applicable` and
+  `root_cause_followup: none`;
+- a bug without `kind: mitigation` becomes `remediation: root_cause` and
+  `root_cause_followup: none`, matching the old bug protocol's root-cause requirement;
+- a bug with legacy `kind: mitigation` becomes `remediation: mitigation` and must not be
+  relabeled as root-cause. If it has no valid durable root-cause follow-up, recovery
+  records planning drift and re-decomposes the unfinished closure into immutable
+  replacement tasks. A completed legacy mitigation instead uses the repair overlay below;
+  its historical task bytes remain unchanged.
+
+Never edit the old task bytes to add these fields. A legacy mitigation is usable only
+after the follow-up relationship is durable in the replacement task set or recovery
+overlay; ambiguity over whether `kind` meant mitigation is a stop, not a default to
+`root_cause`.
+
 Encapsulate the *contract*, reference the *context*. Goal, surface, acceptance and check
 belong in the task. Conventions and module layout are pointed at, never copied — copies
 drift apart from `map.md` and from each other.
@@ -794,6 +893,8 @@ id: T-014
 title: Rotate refresh tokens inside session middleware
 milestone: M-03
 type: feature            # feature | bug | refactor | characterization | chore
+remediation: not_applicable # root_cause | mitigation | not_applicable
+root_cause_followup: none # T-nnn for mitigation; none otherwise
 verification: red_then_green # red_then_green | green_baseline | characterization
 blocked_by: [T-011]
 ---
@@ -831,6 +932,125 @@ after: must pass
 - [ ] Project oracle still passes (no regression)
 - [ ] rotate() is called exactly once per refresh
 ```
+
+`remediation` is the canonical distinction between a root-cause fix and a temporary
+mitigation. A `bug` task uses exactly `root_cause | mitigation`; every other task uses
+`not_applicable`. `root_cause_followup` is `none` except on a mitigation, where it is one
+different final `T-nnn` in the same milestone whose task has `type: bug`,
+`remediation: root_cause`, and `root_cause_followup: none`. The relationship does not
+imply execution order; `blocked_by` remains the only dependency field. The reconciler
+allocates both files before registering either row, maps the mitigation draft's local
+`D-nnn` link to the final id, and refuses an orphan, self-link, cycle, missing target, or
+link to another mitigation. A mitigation may satisfy its own acceptance and land, but it
+never closes, retires, or substitutes for the linked root-cause task.
+
+### Completed legacy mitigation repair overlay
+
+A completed immutable legacy task cannot gain `root_cause_followup` without destroying
+the historical contract. Its one authoritative overlay is an `## Dispatches` row plus the
+immutable artifact written by the assigned `ai-decompose` reconciler. Before dispatch,
+the parent serially allocates a fresh run plus a globally unused root-cause `T-nnn`, writes
+the run's immutable protocol, and persists the pending row in a valid schema-2 ledger.
+The protocol is the durable allocation record even if the parent dies before the ledger
+replacement:
+
+```rune-mitigation-repair-protocol
+run: M-03/R-005
+repair: completed_legacy_mitigation
+legacy_mitigation: T-031
+reserved_root_cause: T-033
+legacy_task: /workspace/acme/.rune/tasks/T-031.md
+root_cause_task: /workspace/acme/.rune/tasks/T-033.md
+repair_artifact: /workspace/acme/.rune/drafts/M-03/R-005/mitigation-repair.md
+```
+
+All seven fields are required and no others are accepted. `repair` has the single enum
+`completed_legacy_mitigation`; both task ids must match their exact absolute task paths,
+and `legacy_task`, `root_cause_task`, and `repair_artifact` must share the same absolute
+`main_root` while the artifact path embeds the exact run. A relative or mismatched path
+invalidates the protocol before any ledger row is written.
+
+These are the exact canonical row shapes:
+
+```rune-mitigation-repair-rows
+| mitigation-repair | ai-decompose | M-03/R-005 | pending T-031 -> T-033: protocol /workspace/acme/.rune/drafts/M-03/R-005/protocol.md; task /workspace/acme/.rune/tasks/T-033.md; repair /workspace/acme/.rune/drafts/M-03/R-005/mitigation-repair.md |
+| mitigation-repair | ai-decompose | M-03/R-005 | linked T-031 -> T-033: protocol /workspace/acme/.rune/drafts/M-03/R-005/protocol.md; task /workspace/acme/.rune/tasks/T-033.md; repair /workspace/acme/.rune/drafts/M-03/R-005/mitigation-repair.md |
+| mitigation-repair | ai-decompose | M-03/R-005 | blocked T-031 -> T-033: protocol /workspace/acme/.rune/drafts/M-03/R-005/protocol.md; task /workspace/acme/.rune/tasks/T-033.md; repair /workspace/acme/.rune/drafts/M-03/R-005/mitigation-repair.md; blocker evidence-insufficient; detail diagnosis-does-not-identify-causal-boundary; unblocks_when decision:DEC-004:decided |
+```
+
+The parent is the allocator and ledger writer for repair reservations; it never composes
+the task. The reconciler remains sole writer of the reserved task path and repair artifact.
+Allocation scans task files, every protocol's `reserved_root_cause`, and every pending,
+blocked, or linked repair row. A reservation burns both run and task id permanently.
+When several repairs are found together, the one parent assigns distinct ids and paths in
+numeric legacy-task order, writes each no-replace protocol, then persists all pending rows
+in one validated ledger replacement before any worker starts. Duplicate root ids, runs,
+task paths, or repair paths are invalid; simultaneous reconcilers therefore cannot collide.
+
+The durable order is strict: publish the no-replace protocol, persist its pending ledger
+row, then dispatch the worker. A row without its exact protocol and a dispatch without its
+pending row are invalid. A crash after protocol publication creates an attributable orphan;
+after schema 2 is durable, recovery validates that protocol and writes its uniquely derived
+pending row before any dispatch. It never invents or reallocates a field.
+
+The row's `work` is the fresh run id. Its outcome binds both task identities and every
+absolute path before dispatch. The reconciler receives the protocol, old task, its
+evidence, and milestone. It uses `reserved_root_cause` rather than allocating an id, and
+alone writes both the new immutable root-cause task and this complete artifact:
+
+```rune-mitigation-repair
+legacy_mitigation: T-031
+root_cause_followup: T-033
+milestone: M-03
+run: M-03/R-005
+legacy_task: /workspace/acme/.rune/tasks/T-031.md
+root_cause_task: /workspace/acme/.rune/tasks/T-033.md
+```
+
+The parent accepts the return only when the assignment, artifact, and both task files
+agree; the old task has `type: bug`, legacy `kind: mitigation`, and a `done` ledger row;
+and the new task is different, in the same milestone, and declares `type: bug`,
+`remediation: root_cause`, and `root_cause_followup: none`. In one validated ledger
+replacement it registers the new task and changes only that pending outcome to the linked
+shape above.
+
+That linked row and immutable artifact are the durable relationship. Task readers
+normalize the old task to `remediation: mitigation` and obtain its follow-up from exactly
+one matching linked repair row; they never rewrite or pretend the field existed in the
+old bytes. A missing, duplicate, pending, mismatched, cross-milestone, self, or mitigation
+target is unresolved repair work, not a valid task contract. Report, ledger, verification,
+and milestone-completion readers all perform this same join.
+
+Publication order is task file first, repair artifact second, both with atomic no-replace
+installation. Recovery handles every state without guessing:
+
+- neither exists: after proving the prior worker stopped, redispatch the same pending
+  assignment;
+- only the reserved task exists: validate it, keep it immutable, and redispatch the same
+  assignment only to validate that file and write the missing repair artifact;
+- only the repair artifact exists: this violates publication order, so change the row to
+  blocked with `blocker artifact-without-task` and an observable restore condition;
+- both exist and agree: perform the one registration-plus-linked ledger replacement;
+- either exists but conflicts with the reservation or the other output: preserve all
+  bytes and record a blocked mismatch; never overwrite or allocate around it;
+- an already-linked row: validate the registered task, both files, and row, then do nothing.
+
+`plan: blocked` writes neither task nor repair artifact. The parent persists the worker's
+lowercase `blocker`, single-token-or-pointer `detail`, and objective `unblocks_when` in the
+blocked row shape above. Blocked is durable and is never redispatched merely because a
+session restarted. Replaying the identical blocker, detail, and condition is a no-op;
+different values for an already-blocked reservation are a conflict and leave the row
+unchanged. Only after the named durable condition is observed does the parent
+atomically replace blocked with the same pending reservation, then redispatch; ids and
+paths never change. Reports show the blocked repair and its condition, and milestone
+completion remains false.
+
+Predecessor-ledger migration may put fully reserved pending assignments in its complete
+schema-2 candidate, but it must first write their protocols and then persist that candidate
+before dispatching `ai-decompose`. Thus the only pre-migration worker remains the amendment
+drift recorder. An orphan valid repair protocol is not dispatched pre-migration: recovery
+finishes its uniquely matching pending row after schema 2 is durable. A protocol/row
+collision or ambiguity stops.
 
 When a verifier rejects a task, its finding goes to `notes/T-nnn.verify.md` and never into
 the task file. The contract did not change merely because an attempt failed to meet it.

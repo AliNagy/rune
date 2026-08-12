@@ -144,7 +144,8 @@ the worktree `ai-verify` already ran the oracle in, so a re-run cannot say anyth
 Any other merge produced a tree nobody has tested yet. That is a git fact you check, not
 a call you make — and it is the only permitted reason to skip.
 
-Pass → the artifact landed. Continue to cleanup below, then return `landed`.
+`passing` → the artifact landed. Continue to cleanup below, then return `landed` with
+`oracle_result: passing`. In degraded mode use `oracle_result: none`.
 
 **6. On oracle failure, roll the merge back, then write the record.**
 
@@ -169,8 +170,9 @@ that one command quietly breaks it.
 
 **7. Run the oracle again** to confirm the rollback actually restored the tree.
 
-Green → return `reverted`. Main is back to known-good.
-Still red → return `stuck`. Say so plainly. The rollback did not restore the tree, and no
+`passing` → return `reverted` with the merge verdict `oracle_result: failing`. Main is back to
+known-good.
+Still `failing` → return `stuck`. Say so plainly. The rollback did not restore the tree, and no
 further landing is safe until a human looks.
 
 Step 7 is the step most worth not skipping. A rollback assumed to have worked and did not
@@ -178,7 +180,8 @@ leaves main red while your return value says it is green — which is the exact 
 skill exists to prevent, moved one step later where nobody is looking for it.
 
 **8. Record success, then clean up.** Append a `landed` block naming `base_commit`,
-`artifact_commit`, `verified_commit`, and the resulting main `HEAD`. Write that durable
+`artifact_commit`, `verified_commit`, the resulting main `HEAD`, and
+`oracle_result: passing | none` (`none` only in degraded mode). Write that durable
 fact before cleanup: if you die after it, reconciliation knows the code landed and only
 garbage collection remains.
 
@@ -238,7 +241,7 @@ artifact_commit: 4a91c02
 verified_commit: 4a91c02
 merged: b72de10             # resulting main HEAD, now rolled back
 rolled_back_to: 8f3e1d7     # HEAD before the merge
-oracle: 2 new failures, neither in the known-red baseline
+oracle_result: failing
 failing:
   - auth/session.test.ts :: "refresh keeps the device id"
     Expected "dev-7781", received undefined
@@ -289,14 +292,16 @@ making a decision — the parent decides what happens next, it just cannot see w
 
 ≤200 tokens.
 
-```
-task: T-014
+```rune-return
+work: T-014
+summary: rotation drops the device id the api layer reads back
 landing: landed | refused | conflict | reverted | stuck | not_landed
 main: green | red
+worktree: kept | discarded       # discarded only after successful cleanup
 worktree_path: /workspace/acme/.rune/worktrees/T-014
 verified_commit: 4a91c02
 attempt: 2 of 5              # exactly the attempt supplied by the parent
-summary: rotation drops the device id the api layer reads back
+oracle_result: passing | failing | none # only after an oracle verdict exists
 escalate: no             # or: yes (rule 3) — session.test.ts failed on attempt 1 too
 detail: /workspace/acme/.rune/notes/T-014.landing.md
 cleanup: complete | pending   # only for landed
@@ -307,13 +312,14 @@ causal drift id. Normal landing never emits it.
 
 Cleanup has its own complete envelope because no artifact was landed or recorded:
 
-```
-task: T-014
+```rune-return
+work: T-014
+summary: clean merged orphan removed | exact refusal reason
 landing: cleaned | refused
 main: green
+worktree: discarded | kept
 worktree_path: /workspace/acme/.rune/worktrees/T-014
 branch: refs/heads/task/T-014
-summary: clean merged orphan removed | exact refusal reason
 cleanup: complete | branch-pending | pending
 ```
 

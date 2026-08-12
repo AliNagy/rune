@@ -42,8 +42,10 @@ So:
 
 ## Procedure
 
-1. **Read the task spec** — type, verification mode, steps, change surface, acceptance,
-   and the stated check.
+1. **Read the task spec** — type, remediation, root-cause-follow-up link, verification
+   mode, steps, change surface, acceptance, and the stated check. A mitigation whose
+   follow-up is missing or not a root-cause bug is planning drift, never salvageable
+   implementation.
 2. **Read the progress file** — diagnosis, ticks, and the mode-specific evidence recorded
    so far. For a bug, bind the recovery baseline to its recorded `diagnosis_commit`.
 3. **Read `git -C <worktree_path> diff`.** This is the authoritative record of what happened.
@@ -96,17 +98,18 @@ original behavior.
 
 ## Return
 
-```
-task: T-016
+```rune-return
+work: T-016
+summary: steps 1-2 are salvageable; red evidence must be restored before step 3
 verdict: salvage | discard | partial
+worktree: kept
+worktree_path: /workspace/acme/.rune/worktrees/T-016
 premise_drift: true              # only when rule 3 matched
 applied: steps 1-2 complete, step 3 partly (rotate() exists, not wired into handle())
 containment: clean            # or: touched src/api/routes.ts, outside surface
 verification: red_then_green
 evidence: missing red         # forces the behavior change to be reset
 resume_at: step:3 | evidence:red_then_green | fresh
-worktree: kept
-worktree_path: /workspace/acme/.rune/worktrees/T-016
 detail: /workspace/acme/.rune/notes/T-016.md
 ```
 

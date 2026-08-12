@@ -62,11 +62,16 @@ files are normal coordination-file operations, not Git lifecycle commands.
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
-follow `ai-root` with that absolute root and `mode: initialize` before reading or writing
+follow `ai-root` with `work: coordination-root`, that absolute root, and
+`mode: initialize` before reading or writing
 coordination state. Stop and report any failure it returns. Resolve every coordination
 path against the returned root and include `main_root` plus absolute pointers in every
 dispatch. If step 1 drains task work, reuse each ledger-recorded absolute `worktree_path`
 through verification and landing.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 **Anything not on that list is a dispatch**, including `map.md` and Serena memories. You
 are the most context-starved parent in the system by the time you run; this is the worst
@@ -93,11 +98,21 @@ twice.
 
 | What you found | Where it goes |
 |---|---|
-| a convention the user corrected you on | **dispatch `ai-survey` with `main_root`** — one convention → `map.md` |
-| a codebase gotcha you discovered | **dispatch `ai-survey` with `main_root`** — one gotcha → a Serena memory |
+| a convention the user corrected you on | **dispatch `ai-survey` with `work: survey`, `main_root`** — one convention → `map.md` |
+| a codebase gotcha you discovered | **dispatch `ai-survey` with `work: survey`, `main_root`** — one gotcha → a Serena memory |
 | a choice made verbally | you write it — `decisions.md`, `status: decided` |
 | a constraint on the project | you write it — `vision.md` |
 | something the user wants built later | you write it — `vision.md`, as a want |
+
+Either survey update uses the same canonical assignment:
+
+```rune-dispatch
+follow: ai-survey
+work: survey
+main_root: /workspace/acme
+pointers:
+  map: /workspace/acme/.rune/map.md
+```
 
 The two dispatches are not ceremony. You are running at ~70% context by definition — the
 worst possible moment to open `map.md`, find the right section, and check a new line does

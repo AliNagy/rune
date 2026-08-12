@@ -67,11 +67,16 @@ to `ai-drift`.
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel` before
-reading state. Then follow `ai-root` with that absolute root and `mode: resolve`; it
+reading state. Then follow `ai-root` with `work: coordination-root`, that absolute root,
+and `mode: resolve`; it
 resumes an interrupted directory migration before ledger recovery. Stop and report any
 failure it returns. Resolve every `.rune/...` path against the returned root. Every
 recovery, verification, or landing dispatch carries `main_root`, the absolute
 `worktree_path` recorded in the task's ledger row, and absolute coordination pointers.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 **Anything not on that list is a dispatch** — above all reading a torn worktree's diff,
 which is the single most expensive thing you could do here and the reason `ai-recover`
@@ -96,6 +101,11 @@ the purpose of having resumed at all.
 
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
 to act on one.
+
+If `rune.yml` has legacy `commands.*.status: ok | fail` (or the old `none found` command
+result), route through `init` before task dispatch so its sole writer performs the exact
+canonical migration. `continue` may recognize that shape but never rewrites the manifest.
+Any other enum is damaged state and stops.
 
 ### Validate or migrate the ledger first
 
@@ -147,9 +157,26 @@ whitespace or its old placeholder comment follows the heading.
   rows are stale in a fresh session and are reconciled under the freeze, never resumed
   normally.
 
-This is the only pre-migration worker dispatch. It creates evidence required by the
-schema-2 candidate; no diagnosis, execution, verification, landing, or decomposition may
-start against a predecessor ledger.
+Apply the same task-reader normalization to predecessor and schema-2 ledgers whose
+immutable tasks predate `remediation`: non-bugs become `not_applicable`; bugs without
+legacy `kind: mitigation` become `root_cause`; known legacy mitigations stay mitigations.
+Never rewrite the task bytes. A known mitigation without a valid different, same-milestone
+root-cause task is repair work: unfinished rows enter the drift/re-decomposition path
+above. For a completed row, include an `ai-taskfmt` mitigation-repair pending assignment
+with a fresh run id, globally unused reserved root-cause id, and exact protocol, task, and
+repair paths in the complete schema-2 candidate. The parent writes the immutable protocol
+first and serializes multiple allocations in numeric legacy-task order; every protocol and
+pending/blocked/linked row burns its ids. Persist that candidate next; only then may normal
+schema-2 recovery dispatch the assigned fresh
+`ai-decompose` reconciliation. The reconciler alone writes the immutable root-cause task
+and repair artifact; the parent validates them and atomically registers the new row plus
+the linked outcome. A missing or ambiguous legacy marker stops rather than silently
+classifying known temporary work as a fix.
+
+The amendment drift recorder above is the only pre-migration worker dispatch. A pending
+mitigation-repair assignment may be created inside the migration candidate, but no
+decomposition starts until that schema-2 candidate is durable. No diagnosis, execution,
+verification, landing, or decomposition may start against a predecessor ledger.
 
 Only schemas 0 and 1 have migration paths. Migration is idempotent because a successful
 replacement is schema 2 and later runs validate it instead of migrating again.
@@ -337,6 +364,23 @@ Also check:
 - `retired` rows → validate their drift pointer and explicit `replaced_by` disposition,
   but never recover, claim, or resurrect them. Follow replacement chains only to report
   the current leaf tasks.
+- mitigation rows → for canonical tasks, validate `root_cause_followup` against a
+  different same-milestone ledger row and immutable task with `type: bug`,
+  `remediation: root_cause`, and no further follow-up. For a completed legacy
+  `kind: mitigation` task, consume exactly one mitigation-repair assignment. A linked row
+  and matching immutable artifact supply the normalized follow-up. A pending row with no
+  outputs is redispatched to `ai-decompose` with the same `work`, reserved root id, and
+  paths after proving the prior worker stopped. Task-only validates and redispatches only
+  to create the missing repair artifact. Artifact-only violates the required write order;
+  mismatched, duplicate, or artifact-only state becomes a durable blocked outcome with
+  `blocker`, `detail`, and objective `unblocks_when`. Both valid outputs are completed by
+  one registration-plus-linked ledger replacement. Already-linked state only revalidates.
+  A blocked repair is idempotent across sessions and is not dispatched until its named
+  durable condition is observed; then replace it with the same pending reservation before
+  retry. If no assignment exists, first reserve a fresh run and globally unused root id,
+  write its protocol, and persist the exact pending row. Preserve and route the root-cause row
+  independently even when the mitigation is `done`; recovery never converts the
+  relationship into completion or replacement lineage.
 - **staged worker questions** → collect valid `decisions/open/T-nnn-eN.md` files, require
   `raised_by` and `source_attempt` to match the task's current executor attempt, and sort
   them by numeric task id then attempt. Process that stable order serially using

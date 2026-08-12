@@ -25,12 +25,14 @@ Only these:
 - `main_root` — the absolute orchestration checkout; all coordination paths resolve here
 - `worktree_path` — the exact absolute task worktree used by the executor
 - `attempt` — the positive verifier attempt already incremented in schema-2 ledger state
-- `<main_root>/.rune/tasks/T-nnn.md` — the spec, including type, verification mode,
-  acceptance, and the stated check
+- `<main_root>/.rune/tasks/T-nnn.md` — the spec, including type, remediation,
+  root-cause-follow-up link, verification mode, acceptance, and the stated check
 - `<main_root>/.rune/notes/T-nnn.progress` — ticks, mode-specific evidence, and the latest
   `base_commit` / `artifact_commit` publication
 - the clean task worktree at `worktree_path` and `artifact_commit`
 - `<main_root>/.rune/rune.yml` — the project oracle and its known-red baseline
+- `<main_root>/.rune/ledger.md` — registration and milestone identity for a mitigation's
+  linked root-cause row
 - `<main_root>/.rune/notes/T-nnn.verify.md` — earlier verdicts on this task, if this is a retry
 
 Both roots and every pointer must be absolute. Confirm that `worktree_path` is a registered
@@ -54,8 +56,18 @@ history of what has already been rejected — then verify the task, not the find
 ## Procedure
 
 **1. Bind verification to the published artifact.** Read the last publication block from
-the progress file. Read `type` and `verification` from the task and require one allowed pair
-from `ai-taskfmt`; a missing or incompatible mode is `unverified` with `reason: evidence`.
+the progress file. Read `type`, `remediation`, `root_cause_followup`, and `verification`
+from the task and require one allowed contract from `ai-taskfmt`. For a completed legacy
+task with `type: bug` and `kind: mitigation`, normalize `remediation: mitigation` and
+obtain `root_cause_followup` only from exactly one linked mitigation-repair ledger row and
+matching immutable repair artifact; never edit or pretend to read it from the old task.
+Any other missing or incompatible field, or a pending/missing/duplicate/mismatched repair,
+is `unverified` with `reason: evidence`. For a mitigation, require the linked final task
+and ledger row to exist, use a different id in the same milestone, and declare `type: bug`,
+`remediation: root_cause`, and `root_cause_followup: none`. This
+validates the durable follow-up relationship; it does not require the follow-up to be
+complete before the mitigation can pass. A self-link, cross-milestone link, mitigation
+target, missing target, or chained follow-up is `unverified` with `reason: evidence`.
 Then establish all of these mechanically:
 
 - `git -C <worktree_path> rev-parse HEAD` equals `artifact_commit`.
@@ -152,6 +164,8 @@ tells them apart.
 ```markdown
 ## attempt 2 — 2026-08-08
 verdict: fail
+remediation: not_applicable
+root_cause_followup: none
 verification: red_then_green
 base_commit: a3f91c2
 artifact_commit: 4a91c02
@@ -178,6 +192,8 @@ there is no finding to carry:
 ```markdown
 ## attempt 3 — 2026-08-08
 verdict: pass
+remediation: not_applicable
+root_cause_followup: none
 verification: red_then_green
 base_commit: a3f91c2
 artifact_commit: 62be8d1
@@ -200,10 +216,14 @@ not harmless noise.
 
 ## Verdict
 
-```
+```rune-return
+work: T-014
+summary: rotation meets acceptance; oracle is unchanged from its known-red baseline
 verdict: pass | fail | unverified
-task: T-014
+worktree: kept | discarded # discarded only when the supplied path is proven absent
 worktree_path: /workspace/acme/.rune/worktrees/T-014
+remediation: not_applicable | root_cause | mitigation
+root_cause_followup: none | T-nnn
 reason: artifact | evidence | oracle | acceptance   # required for unverified
 base_commit: a3f91c2
 artifact_commit: 62be8d1
@@ -213,7 +233,7 @@ local_check: pass (rotation.test.ts)
 verification: red_then_green
 evidence: red and green present for rotation.test.ts
 sensitivity_check: test fails when change reverted — check is real
-oracle: pass (baseline: 3 known failures, unchanged)
+oracle_result: passing (baseline: 3 known failures, unchanged)
 flaky: none                       # or: auth/session.test.ts disagreed with itself
 ticks: 3/3 match diff
 acceptance:

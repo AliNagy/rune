@@ -52,10 +52,15 @@ operations; the graph worker owns `milestones.md`, and Git task lifecycle is dis
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
-follow `ai-root` with that absolute root and `mode: initialize` before any coordination
+follow `ai-root` with `work: coordination-root`, that absolute root, and
+`mode: initialize` before any coordination
 read or write. Stop and report any failure it returns. Resolve every coordination path
 against the returned root and include `main_root`, plus absolute pointers, in every
 dispatch.
+
+Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+return envelope: `work` must equal the assigned token, `summary` must be one line, and
+`worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 **Anything not on that list is a dispatch**, including reading source code and generating
 the milestone graph. Holding the interview is why your context is precious; spending it on
@@ -110,10 +115,19 @@ each answer reshapes what is worth asking next.
 
 ## Mode B · In-progress project
 
-1. **Survey** — dispatch a subagent that follows `ai-survey`, carrying `main_root` and
+1. **Survey** — dispatch a subagent that follows `ai-survey`, carrying `work: survey`,
+   `main_root`, and
    absolute coordination pointers. Returns stack,
    modules, conventions, and the completeness assessment: stubs, orphans, half-wired
    paths, contradictions, abandoned directions.
+
+```rune-dispatch
+follow: ai-survey
+work: survey
+main_root: /workspace/acme
+pointers:
+  map: /workspace/acme/.rune/map.md
+```
 2. **Present what is there.** Show the user what actually exists — including the awkward
    parts. Frequently they do not know a subsystem was abandoned half-built.
 3. **Interview** — same topics as Mode A, but anchored to reality. "The billing module
@@ -185,16 +199,26 @@ it dies after it, the interview is complete even when `milestones.md` is absent.
 Generate milestones only with `vision: complete` and once every blocking decision is
 `decided`.
 
-**Dispatch a subagent that follows `ai-decompose` with `main_root` and absolute pointers
+**Dispatch a subagent that follows `ai-decompose` with `work: vision/graph`, `main_root`,
+and absolute pointers
 to write `<main_root>/.rune/milestones.md`. You do not write it yourself.** By this point
 everything the graph needs is already on disk — `vision.md` and
 `decisions.md`, which you have been writing as the interview settled, plus the survey
 digest and `map.md` in Mode B. It reads those, writes the milestone graph per
 `ai-taskfmt`, and returns the list in ≤200 tokens for you to show the user.
 
+```rune-dispatch
+follow: ai-decompose
+work: vision/graph
+main_root: /workspace/acme
+pointers:
+  vision: /workspace/acme/.rune/vision.md
+  milestones: /workspace/acme/.rune/milestones.md
+```
+
 Dispatch exactly one graph worker at a time. Accept `plan: graph` only when `artifact:` is
 the exact absolute `<main_root>/.rune/milestones.md` pointer and the completed file
-validates; log its return as `plan-graph | ai-decompose | vision | graph: <absolute
+validates; log its return as `plan-graph | ai-decompose | vision/graph | graph: <absolute
 milestones path>`. The parent records no copy and never edits or promotes the graph. Confirm a
 stopped predecessor before retrying the same final path.
 

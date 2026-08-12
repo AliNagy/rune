@@ -84,16 +84,21 @@ dispatch, same discipline:
 - **Never summarise a failure you did not read.** The reason belongs in the note, quoted
   from the actual output.
 
-Return ≤200 tokens:
+Return ≤200 tokens. Command verdicts use `passing | failing | unavailable`; the oracle
+uses `passing | failing | none`, exactly as stored by `init`:
 
-```
-build:     ok    22s
-test:      ok    34s
-lint:      fail  8s    14 pre-existing errors
-typecheck: ok    11s
-run:       none found
-
-oracle: npm test — passing, verified on a clean tree
+```rune-return
+work: init/commands
+summary: test is the passing oracle; lint has 14 pre-existing errors
+oracle: passing
+worktree: none
+commands:
+  build: passing 22s
+  test: passing 34s
+  lint: failing 8s - 14 pre-existing errors
+  typecheck: passing 11s
+  run: unavailable
+oracle_command: npm test
 detail: /workspace/acme/.rune/notes/init-commands.md
 ```
 
