@@ -340,7 +340,10 @@ contracts:
    drift-block every inactive row in that set, and stop **all** new diagnosis, execution,
    verification, retry, and landing dispatches for the set. An inactive row with
    `worktree: —` becomes `worktree: discarded` in that update. The ledger drift entry,
-   not an active row's status, is the durable freeze seen after a crash.
+   not an active row's status, is the durable freeze seen after a crash. Count the closure
+   as you build it and record both numbers in that entry — `closure: N of M unfinished`,
+   where `M` is the milestone's unfinished tasks before the freeze. The stop rule below
+   reads those numbers, so a later session never re-derives them.
 2. Drain every frozen row by its pre-freeze state; ordinary outcome routing is suspended:
    - `pending`, `awaiting`, `blocked`, or already `drifted`: leave it drift-blocked. If it
      owns an absolute worktree, dispatch `ai-drift` in quiesce mode after its prior worker
@@ -384,6 +387,22 @@ contracts:
 The user gate below shows both sides: which task ids became history and which fresh task
 ids now carry their outcomes. A `none` disposition is called out explicitly; it means the
 replan proved no replacement work is required, not that a task silently disappeared.
+
+### When drift stops the loop
+
+Every drift replans. What varies is whether you then keep working or hand back to the
+user, and that is decided by the `closure: N of M unfinished` numbers recorded in step 1 —
+never by how serious the drift felt.
+
+| Measure | Stop and ask when |
+|---|---|
+| `N`, the unfinished tasks retired | 3 or more |
+| `N / M`, the share of the milestone retired | half or more |
+| the milestone's own acceptance | the drift record names it as invalid |
+
+Any one is enough. Below all three, replan and carry on; the replan still appears in the
+next report. Quote the two numbers whenever you stop on this rule, so the user sees the
+same measurement you did.
 
 ## Judgment fans out, mechanics do not
 
@@ -755,9 +774,10 @@ Per `ai-ledger`:
   edit its task files.
 - Any executor blocker → keep its worktree and durable handoff; do not retry until the
   recorded condition is proven cleared.
-- Enough drift in one milestone → use *Replanning after drift* to write fresh task ids,
+- Any drift in one milestone → use *Replanning after drift* to write fresh task ids,
   atomically retire the obsolete rows with replacement lineage, and continue only after
-  the replacement transaction validates.
+  the replacement transaction validates. Whether you then keep going or hand back is the
+  measured call in *When drift stops the loop*, not a judgement made here.
 
 Then report, and **re-check `<main_root>/.rune/PAUSED` before dispatching the next batch.** The user
 can pause at any point; the check belongs at the top of every loop iteration, not only at
@@ -781,9 +801,10 @@ Everything you write opens with a TL;DR and uses plain words. Say "the tests pas
 ## Stopping
 
 Stop and return to the user when: the milestone is complete, an `open` decision blocks
-progress, an executor asked a question, drift invalidates a substantial part of the plan,
-an executor is blocked and nothing else is dispatchable, the ledger reaches `failures >= 2`
-for a task, a lander returns `escalate: yes` or `stuck`, or nothing is dispatchable.
+progress, an executor asked a question, drift crosses the measured threshold in *When
+drift stops the loop*, an executor is blocked and nothing else is dispatchable, the ledger
+reaches `failures >= 2` for a task, a lander returns `escalate: yes` or `stuck`, or nothing
+is dispatchable.
 
 ```
 TL;DR

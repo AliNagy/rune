@@ -191,13 +191,21 @@ recovery, and landing. `discarded` and `merged` may replace it only when the pat
 contains live task state.
 
 `## Drift` is also routing state. A live entry has the exact form
-`- DRF-nnn (from T-nnn) quiescing: T-nnn,...`; that frozen set suppresses every new
+`- DRF-nnn (from T-nnn) quiescing: T-nnn,... — closure: N of M unfinished`; that frozen
+set suppresses every new
 task-bound dispatch even while an already-running row still has an active status. The set
 is the complete unfinished dependency closure and may shrink only when an in-flight
 lander proves its commit already reached green main, making that task `done`. The atomic
 replacement transaction changes the entry to `retired: ... — replacements: ...` only
 after every remaining frozen row is inactive and its worktree is `discarded`. A crash
 therefore cannot erase the fact that a late worker return must be quarantined.
+
+`N` is the number of frozen ids in that entry and `M` the milestone's unfinished tasks
+measured before the freeze. Both are written once, by the same update that creates the
+entry, and are never recomputed afterwards: they are the durable evidence for `work`'s
+stop rule, so a later session reads the original measurement rather than re-deriving one
+from a tree that has since moved. `N` falls only when a lander removes an id from the set,
+and `M` never changes.
 
 ## Required fields by status
 

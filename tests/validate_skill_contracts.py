@@ -36,7 +36,9 @@ RETURN_SCHEMAS: dict[str, dict[str, set[str]]] = {
     "ai-recover": {"verdict": {"salvage", "discard", "partial"}},
     "ai-research": {"research": {"answered", "blocked"}},
     "ai-root": {"migration": {"none", "completed", "resumed", "blocked"}},
-    "ai-survey": {"survey": {"mapped", "blocked"}},
+    "ai-survey": {
+        "survey": {"mapped", "amended", "unchanged", "conflict", "blocked"}
+    },
     "ai-taskfmt": {"status": {"done", "drifted", "budget", "blocked", "question"}},
     "ai-triage": {"type": {"bug", "feature", "refactor", "investigation"}},
     "ai-verify": {"verdict": {"pass", "fail", "unverified"}},
@@ -53,12 +55,13 @@ PRIMARY_OUTCOME_FIELDS = {
 EXPECTED_RETURN_EXAMPLES = {
     "ai-bug": 1, "ai-decompose": 1, "ai-drift": 3, "ai-execute": 1,
     "ai-investigate": 1, "ai-land": 2, "ai-oracle": 1, "ai-recover": 1,
-    "ai-research": 1, "ai-root": 1, "ai-survey": 1, "ai-taskfmt": 2,
+    "ai-research": 1, "ai-root": 1, "ai-survey": 2, "ai-taskfmt": 2,
     "ai-triage": 1, "ai-verify": 1, "work": 2,
 }
 EXPECTED_DISPATCH_EXAMPLES = {
     "ai-bug": 1,
     "ai-root": 1,
+    "ai-survey": 1,
     "ai-taskfmt": 4,
     "handoff": 1,
     "init": 2,
@@ -245,7 +248,8 @@ def check_dispatch_examples_and_callers() -> None:
 
     direct_bindings = {
         "ai-bug": [("ai-bug", "T-nnn")],
-        "handoff": [("ai-survey", "survey")],
+        "ai-survey": [("ai-survey", "survey/amend")],
+        "handoff": [("ai-survey", "survey/amend")],
         "init": [("ai-survey", "survey"), ("ai-oracle", "init/commands")],
         "vision": [("ai-survey", "survey"), ("ai-decompose", "vision/graph")],
         "work": [("ai-bug", "T-nnn")],
@@ -572,6 +576,7 @@ def assert_bounded(command: str) -> None:
         or " cat-file -e " in command
         or " merge-base " in command
         or " rev-list --count " in command
+        or (" diff --name-only " in command and command.endswith("| wc -l"))
         or (
             " worktree list --porcelain | awk " in command
             and ("END { print" in command or "registered_worktrees=" in command)
@@ -1956,6 +1961,168 @@ def check_mitigation_contracts() -> None:
             fail(f"mitigation lifecycle coverage is incomplete: {token}")
 
 
+@dataclass
+class SurveyMap:
+    """The parts of map.md an amendment can reach, plus a write-collision guard."""
+
+    sections: dict[str, list[str]] = field(default_factory=dict)
+    revision: int = 0
+
+    def snapshot(self) -> int:
+        return self.revision
+
+
+def apply_amendment(
+    doc: SurveyMap,
+    base_revision: int,
+    *,
+    section_name: str,
+    fact: str,
+    contradicts: str | None = None,
+) -> str:
+    if base_revision != doc.revision:
+        raise ValueError("amendment written from a stale snapshot")
+    if contradicts is not None:
+        return "conflict"
+    if fact in doc.sections.get(section_name, []):
+        return "unchanged"
+    doc.sections.setdefault(section_name, []).append(fact)
+    doc.revision += 1
+    return "amended"
+
+
+def check_measured_thresholds_and_amend() -> None:
+    init = read("skills/init/SKILL.md")
+    stale = section(init, "When setup is stale", 3)
+    for token in ("50 or more", "25 or more", "no longer resolves", "verdict: current"):
+        if token not in stale:
+            fail(f"init staleness rule is not measurable: {token}")
+    for probe in (
+        "git -C <main_root> cat-file -e <recorded_commit>^{commit}",
+        "git -C <main_root> rev-list --count <recorded_commit>..HEAD",
+        "git -C <main_root> diff --name-only <recorded_commit>..HEAD | wc -l",
+    ):
+        if probe not in init:
+            fail(f"init staleness probe is not an admitted command: {probe}")
+    manifest = next(
+        block
+        for info, block in fenced_blocks(init)
+        if info == "yaml" and "commands:" in block and "oracle:" in block
+    )
+    if not re.search(r"(?m)^staleness:\n(?:  [a-z_]+: \S+\n)+", manifest):
+        fail("rune.yml candidate does not persist the staleness measurement")
+
+    work = read("skills/work/SKILL.md")
+    drift_stop = section(work, "When drift stops the loop", 3)
+    for token in ("3 or more", "half or more", "closure: N of M unfinished"):
+        if token not in drift_stop:
+            fail(f"drift stop rule is not measurable: {token}")
+    if "closure: N of M unfinished" not in read("skills/ai-ledger/SKILL.md"):
+        fail("ledger drift entry does not carry the measurement work stops on")
+    if "closure: N of M unfinished" not in section(work, "Replanning after drift", 3):
+        fail("work states the drift stop rule but never records what it measured")
+    for skill in ("work", "init", "vision", "continue"):
+        markdown = read(f"skills/{skill}/SKILL.md")
+        for phrase in ("substantial", "substantially", "enough drift"):
+            if re.search(rf"(?i)\b{phrase}\b", markdown):
+                fail(f"{skill}: subjective threshold survives: {phrase}")
+
+    pause = read("skills/pause/SKILL.md")
+    if re.search(r"(?m)^\|\s*\*\*stop\*\*", pause):
+        fail("pause still offers a stop mode it cannot implement")
+    absent = section(pause, 'Why there is no "stop now"', 3)
+    for token in ("no acknowledgement", "drain", "abandon", "/rune:continue"):
+        if token not in absent:
+            fail(f"pause does not explain the removed mode honestly: {token}")
+    for route in PUBLIC_ROUTES:
+        if "rune:pause stop" in read(f"skills/{route}/SKILL.md"):
+            fail(f"{route}: still routes the user to a removed pause mode")
+
+    survey = read("skills/ai-survey/SKILL.md")
+    amend = section(survey, "Amending one fact")
+    for token in (
+        "Read before you write",
+        "one at a time",
+        "not yours to resolve",
+        "work: survey/amend",
+        "mode: amend",
+    ):
+        if token not in amend:
+            fail(f"amend contract is incomplete: {token}")
+    modes = section(survey, "Two modes")
+    if "never surveys" not in modes:
+        fail("amend mode does not forbid re-surveying the codebase")
+    handoff = read("skills/handoff/SKILL.md")
+    for token in ("mode: amend", "One fact per dispatch", "conflict"):
+        if token not in handoff:
+            fail(f"handoff does not drive the incremental mode: {token}")
+    if "mode: full" not in handoff:
+        fail("handoff does not forbid dispatching a full survey")
+
+    surveyed = SurveyMap(
+        sections={
+            "Conventions": ["errors are typed Result unions"],
+            "Danger zones": ["prisma/migrations/** — generated"],
+        }
+    )
+    base = surveyed.snapshot()
+    first = apply_amendment(
+        surveyed, base, section_name="Conventions", fact="tests are colocated"
+    )
+    second = apply_amendment(
+        surveyed,
+        surveyed.snapshot(),
+        section_name="Danger zones",
+        fact="src/generated/** — regenerated",
+    )
+    if (first, second) != ("amended", "amended"):
+        fail("serial handoff facts did not both file")
+    if surveyed.sections["Conventions"] != [
+        "errors are typed Result unions",
+        "tests are colocated",
+    ] or len(surveyed.sections["Danger zones"]) != 2:
+        fail("an amendment did not preserve the content it was not sent to change")
+
+    unchanged_from = surveyed.snapshot()
+    if (
+        apply_amendment(
+            surveyed,
+            unchanged_from,
+            section_name="Conventions",
+            fact="tests are colocated",
+        )
+        != "unchanged"
+    ):
+        fail("re-filing a known fact was not idempotent")
+    if surveyed.revision != unchanged_from:
+        fail("an unchanged amendment still wrote to the map")
+
+    conflicted = apply_amendment(
+        surveyed,
+        surveyed.snapshot(),
+        section_name="Conventions",
+        fact="errors are thrown across module boundaries",
+        contradicts="errors are typed Result unions",
+    )
+    if conflicted != "conflict" or surveyed.revision != unchanged_from:
+        fail("a contradicting fact was not returned to the parent unwritten")
+
+    racing = SurveyMap(sections={"Conventions": ["errors are typed Result unions"]})
+    shared = racing.snapshot()
+    apply_amendment(racing, shared, section_name="Conventions", fact="first writer")
+    try:
+        apply_amendment(racing, shared, section_name="Conventions", fact="second writer")
+    except ValueError:
+        pass
+    else:
+        fail("concurrent amendments were allowed to overwrite each other")
+    if racing.sections["Conventions"] != [
+        "errors are typed Result unions",
+        "first writer",
+    ]:
+        fail("a losing concurrent amendment corrupted the map")
+
+
 @dataclass(frozen=True)
 class StagedQuestion:
     task: int
@@ -2331,6 +2498,7 @@ def main() -> None:
     check_decision_allocation_and_returns()
     check_pre_reconciliation_decision_gate()
     check_mitigation_contracts()
+    check_measured_thresholds_and_amend()
     check_scaffold_behavior()
     print("skill contracts and scaffold behavior: ok")
 

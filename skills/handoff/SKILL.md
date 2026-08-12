@@ -83,8 +83,9 @@ If work is in flight, drain it exactly as `pause` does — let executors finish,
 staged question into a parent-assigned decision and `awaiting` row, verify, and merge.
 Never hand a torn tree to a session that has no idea what caused it.
 
-If the user wants out immediately, that is `/rune:pause stop` first, then handoff. Say
-which you did.
+If the user wants out immediately, a running worker still cannot be interrupted — `pause`
+says why. Either wait for it to return, or run `/rune:pause abandon` to discard that task's
+work, and then hand off. Say which one you did.
 
 ## 2. Triage what is in your head
 
@@ -98,25 +99,45 @@ twice.
 
 | What you found | Where it goes |
 |---|---|
-| a convention the user corrected you on | **dispatch `ai-survey` with `work: survey`, `main_root`** — one convention → `map.md` |
-| a codebase gotcha you discovered | **dispatch `ai-survey` with `work: survey`, `main_root`** — one gotcha → a Serena memory |
+| a convention the user corrected you on | **dispatch `ai-survey` in `amend` mode** — one convention → `map.md` |
+| a codebase gotcha you discovered | **dispatch `ai-survey` in `amend` mode** — one gotcha → a Serena memory |
 | a choice made verbally | you write it — `decisions.md`, `status: decided` |
 | a constraint on the project | you write it — `vision.md` |
 | something the user wants built later | you write it — `vision.md`, as a want |
 
-Either survey update uses the same canonical assignment:
+Either survey update uses the same canonical assignment, carrying the one fact and its
+kind:
 
 ```rune-dispatch
 follow: ai-survey
-work: survey
+work: survey/amend
+mode: amend
 main_root: /workspace/acme
+fact_kind: convention
+fact: errors are typed Result unions, never thrown across module boundaries
 pointers:
   map: /workspace/acme/.rune/map.md
 ```
 
-The two dispatches are not ceremony. You are running at ~70% context by definition — the
+**One fact per dispatch, and one dispatch at a time.** Send it, wait for the return, then
+send the next. Never batch facts into a list and never run two of these at once — both
+workers would edit `map.md` from the copy they each loaded, and the second write would
+silently erase the first. Never dispatch `mode: full` from here either; a full survey
+re-derives the whole codebase to file a sentence, and overwrites the map while doing it.
+
+Act on what comes back:
+
+- `amended` — filed. Name it in the handoff doc's *Filed elsewhere* section.
+- `unchanged` — already on disk. Say nothing; there is nothing to report.
+- `conflict` — **ask the user before the session ends.** The worker quotes the map line
+  your fact contradicts. One of the two is wrong and only the user knows which. If they
+  are gone, put both in the handoff doc as an open thread; never guess and never re-send
+  the same fact hoping for a different answer.
+- `blocked` — put the fact in the handoff doc verbatim so the next session can file it.
+
+These dispatches are not ceremony. You are running at ~70% context by definition — the
 worst possible moment to open `map.md`, find the right section, and check a new line does
-not contradict what is already there. One dispatch per item, never a list.
+not contradict what is already there.
 
 A want goes to `vision.md`, **not** `milestones.md`. A passing remark is not a plan; the
 next `rune:vision` decides whether it becomes one, with the decision records that requires.

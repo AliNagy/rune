@@ -88,7 +88,7 @@ the purpose of having resumed at all.
 ```
 <main_root>/.rune/PAUSED        · paused? when, why, was the tree left clean?
 <main_root>/.rune/sessions/     · newest session handoff — context the ledger does not carry
-<main_root>/.rune/rune.yml      · initialized? stale? oracle?
+<main_root>/.rune/rune.yml      · initialized? oracle? last recorded staleness verdict?
 <main_root>/.rune/vision.md     · which required topics are durably settled?
 <main_root>/.rune/decisions.md  · any status: open?
 <main_root>/.rune/milestones.md · exists? which is current?
@@ -101,6 +101,10 @@ the purpose of having resumed at all.
 
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
 to act on one.
+
+`staleness` in `rune.yml` is the verdict from the last `rune:init` run, not a fresh
+measurement. Report it as what it is — "setup was current as of that commit" — and leave
+re-measuring to `init`, which owns the rule and the probes.
 
 If `rune.yml` has legacy `commands.*.status: ok | fail` (or the old `none found` command
 result), route through `init` before task dispatch so its sole writer performs the exact

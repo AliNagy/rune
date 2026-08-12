@@ -60,8 +60,9 @@ so do not fall back to `Read` because one lookup felt slow.
 Two stores, different jobs, do not mix them.
 
 - **Serena memories** — stable, agent-facing background knowledge about the codebase.
-  Architecture notes, subsystem explanations, gotchas. Survives sessions. Written by
-  `rune:init` and by surveyors.
+  Architecture notes, subsystem explanations, gotchas. Survives sessions. Written only by
+  `ai-survey` workers. `rune:init`, `rune:vision`, and `handoff` dispatch those workers;
+  no parent route writes a memory itself.
 - **`.rune/*`** — the plan and its mutable state. Human-readable, git-tracked, edited
   by the user. Vision, milestones, tasks, ledger.
 
