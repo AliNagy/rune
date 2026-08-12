@@ -27,6 +27,7 @@ stranger with an empty context.
   tasks/T-nnn.md         # immutable task specification; never edited or deleted
   notes/T-nnn.md         # handoff notes, long results
   notes/T-nnn.progress   # diagnosis, step ticks, verification evidence, publications
+  notes/T-nnn.sizing.md  # does this fit one agent? single writer: the sizer
   notes/T-nnn.verify.md  # verdicts and findings, one block per attempt. single writer: the verifier
   notes/T-nnn.landing.md # merge attempts and what broke. single writer: the lander
   notes/INV-nnn.md       # promoted investigation answer
@@ -118,6 +119,7 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `tasks/T-nnn.md` | the single reconciling worker on `ai-decompose` that creates it |
 | `notes/T-nnn.progress` | the worker holding T-nnn: `ai-bug` during diagnosis, then `ai-execute` |
 | `notes/T-nnn.md` | the worker holding T-nnn |
+| `notes/T-nnn.sizing.md` | a worker on `ai-size` |
 | `notes/T-nnn.verify.md` | a worker on `ai-verify` |
 | `notes/T-nnn.landing.md` | a worker on `ai-land` |
 | `decisions/open/T-nnn-eN.md` | the worker holding that exact T-nnn executor attempt |
@@ -502,6 +504,7 @@ skill**:
 | `ai-survey` | `survey: mapped \| amended \| unchanged \| conflict \| blocked` |
 | `ai-root` | `migration: none \| completed \| resumed \| blocked` |
 | `ai-verify-finding` | `finding: confirmed \| refuted \| inconclusive` |
+| `ai-size` | `sizing: pass \| split \| blocked` |
 
 Then whatever else that skill defines.
 
@@ -1141,6 +1144,12 @@ One task = **at most 5 files, one subsystem, one verifiable outcome.** If it nee
 it is two tasks. Oversized tasks are the root cause of blown context budgets and of
 drift bounces — a task that keeps drifting was cut too large, and that is a signal about
 the planner, not the executor.
+
+That rule is necessary and not sufficient, so it is checked twice. The planner applies it
+while cutting. Then **every newly written task is sized again by a fresh worker on
+`ai-size`, before it can be executed** — because five files can be a small job or an
+enormous one, and the planner holding the whole milestone is the least able to tell which.
+A task is registered `unsized` and only a `pass` moves it to `pending`; see `ai-ledger`.
 
 ### Step rules
 

@@ -310,15 +310,48 @@ Use this exact two-phase protocol:
    a different final task in the same batch and milestone whose immutable contract is a
    root-cause bug; both files must exist and validate before either row is registered.
    Then register exactly those tasks in `<main_root>/.rune/ledger.md` in one
-   validated parent update. New rows start `pending`, `d0/e0/v0/l0`, zero failures, no
+   validated parent update. New rows start `unsized`, `d0/e0/v0/l0`, zero failures, no
    finding or blocker, `resume_at: fresh`, `replaced_by: —`, and no worktree. For a bug,
    update the existing
-   reserved row's title and dependencies, move `diagnosing -> pending`, preserve `d1` and
+   reserved row's title and dependencies, move `diagnosing -> unsized`, preserve `d1` and
    its absolute worktree, clear the blocker, and set `resume_at: fresh`; add only the extra
    rows. Draft planners and the reconciler never register tasks themselves.
+7. Size every newly registered task, below. Nothing is dispatchable until it passes.
 
 The draft files remain immutable after reconciliation. They are the evidence for what the
 planners agreed on, where they disagreed, and what the reconciler changed.
+
+### Sizing the new tasks
+
+A task arrives registered `unsized`, which means nothing can claim it. The planner already
+applied the five-file rule while cutting; this asks the different question that rule cannot
+answer — whether **one fresh agent could finish this whole task with room left over.**
+Five files in one module and five files across three subsystems both pass the rule and are
+not the same job.
+
+Dispatch one worker following `ai-size` per new task, with the task, milestone, map, and
+`notes/T-nnn.sizing.md` pointers. They are independent and read-only, so run them
+concurrently. Never send a planner or reconciler from this run: the reasoning that produced
+the task is exactly what would talk a reviewer into accepting it.
+
+| Returned | What you record |
+|---|---|
+| `pass` | `unsized -> pending`, blocker `—`, resume `fresh`. Now dispatchable. |
+| `split` | leave it `unsized` and re-cut, below. |
+| `blocked` | stays `unsized`, blocker `sizing:<slug>`, finding points at the sizing record. Report it; a task nobody can assess is not a task you dispatch anyway. |
+
+A `split` goes back through decomposition, not into a patched task file. Allocate a fresh
+`R-nnn` whose protocol carries the sizing record and the retiring id, re-cut that one task,
+and retire the oversized row with `replaced_by` naming its replacements — the same atomic
+handoff a drift replan uses. **The replacements are registered `unsized` and sized like any
+other new task**, because a split can be cut too large again.
+
+If the same task returns `split` twice, stop and take it to the user. Two rejections is a
+signal about the milestone, not the cut, and a third planning round usually produces the
+second cut again.
+
+Report a split at the next checkpoint in plain words: what was too big and how it is now
+divided. Do not report a `pass` — a task that fits is the normal case and says nothing.
 
 If a protocol reclassifies work after a run has been created, abandon that run and start a
 fresh `R-nnn` with a new protocol record. A bug reservation is also removed from the live
@@ -381,10 +414,12 @@ contracts:
    validated same-milestone root-cause task in the replacement set. Never overwrite or
    delete any old task file.
 5. After every new file exists, perform the one ledger transaction from `ai-ledger`: add
-   the new `pending` rows (or finalize the fresh reproduced bug reservation) and move all
+   the new `unsized` rows (or finalize the fresh reproduced bug reservation as `unsized`)
+   and move all
    old rows to terminal `retired` with their immediate `replaced_by` values. If validation
    or the write fails, none of the old rows retires and none of the new tasks becomes
-   executable. Unregistered task-file ids remain burned.
+   executable. Unregistered task-file ids remain burned. Then size every new row exactly as
+   a first cut is sized; a replan is not evidence that the replacements fit.
 
 The user gate below shows both sides: which task ids became history and which fresh task
 ids now carry their outcomes. A `none` disposition is called out explicitly; it means the
@@ -492,8 +527,10 @@ Anything to add before I start?
 
 ### Choosing a batch
 
-A task is eligible when its `blocked_by` are all resolved. Among eligible tasks, dispatch
-several at once when — and only when — **their change surfaces are disjoint.**
+A task is eligible when it is `pending` and its `blocked_by` are all resolved. `unsized`
+rows are not eligible and never become so by waiting — they are waiting on `ai-size`, not
+on a dependency. Among eligible tasks, dispatch several at once when — and only when —
+**their change surfaces are disjoint.**
 
 That second condition is the real constraint, and it is checkable: every task declares its
 change surface, so compare the file lists. Two tasks touching the same file will conflict

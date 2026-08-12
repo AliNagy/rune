@@ -36,6 +36,7 @@ main: green
 | T-013 | M-03 | Diagnose refresh regression | diagnosing | — | /workspace/acme/.rune/worktrees/T-013 | d1/e0/v0/l0 | 0 | — | — | plan:M-03/R-002 | — |
 | T-014 | M-03 | Rotate refresh tokens | in_progress | — | /workspace/acme/.rune/worktrees/T-014 | d0/e2/v1/l0 | 1 | .rune/notes/T-014.verify.md#attempt-1 | — | recover | — |
 | T-015 | M-03 | Refresh endpoint | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh | — |
+| T-018 | M-03 | Session listing | unsized | — | — | d0/e0/v0/l0 | 0 | .rune/notes/T-018.sizing.md | sizing:surface-file-missing | fresh | — |
 | T-016 | M-03 | Session restart persistence | retired | — | discarded | d0/e1/v0/l0 | 0 | .rune/drift/DRF-003.md | — | — | T-020,T-021 |
 | T-017 | M-03 | Expiry sweep | blocked | — | /workspace/acme/.rune/worktrees/T-017 | d0/e1/v0/l0 | 0 | .rune/notes/T-017.md | external:registry-unreachable | step:2 | — |
 | T-020 | M-03 | Persist sessions through restart | pending | T-014 | — | d0/e0/v0/l0 | 0 | — | — | fresh | — |
@@ -62,6 +63,8 @@ main: green
 | report-slot | ai-drift      | T-016             | recorded DRF-003: /workspace/acme/.rune/drift/DRF-003.md |
 | report-slot | ai-investigate| INV-004           | recorded INV-004: /workspace/acme/.rune/notes/INV-004.md |
 | find-check  | ai-verify-finding | FND-007       | confirmed FND-007: /workspace/acme/.rune/findings/FND-007.md |
+| size        | ai-size       | T-014             | pass: /workspace/acme/.rune/notes/T-014.sizing.md |
+| size        | ai-size       | T-018             | blocked: /workspace/acme/.rune/notes/T-018.sizing.md |
 | execute     | ai-execute    | T-014             | done @ 4a91c02                  |
 | verify      | ai-verify     | T-014             | pass @ 4a91c02                  |
 | land        | ai-land       | T-014             | landed @ 4a91c02                |
@@ -229,6 +232,7 @@ and `M` never changes.
 | status | Required state |
 |---|---|
 | `diagnosing` | absolute worktree; `d >= 1`; resume is `diagnose` or the bound `plan:M-nn/R-nnn`; blocker is `—` or `external:*` |
+| `unsized` | no worktree; `e0/v0/l0`; zero failures; resume `fresh`; `replaced_by: —`; blocker `—` until a `sizing: blocked` verdict records `sizing:<slug>`, and then the finding points at `notes/T-nnn.sizing.md` |
 | `pending` | blocker `—`; resume is `fresh`, `step:N`, `evidence:<mode>`, or `publish`; a missing worktree is valid only with `fresh`; partial step/evidence resumes require a finding pointer |
 | `in_progress` | absolute worktree; `e >= 1`; blocker `—`; resume `recover` |
 | `verifying` | absolute worktree; `e >= 1`, `v >= 1`; blocker `—`; resume `verify` |
@@ -329,10 +333,14 @@ detail belongs in the notes the subagents themselves write.
 ## Status transitions
 
 ```
-diagnosing ─reproduced + reconciled─> pending
+diagnosing ─reproduced + reconciled─> unsized
      ├─not reproduced───────────────> reservation removed; id burned
      ├─reclassified─────────────────> reservation removed; id burned; fresh run
      └─blocked──────────────────────> diagnosing (blocker recorded)
+
+reconciled ─registered─> unsized ─pass────> pending
+                           ├─split──────> retired (replacements start unsized)
+                           └─blocked────> unsized (blocker recorded)
 
 pending ─claim; e++─> in_progress ─done; v++─> verifying ─pass; l++─> landing ─landed─> done
                       │                    │                │
@@ -352,6 +360,11 @@ drifted or drift-blocked ─atomic replan with new ids─> retired (terminal; re
 
 - `diagnosing` — a bug id and worktree are reserved, but its immutable task spec does not
   exist yet. Only `ai-bug` may hold it; it is never executable.
+- `unsized` — the task file exists and is registered, but no fresh worker has yet said one
+  executor could finish it. **Never executable.** This is the whole of the gate: the
+  executable queue is the set of `pending` rows, so a task that has not passed sizing
+  cannot be claimed, and no route needs to remember to check a flag. Only `ai-size` moves
+  it, and only a `pass` moves it to `pending`
 - `pending` — available, provided `blocked_by` is empty or all resolved. `resume_at` tells
   the next executor whether to start fresh or consume durable partial state
 - `in_progress` — an executor holds it. Its worktree is absolute and `resume_at: recover`
@@ -417,9 +430,14 @@ proof. User decisions use `awaiting`, not this transition.
 
 `diagnosing` is deliberately earlier than `pending`. A reproduced bug remains there while
 its planners consume `diagnosis_commit`; only successful reconciliation creates the task
-spec and moves the existing row to `pending`. If diagnosis fails or reclassifies, remove
+spec and moves the existing row to `unsized`, where it waits for sizing like any other new
+task. If diagnosis fails or reclassifies, remove
 the provisional row but retain its protocol and progress artifacts. The id remains used
 forever, so a late worker cannot attach its result to a different task.
+
+Both pre-executable statuses exist for the same reason: a row can be real without being
+ready. `diagnosing` has no task spec yet; `unsized` has one nobody has confirmed is
+finishable. Neither is ever claimed, and the claiming rule below reads `pending` only.
 
 ## Claiming
 
