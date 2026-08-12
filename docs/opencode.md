@@ -67,7 +67,7 @@ checkout. A successful lander removes the worktree; abandoned paths remain under
 
 ### Internal skills remain visible
 
-OpenCode may display the nineteen `rune-ai-*` skills even though their frontmatter says
+OpenCode may display the twenty `rune-ai-*` skills even though their frontmatter says
 `user-invocable: false`. They are model-facing protocols and should not normally be called
 directly by the user.
 

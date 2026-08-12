@@ -35,6 +35,9 @@ stranger with an empty context.
   notes/open/RES-nnn.md  # complete research awaiting parent promotion
   drift/DRF-nnn.md       # misconceptions + which tasks they invalidate
   drift/open/DRF-nnn.md  # complete drift record awaiting parent promotion
+  findings/FND-nnn.md    # a checked claim: confirmed, refuted, or inconclusive
+  findings/open/T-nnn-eN-K.md # one unverified claim, awaiting a fresh verifier
+  findings/open/FND-nnn.md # complete verified finding awaiting parent promotion
   decisions/open/T-nnn-eN.md # one executor attempt's question, awaiting a parent id
   sessions/<stamp>.md    # session handoffs. written by `handoff`
   worktrees/T-nnn/       # disposable task source checkout; never coordination state
@@ -118,10 +121,13 @@ what made `pause` and `handoff` look like second writers when they are the same 
 | `notes/T-nnn.verify.md` | a worker on `ai-verify` |
 | `notes/T-nnn.landing.md` | a worker on `ai-land` |
 | `decisions/open/T-nnn-eN.md` | the worker holding that exact T-nnn executor attempt |
+| `findings/open/T-nnn-eN-K.md` | the worker holding that exact T-nnn executor attempt |
 | `notes/init-commands.md` | a worker on `ai-oracle` |
 | `notes/open/INV-nnn.md`, `notes/open/RES-nnn.md` | the worker assigned that exact id and staging path |
 | `drift/open/DRF-nnn.md` | the detector or record-only worker assigned that exact id and staging path |
-| final `notes/INV-nnn.md`, `notes/RES-nnn.md`, `drift/DRF-nnn.md` | unchanged worker content, atomically promoted by the parent |
+| `findings/open/FND-nnn.md` | the `ai-verify-finding` worker assigned that exact id and staging path |
+| final `notes/INV-nnn.md`, `notes/RES-nnn.md`, `drift/DRF-nnn.md`, `findings/FND-nnn.md` | unchanged worker content, atomically promoted by the parent |
+| the `rune` block in `CLAUDE.md` | the parent, only on `rune:init` |
 
 ## The concurrency rule that generates this table
 
@@ -493,8 +499,9 @@ skill**:
 | `ai-investigate` | `investigation: answered \| blocked` |
 | `ai-research` | `research: answered \| blocked` |
 | `ai-drift` | `status: drifted \| recorded \| quiesced \| abandoned \| discarded \| refused \| budget \| question` |
-| `ai-survey` | `survey: mapped \| blocked` |
+| `ai-survey` | `survey: mapped \| amended \| unchanged \| conflict \| blocked` |
 | `ai-root` | `migration: none \| completed \| resumed \| blocked` |
+| `ai-verify-finding` | `finding: confirmed \| refuted \| inconclusive` |
 
 Then whatever else that skill defines.
 
@@ -579,6 +586,77 @@ their deterministic migration: `ok -> passing`, `fail -> failing`, and a recorde
 validates the complete candidate and replaces the manifest once. An unknown value stops;
 no reader guesses. `continue` detects this legacy shape and routes through `init` rather
 than writing another owner's file.
+
+### Findings — a claim is not a fact
+
+Work turns things up that nobody asked about. An executor fixing a session bug notices a
+second bug two files away. A verifier spots a test that has been passing for the wrong
+reason. A surveyor sees a config key nothing reads.
+
+These are worth keeping, and they are also the most dangerous thing an agent can produce,
+because they arrive already phrased as facts. The agent that noticed it was looking at
+something else at the time, had it in view for a few seconds, and has every incentive to
+believe a plausible guess. Left alone, that guess gets reported to the user, planned
+against, and eventually acted on — and nobody ever went back to check it was true.
+
+So: **a finding is a claim until a fresh subagent confirms it.** Until then nobody reports
+it as true, plans from it, files an issue for it, or fixes it.
+
+Findings are not the other two things Rune already records:
+
+| | What it is | Blocks the task? |
+|---|---|---|
+| **drift** | the task's own plan is wrong | yes, that is the point |
+| **investigation** | a question the parent deliberately asked | no, it was scheduled |
+| **finding** | something noticed in passing, outside this task's contract | no |
+
+If it stops the task you are on, that is drift. Use `ai-drift` and do not open a finding.
+
+**1. The finder writes a claim and moves on.** One file per claim, in this exact shape, at
+`<main_root>/.rune/findings/open/T-nnn-eN-K.md` — your task, your attempt, and `K`
+counting from 1 for each claim you raise in that attempt. You are the only worker holding
+that attempt, so those names cannot collide and need no allocated id.
+
+```markdown
+---
+status: unverified
+raised_by: T-014
+source_attempt: e2
+---
+
+## Claim
+`SessionStore.purge` deletes rows whose expiry is null, so sessions that never expire are
+swept on the first run.
+
+## Where I saw it
+src/auth/store.ts :: SessionStore/purge — the `WHERE expires_at < now()` branch
+
+## Why I did not check it
+Outside T-014's change surface. I read the query while wiring rotate(); I did not run it,
+write a test for it, or look at any caller.
+```
+
+That last section is required and it is the honest one. Say exactly how much you actually
+looked at, because the verifier needs to know whether it is checking a hunch or a
+near-certainty. "I did not check it" is a complete answer.
+
+Then keep going. Raising a claim is not permission to investigate it, widen your change
+surface, or fix it — those are the failures this artifact exists to prevent.
+
+**2. The parent gets it checked by someone who was not there.** For each claim it
+allocates `FND-nnn`, assigns the staging and final paths, and dispatches **a fresh
+subagent following `ai-verify-finding`** with the claim pointer. Fresh matters: the finder
+cannot review its own guess, because the context that produced the guess is exactly what
+would make it look right.
+
+**3. The verifier writes the record and the parent promotes it.** Confirmed, refuted, or
+inconclusive — all three are promoted to `findings/FND-nnn.md`, then the consumed claim
+file is deleted. A refuted claim is kept on purpose: it stops the same wrong observation
+being raised again next month.
+
+Only `confirmed` is actionable. A confirmed finding may become a task, an issue, or
+nothing at all — that call belongs to the user, and it is made with the verifier's
+evidence in front of them.
 
 ### The published task artifact
 

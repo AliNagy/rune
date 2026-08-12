@@ -178,6 +178,30 @@ Ask only for choices that change visible behaviour. Anything you could have dete
 from the spec or the surrounding code, determine — spending the user's attention on it is
 worse than deciding and noting it.
 
+## When you notice something that is not your task
+
+You will. Implementing one thing puts you in front of code that does something else, and
+some of it will look wrong.
+
+Three things it might be, and only the first two belong to you:
+
+- it makes your task's plan false → that is **drift**, `status: drifted`, per `ai-drift`
+- you cannot proceed without a user choice → that is a **question**, as above
+- it is simply something you noticed, and your task works fine either way → **write it
+  down and carry on**
+
+The third one goes to `<main_root>/.rune/findings/open/T-nnn-eN-K.md` in the exact shape
+`ai-taskfmt` defines: your task, this dispatch's attempt, and `K` counting from 1 for each
+claim you raise. Install each with no-replace semantics. Then continue with your task.
+
+**Writing it down is the whole of your involvement.** Do not look into it, do not widen
+your change surface to check, do not fix it. You have not verified it and you are not
+going to — a fresh worker does that later, and the claim file says plainly how little you
+actually looked. That is not an admission; it is the reason the record is trustworthy.
+
+Raising nothing is the normal outcome. A finding for every file you opened is noise that
+buries the one real observation.
+
 ## Durable early stops
 
 `budget`, `blocked`, and `question` all write `<main_root>/.rune/notes/T-nnn.md` before

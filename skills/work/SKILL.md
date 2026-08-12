@@ -25,9 +25,11 @@ from that, and this list is exhaustive:
 - **Write** parent-authored `source: planning` behaviour/scope decision records to
   `<main_root>/.rune/decisions.md` only at the pre-reconciliation gate. This is the same
   sole parent writer; planners never allocate ids or edit the file.
-- **Promote** a complete worker-authored `DRF-`, `INV-`, or `RES-` staging file to the
-  exact final path already reserved in `ledger.md`, using a same-filesystem atomic
+- **Promote** a complete worker-authored `DRF-`, `INV-`, `RES-`, or `FND-` staging file to
+  the exact final path already reserved in `ledger.md`, using a same-filesystem atomic
   no-replace operation. You never compose or edit report content.
+- **Delete** only a `<main_root>/.rune/findings/open/T-nnn-eN-K.md` claim whose verified
+  `FND-nnn` record has already been promoted. You never edit a claim or write a verdict.
 - **Create** one immutable
   `<main_root>/.rune/drafts/<milestone>/R-nnn/protocol.md` before dispatching that
   decomposition run. For a bug, create it before diagnosis and include the reserved task
@@ -721,6 +723,35 @@ Do not answer it yourself. In the same update that moves the task to `awaiting`,
 options, your recommendation — and keep the rest of the batch running while you wait. When
 the decision lands, re-dispatch the task; a fresh executor picks up the handoff, the
 worktree diff, and the now-resolved decision.
+
+### When a worker raises a finding
+
+Workers write claims about things they noticed outside their own task to
+`<main_root>/.rune/findings/open/T-nnn-eN-K.md`. They do not block anything and no
+executor status announces them, so sweep that directory once per batch rather than
+watching for a return value.
+
+Every claim goes through the same three steps, in this order:
+
+1. **Allocate and dispatch.** In numeric task-id, attempt, then `K` order, give each claim
+   an `FND-nnn`, reserve its staging and final paths in the ledger, and dispatch **a fresh
+   subagent following `ai-verify-finding`** with the claim pointer. One claim per
+   dispatch. Never send the finder, and never send an agent that worked on the task the
+   claim came from — the point of the check is that nobody involved is doing it.
+2. **Promote the verdict.** Validate the returned staging file and atomically promote it
+   to the reserved final path, exactly as a `DRF-`, `INV-`, or `RES-` report. All three
+   verdicts get promoted; a refuted claim is a durable result, not a mistake to erase.
+3. **Delete the consumed claim** only after its record is promoted. If you die between
+   the two, `continue` finds a claim with a promoted record and deletes it then.
+
+Then record it under `## Findings` in the ledger and stop. **You do not act on a confirmed
+finding.** It becomes a task only when the user says so, through triage and decomposition
+like any other request. Quietly turning a finding into work is how a session that was
+asked to fix one bug returns having changed six files.
+
+Report only what came back verified, per `ai-report`. An unverified claim is not something
+the user hears about — telling them about it makes them act on it, which is exactly what
+the verification step exists to prevent.
 
 ## 5. Verify
 
