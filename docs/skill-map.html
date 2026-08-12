@@ -1,0 +1,2009 @@
+<title>The Rune Skill Map</title>
+<style>
+:root{
+  --ground:#EDEFEE; --surface:#FFFFFF; --surface-2:#F6F8F7; --surface-3:#E7EAE9;
+  --ink:#15181A; --ink-2:#525A5D; --ink-3:#7B8487;
+  --rule:#D2D8D6; --rule-2:#E2E7E5;
+  --accent:#0E5E59; --accent-soft:#0E5E5914;
+  --route:#0E5E59; --library:#33468F; --worker:#8A5A1F; --protocol:#6E3A63;
+  --ok:#2C6E49; --warn:#8A6100; --stop:#9E2B2B;
+  --shadow:0 1px 2px rgba(20,30,28,.06),0 6px 18px rgba(20,30,28,.05);
+  --f-sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",SFMono-Regular,"Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1112; --surface:#161A1B; --surface-2:#1C2122; --surface-3:#242A2B;
+    --ink:#E7EBEA; --ink-2:#A3ACAB; --ink-3:#7C8685;
+    --rule:#2B3233; --rule-2:#222829;
+    --accent:#5BC8BE; --accent-soft:#5BC8BE1A;
+    --route:#5BC8BE; --library:#93A5F2; --worker:#DBA86A; --protocol:#C89ED2;
+    --ok:#70C08F; --warn:#DAAE57; --stop:#E4776F;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1112; --surface:#161A1B; --surface-2:#1C2122; --surface-3:#242A2B;
+  --ink:#E7EBEA; --ink-2:#A3ACAB; --ink-3:#7C8685;
+  --rule:#2B3233; --rule-2:#222829;
+  --accent:#5BC8BE; --accent-soft:#5BC8BE1A;
+  --route:#5BC8BE; --library:#93A5F2; --worker:#DBA86A; --protocol:#C89ED2;
+  --ok:#70C08F; --warn:#DAAE57; --stop:#E4776F;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--f-sans); font-size:16.5px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent); text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:2px}
+
+/* ---------- shell ---------- */
+.shell{display:grid; grid-template-columns:242px minmax(0,1fr); max-width:1460px; margin:0 auto}
+.rail{
+  position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  border-right:1px solid var(--rule); padding:26px 18px 40px; background:var(--ground);
+}
+.rail-brand{font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); margin-bottom:14px}
+.rail a{
+  display:flex; gap:9px; padding:5px 8px; margin-left:-8px; border-radius:4px;
+  text-decoration:none; color:var(--ink-2); font-size:13.5px; line-height:1.35;
+}
+.rail a:hover{background:var(--surface-3); color:var(--ink)}
+.rail a.on{color:var(--ink); background:var(--accent-soft); box-shadow:inset 2px 0 0 var(--accent)}
+.rail a .n{font-family:var(--f-mono); font-size:11px; color:var(--ink-3); padding-top:2px; min-width:16px}
+.rail a.on .n{color:var(--accent)}
+main{padding:0 clamp(20px,4vw,62px) 120px; min-width:0}
+section{padding-top:64px; scroll-margin-top:20px}
+.prose{max-width:74ch}
+
+/* ---------- masthead ---------- */
+.mast{padding:66px 0 34px; border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--f-mono); font-size:11.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin:0 0 16px}
+h1{font-size:clamp(2.3rem,4.6vw,3.4rem); line-height:1.04; letter-spacing:-.025em; font-weight:700; margin:0 0 18px; text-wrap:balance; max-width:16ch}
+.lede{font-size:1.18rem; line-height:1.55; color:var(--ink-2); max-width:64ch; margin:0}
+.stats{display:flex; flex-wrap:wrap; gap:0; margin-top:36px; border:1px solid var(--rule); border-radius:6px; overflow:hidden; background:var(--surface)}
+.stat{flex:1 1 130px; padding:14px 18px; border-right:1px solid var(--rule-2)}
+.stat:last-child{border-right:0}
+.stat b{display:block; font-family:var(--f-mono); font-size:1.5rem; letter-spacing:-.02em; font-weight:600; color:var(--ink)}
+.stat span{font-size:12px; color:var(--ink-3); letter-spacing:.02em}
+
+/* ---------- headings ---------- */
+h2{
+  font-size:1.62rem; letter-spacing:-.02em; font-weight:700; margin:0 0 8px; text-wrap:balance;
+  display:flex; align-items:baseline; gap:12px;
+}
+h2 .num{font-family:var(--f-mono); font-size:.82rem; font-weight:500; color:var(--accent); letter-spacing:.04em}
+h3{font-size:1.06rem; font-weight:660; letter-spacing:-.008em; margin:34px 0 8px; text-wrap:balance}
+h4{font-size:.92rem; font-weight:660; margin:22px 0 6px; color:var(--ink)}
+.sub{color:var(--ink-2); margin:0 0 22px; max-width:70ch}
+p{margin:0 0 14px}
+
+/* ---------- inline bits ---------- */
+code,.mono{font-family:var(--f-mono); font-size:.855em}
+p code,li code,td code,th code,dd code{background:var(--surface-3); padding:.1em .34em; border-radius:3px; white-space:nowrap}
+.k{color:var(--ink); font-weight:600}
+.chip{
+  display:inline-block; font-family:var(--f-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:3px; border:1px solid currentColor; white-space:nowrap; line-height:1.5;
+}
+.c-route{color:var(--route)} .c-library{color:var(--library)}
+.c-worker{color:var(--worker)} .c-protocol{color:var(--protocol)}
+.ok{color:var(--ok)} .warn{color:var(--warn)} .stop{color:var(--stop)}
+
+/* ---------- tables ---------- */
+.scroll{overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:var(--surface); margin:18px 0 26px}
+table{border-collapse:collapse; width:100%; font-size:14.2px; line-height:1.5}
+th,td{text-align:left; padding:9px 14px; border-bottom:1px solid var(--rule-2); vertical-align:top}
+thead th{
+  position:sticky; top:0; background:var(--surface-2); z-index:1;
+  font-family:var(--f-mono); font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--ink-3); font-weight:500; border-bottom:1px solid var(--rule); white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--surface-2)}
+td.tight,th.tight{white-space:nowrap}
+.matrix td,.matrix th{text-align:center; padding:7px 8px}
+.matrix td:first-child,.matrix th:first-child{text-align:left; white-space:nowrap; position:sticky; left:0; background:var(--surface)}
+.matrix thead th:first-child{background:var(--surface-2); z-index:2}
+.matrix tbody tr:hover td:first-child{background:var(--surface-2)}
+.dot{color:var(--accent); font-weight:700}
+.dash{color:var(--ink-3); opacity:.45}
+
+/* ---------- cards ---------- */
+.cards{display:grid; gap:16px; margin:22px 0 8px}
+.card{border:1px solid var(--rule); border-radius:7px; background:var(--surface); padding:20px 22px; box-shadow:var(--shadow)}
+.card-head{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin-bottom:4px}
+.card-head h3{margin:0; font-family:var(--f-mono); font-size:1.02rem; font-weight:600; letter-spacing:-.01em}
+.card-head .role{font-size:13px; color:var(--ink-2)}
+.card>p{font-size:14.8px}
+dl.meta{display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 16px; margin:14px 0 0; font-size:13.4px}
+dl.meta dt{font-family:var(--f-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); padding-top:4px}
+dl.meta dd{margin:0; color:var(--ink-2)}
+.rule{border:0; border-top:1px solid var(--rule-2); margin:16px 0}
+
+/* ---------- callouts ---------- */
+.note{border-left:2px solid var(--accent); padding:2px 0 2px 16px; margin:18px 0; color:var(--ink-2); font-size:15px}
+.note b{color:var(--ink)}
+.why{background:var(--surface-2); border:1px solid var(--rule-2); border-radius:6px; padding:14px 18px; margin:16px 0; font-size:14.6px; color:var(--ink-2)}
+.why b{color:var(--ink)}
+
+/* ---------- figures ---------- */
+figure{margin:26px 0 30px}
+.figbox{border:1px solid var(--rule); border-radius:7px; background:var(--surface); padding:20px 18px; overflow-x:auto}
+figure svg{display:block; width:100%; min-width:520px; height:auto; color:var(--ink)}
+figcaption{font-size:13.2px; color:var(--ink-3); margin-top:11px; max-width:72ch}
+figcaption b{color:var(--ink-2)}
+
+/* ---------- lists ---------- */
+ul,ol{margin:0 0 16px; padding-left:20px}
+li{margin-bottom:6px}
+ul.tight li{margin-bottom:2px}
+.steps{list-style:none; padding:0; counter-reset:s; margin:18px 0}
+.steps li{counter-increment:s; position:relative; padding-left:38px; margin-bottom:14px; font-size:15px}
+.steps li::before{
+  content:counter(s); position:absolute; left:0; top:1px; width:24px; height:24px; border-radius:50%;
+  border:1px solid var(--rule); background:var(--surface); color:var(--ink-3);
+  font-family:var(--f-mono); font-size:11.5px; display:grid; place-items:center;
+}
+.flow{list-style:none; padding:0; margin:16px 0; border-left:1px solid var(--rule); }
+.flow li{margin:0; padding:9px 0 9px 20px; position:relative; font-size:14.6px}
+.flow li::before{content:""; position:absolute; left:-4.5px; top:18px; width:8px; height:8px; border-radius:50%; background:var(--surface); border:1px solid var(--accent)}
+.flow .who{font-family:var(--f-mono); font-size:13px; color:var(--ink); font-weight:600}
+.flow .what{color:var(--ink-2)}
+
+/* ---------- filter ---------- */
+.filters{display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 4px; align-items:center}
+.filters button{
+  font-family:var(--f-mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+  padding:5px 11px; border-radius:4px; border:1px solid var(--rule); background:var(--surface);
+  color:var(--ink-2); cursor:pointer;
+}
+.filters button:hover{border-color:var(--ink-3); color:var(--ink)}
+.filters button[aria-pressed="true"]{background:var(--ink); color:var(--ground); border-color:var(--ink)}
+tr[hidden]{display:none}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static; height:auto; border-right:0; border-bottom:1px solid var(--rule); padding:14px 20px}
+  .rail-nav{display:flex; gap:4px; overflow-x:auto; padding-bottom:4px}
+  .rail a{white-space:nowrap; margin-left:0}
+  .rail a.on{box-shadow:inset 0 -2px 0 var(--accent)}
+  main{padding:0 20px 90px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important; scroll-behavior:auto!important}}
+</style>
+
+<div class="shell">
+<nav class="rail" aria-label="Sections">
+  <div class="rail-brand">Rune v0.12.1</div>
+  <div class="rail-nav">
+    <a href="#read"><span class="n">01</span><span>How to read this</span></a>
+    <a href="#classes"><span class="n">02</span><span>Four classes</span></a>
+    <a href="#matrix"><span class="n">03</span><span>Who dispatches whom</span></a>
+    <a href="#loop"><span class="n">04</span><span>The execution loop</span></a>
+    <a href="#doors"><span class="n">05</span><span>The seven doors</span></a>
+    <a href="#libraries"><span class="n">06</span><span>Parent libraries</span></a>
+    <a href="#workers"><span class="n">07</span><span>The workers</span></a>
+    <a href="#protocols"><span class="n">08</span><span>Planning protocols</span></a>
+    <a href="#triggers"><span class="n">09</span><span>Trigger matrix</span></a>
+    <a href="#walks"><span class="n">10</span><span>Walkthroughs</span></a>
+    <a href="#ledger"><span class="n">11</span><span>Ledger states</span></a>
+    <a href="#invariants"><span class="n">12</span><span>Invariants &amp; caps</span></a>
+    <a href="#vocab"><span class="n">13</span><span>Outcome vocabularies</span></a>
+    <a href="#writers"><span class="n">14</span><span>Who writes what</span></a>
+    <a href="#notes"><span class="n">15</span><span>Notes on this map</span></a>
+  </div>
+</nav>
+<main>
+<header class="mast">
+  <p class="eyebrow">Complete skill reference</p>
+  <h1>The Rune Skill Map</h1>
+  <p class="lede">All 28 skills: what each one is, what triggers it, which subagent it spawns, what it is
+  allowed to touch, and what it hands back. Rune has no <code>agents/</code> directory — every worker is an
+  ordinary subagent told which skill to follow, so <b>“which subagent is spawned”</b> and <b>“which skill was
+  named in the dispatch”</b> are the same question.</p>
+  <div class="stats">
+    <div class="stat"><b>28</b><span>skills on disk</span></div>
+    <div class="stat"><b>7</b><span>user-invocable</span></div>
+    <div class="stat"><b>14</b><span>dispatched workers</span></div>
+    <div class="stat"><b>≤200</b><span>tokens per return</span></div>
+    <div class="stat"><b>≤150k</b><span>context per unit of work</span></div>
+    <div class="stat"><b>3</b><span>concurrent executors, max</span></div>
+  </div>
+</header>
+
+<section id="read">
+  <h2><span class="num">01</span>How to read this map</h2>
+  <p class="sub">Two mechanisms move control between skills, and they are not interchangeable. Almost every
+  confusion about Rune dissolves once you can tell them apart.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 760 236" role="img" aria-label="Follow loads a skill into the current agent, paying its context cost there. Dispatch spawns a fresh subagent that reads pointers from disk, writes its output back to disk, returns at most 200 tokens, and dies.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <!-- divider -->
+        <line x1="368" y1="14" x2="368" y2="222" stroke="currentColor" stroke-opacity=".18" stroke-dasharray="3 4"/>
+
+        <!-- FOLLOW -->
+        <text x="14" y="22" font-family="ui-monospace,monospace" font-size="11" letter-spacing="1.6" fill="currentColor" fill-opacity=".55">FOLLOW</text>
+        <rect x="14" y="40" width="240" height="112" rx="6" fill="none" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="30" y="64" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">the same agent</text>
+        <rect x="30" y="78" width="126" height="26" rx="4" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-opacity=".4"/>
+        <text x="93" y="95" font-family="ui-monospace,monospace" font-size="11.5" text-anchor="middle" fill="currentColor">ai-report</text>
+        <rect x="30" y="110" width="126" height="26" rx="4" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-opacity=".4"/>
+        <text x="93" y="127" font-family="ui-monospace,monospace" font-size="11.5" text-anchor="middle" fill="currentColor">ai-ledger</text>
+        <text x="172" y="97" font-family="ui-monospace,monospace" font-size="10.5" fill="currentColor" fill-opacity=".55">skills</text>
+        <text x="172" y="111" font-family="ui-monospace,monospace" font-size="10.5" fill="currentColor" fill-opacity=".55">loaded</text>
+        <text x="172" y="125" font-family="ui-monospace,monospace" font-size="10.5" fill="currentColor" fill-opacity=".55">in place</text>
+        <text x="14" y="180" font-size="12" fill="currentColor" fill-opacity=".7">context cost paid by the caller</text>
+        <text x="14" y="198" font-size="12" fill="currentColor" fill-opacity=".7">no return value — it is the same agent</text>
+        <text x="14" y="216" font-size="12" fill="currentColor" fill-opacity=".7">5 libraries + 3 protocols work this way</text>
+
+        <!-- DISPATCH -->
+        <text x="400" y="22" font-family="ui-monospace,monospace" font-size="11" letter-spacing="1.6" fill="currentColor" fill-opacity=".55">DISPATCH</text>
+        <rect x="400" y="40" width="112" height="46" rx="6" fill="none" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="456" y="68" font-family="ui-monospace,monospace" font-size="12" text-anchor="middle" fill="currentColor">parent</text>
+
+        <rect x="614" y="40" width="132" height="46" rx="6" fill="none" stroke="currentColor" stroke-opacity=".9" stroke-width="1.4"/>
+        <text x="680" y="62" font-family="ui-monospace,monospace" font-size="12" text-anchor="middle" fill="currentColor">subagent</text>
+        <text x="680" y="77" font-family="ui-monospace,monospace" font-size="10" text-anchor="middle" fill="currentColor" fill-opacity=".6">follows one skill</text>
+
+        <line x1="512" y1="55" x2="606" y2="55" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="559" y="47" font-size="10.5" text-anchor="middle" fill="currentColor" fill-opacity=".7">pointers</text>
+        <line x1="606" y1="76" x2="514" y2="76" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="559" y="93" font-size="10.5" text-anchor="middle" fill="currentColor" fill-opacity=".7">≤200 tokens</text>
+
+        <!-- disk -->
+        <ellipse cx="680" cy="150" rx="58" ry="11" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <path d="M622,150 v26 a58,11 0 0 0 116,0 v-26" fill="none" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="680" y="172" font-family="ui-monospace,monospace" font-size="11" text-anchor="middle" fill="currentColor" fill-opacity=".75">.rune/</text>
+        <line x1="680" y1="88" x2="680" y2="136" stroke="currentColor" marker-end="url(#ar)"/>
+        <text x="692" y="116" font-size="10.5" fill="currentColor" fill-opacity=".7">everything else</text>
+
+        <text x="400" y="198" font-size="12" fill="currentColor" fill-opacity=".7">context cost quarantined in the worker,</text>
+        <text x="400" y="216" font-size="12" fill="currentColor" fill-opacity=".7">which dies — 14 workers work this way</text>
+      </svg>
+    </div>
+    <figcaption><b>The whole design in one picture.</b> A followed skill is loaded into the agent already
+    running; a dispatched skill gets a fresh subagent that reads its inputs from disk, writes its outputs back
+    to disk, and returns a fixed-size envelope. Everything else in Rune — the ≤200 token cap, the
+    single-writer rule, the pointer-not-payload rule — exists to keep that second arrow small.</figcaption>
+  </figure>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th></th><th>Follow</th><th>Dispatch</th></tr></thead>
+      <tbody>
+        <tr><td class="tight"><b>What happens</b></td><td>the current agent loads the skill into its own context</td><td>a fresh subagent is spawned and told which skill to follow</td></tr>
+        <tr><td class="tight"><b>Context cost</b></td><td>paid by the caller</td><td>quarantined in the worker, which dies afterwards</td></tr>
+        <tr><td class="tight"><b>Return</b></td><td>none — it is the same agent</td><td>a <code>≤200 token</code> envelope; everything longer goes to disk</td></tr>
+        <tr><td class="tight"><b>Written as</b></td><td>“follow <code>ai-report</code>”</td><td>a <code>rune-dispatch</code> block naming <code>follow:</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><b>There is exactly one parent role.</b> The main agent is the same writer whether it is
+  running <code>hello</code>, <code>init</code>, <code>vision</code>, <code>work</code>, <code>pause</code>,
+  <code>handoff</code>, or <code>continue</code>. Those seven are routes through one role, not seven agents —
+  which is why <code>pause</code> and <code>handoff</code> writing the ledger does not break the single-writer
+  rule.</div>
+</section>
+
+<section id="classes">
+  <h2><span class="num">02</span>Four classes of skill</h2>
+  <p class="sub">The follow/dispatch split, plus who is allowed to talk to the user, sorts all 28 skills into
+  four groups. Two skills sit in more than one group, and both are flagged wherever they appear.</p>
+
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr))">
+    <div class="card">
+      <div class="card-head"><span class="chip c-route">Route</span><span class="role">7 · user-invocable</span></div>
+      <p>The parent role. Reads state, talks to the user, dispatches everything else. Never reads source code.</p>
+      <p class="mono" style="color:var(--ink-2);font-size:13px">hello · init · vision · work · pause · handoff · continue</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="chip c-library">Library</span><span class="role">5 · followed in place</span></div>
+      <p>Rules and schemas loaded into whoever needs them. Never dispatched, never a subagent of their own.</p>
+      <p class="mono" style="color:var(--ink-2);font-size:13px">ai-root · ai-taskfmt · ai-ledger · ai-report · ai-serena</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="chip c-worker">Worker</span><span class="role">14 · dispatched</span></div>
+      <p>One issue each, one fresh subagent each. Returns ≤200 tokens; everything else lands on disk.</p>
+      <p class="mono" style="color:var(--ink-2);font-size:13px">ai-survey · ai-oracle · ai-triage · ai-bug · ai-decompose · ai-size · ai-execute · ai-verify · ai-land · ai-recover · ai-drift · ai-investigate · ai-research · ai-verify-finding</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="chip c-protocol">Protocol</span><span class="role">3 · bound by protocol.md</span></div>
+      <p>Type-specific planning rules. A decomposition worker loads whichever one the run’s immutable protocol
+      record names — never one it inferred from a title.</p>
+      <p class="mono" style="color:var(--ink-2);font-size:13px">ai-bug · ai-feature · ai-refactor</p>
+    </div>
+  </div>
+
+  <div class="why"><b>Two skills wear two hats.</b> <code>ai-bug</code> is a dispatched diagnosis worker
+  <i>and</i> a planning protocol — it reproduces the failure first, then governs how the fix is cut.
+  <code>ai-drift</code> is followed in place by the executor (detect mode) <i>and</i> dispatched as a worker in
+  four bounded modes.</div>
+
+  <h3>All 28, filterable</h3>
+  <div class="filters" role="group" aria-label="Filter by class">
+    <span class="mono" style="font-size:11px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase">Show</span>
+    <button data-f="all" aria-pressed="true">All 28</button>
+    <button data-f="route" aria-pressed="false">Routes</button>
+    <button data-f="library" aria-pressed="false">Libraries</button>
+    <button data-f="worker" aria-pressed="false">Workers</button>
+    <button data-f="protocol" aria-pressed="false">Protocols</button>
+  </div>
+  <div class="scroll">
+    <table id="all28">
+      <thead><tr><th class="tight">Skill</th><th class="tight">Class</th><th>Job</th><th>Loaded by</th><th class="tight">Outcome field</th></tr></thead>
+      <tbody>
+        <tr data-c="route"><td class="tight"><code>hello</code></td><td><span class="chip c-route">Route</span></td><td>Routes a plain-language request to the skill that owns it.</td><td>the user</td><td class="dash">—</td></tr>
+        <tr data-c="route"><td class="tight"><code>init</code></td><td><span class="chip c-route">Route</span></td><td>Establishes ground truth: oracle, commands, module map, danger zones, scaffold.</td><td>the user · <code>vision</code></td><td class="dash">—</td></tr>
+        <tr data-c="route"><td class="tight"><code>vision</code></td><td><span class="chip c-route">Route</span></td><td>Interviews the user, records decisions, produces the milestone graph.</td><td>the user · <code>hello</code></td><td class="dash">—</td></tr>
+        <tr data-c="route"><td class="tight"><code>work</code></td><td><span class="chip c-route">Route</span></td><td>The execution loop: triage → plan → size → dispatch → verify → land.</td><td>the user · <code>hello</code></td><td class="dash">—</td></tr>
+        <tr data-c="route"><td class="tight"><code>pause</code></td><td><span class="chip c-route">Route</span></td><td>Stops the loop cleanly; drains or abandons in-flight work.</td><td>the user · <code>hello</code></td><td class="dash">—</td></tr>
+        <tr data-c="route"><td class="tight"><code>handoff</code></td><td><span class="chip c-route">Route</span></td><td>Moves a full session to a fresh one, filing what only the conversation knows.</td><td>the user · <code>hello</code></td><td class="dash">—</td></tr>
+        <tr data-c="route"><td class="tight"><code>continue</code></td><td><span class="chip c-route">Route</span></td><td>Reconciles state left by a dead session, then reports where things stand.</td><td>the user · <code>hello</code></td><td class="dash">—</td></tr>
+        <tr data-c="library"><td class="tight"><code>ai-root</code></td><td><span class="chip c-library">Library</span></td><td>Canonical <code>.rune</code> root identity and legacy <code>.agent/</code> migration.</td><td>all 7 routes</td><td><code>migration:</code></td></tr>
+        <tr data-c="library"><td class="tight"><code>ai-taskfmt</code></td><td><span class="chip c-library">Library</span></td><td>Every file schema, the dispatch and return envelopes, the single-writer table.</td><td>parent + every worker that writes</td><td class="dash">—</td></tr>
+        <tr data-c="library"><td class="tight"><code>ai-ledger</code></td><td><span class="chip c-library">Library</span></td><td>Ledger schema 2, the status machine, claiming, crash reconciliation.</td><td>the parent only</td><td class="dash">—</td></tr>
+        <tr data-c="library"><td class="tight"><code>ai-report</code></td><td><span class="chip c-library">Library</span></td><td>When to speak to the user, and in what words.</td><td>the parent only</td><td class="dash">—</td></tr>
+        <tr data-c="library"><td class="tight"><code>ai-serena</code></td><td><span class="chip c-library">Library</span></td><td>Symbol-level lookup over file reads — the largest single context lever.</td><td>every worker that reads code</td><td class="dash">—</td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-survey</code></td><td><span class="chip c-worker">Worker</span></td><td>Maps the codebase, or files one fact into the map.</td><td><code>init</code> · <code>vision</code> · <code>handoff</code></td><td><code>survey:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-oracle</code></td><td><span class="chip c-worker">Worker</span></td><td>Finds and <i>runs</i> the pass/fail command that proves the code works.</td><td><code>init</code></td><td><code>oracle:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-triage</code></td><td><span class="chip c-worker">Worker</span></td><td>Classifies one request against real code, not its wording.</td><td><code>work</code></td><td><code>type:</code></td></tr>
+        <tr data-c="worker protocol"><td class="tight"><code>ai-bug</code></td><td><span class="chip c-worker">Worker</span> <span class="chip c-protocol">Protocol</span></td><td>Reproduces the failure in a reserved worktree before any planning.</td><td><code>work</code> · <code>continue</code> · <code>ai-decompose</code></td><td><code>diagnosis:</code></td></tr>
+        <tr data-c="protocol"><td class="tight"><code>ai-feature</code></td><td><span class="chip c-protocol">Protocol</span></td><td>Vertical slices; decisions surfaced before anything is built.</td><td><code>ai-decompose</code></td><td class="dash">—</td></tr>
+        <tr data-c="protocol"><td class="tight"><code>ai-refactor</code></td><td><span class="chip c-protocol">Protocol</span></td><td>Characterization net first; restructuring tasks may not touch tests.</td><td><code>ai-decompose</code></td><td class="dash">—</td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-investigate</code></td><td><span class="chip c-worker">Worker</span></td><td>Read-only; terminates in a written answer, not an implementation.</td><td><code>work</code> · <code>continue</code></td><td><code>investigation:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-research</code></td><td><span class="chip c-worker">Worker</span></td><td>Evidence from outside the repo, every source graded and cited.</td><td><code>work</code> · <code>continue</code> · <code>ai-investigate</code></td><td><code>research:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-decompose</code></td><td><span class="chip c-worker">Worker</span></td><td>Milestone graph, planner drafts, reconciliation, mitigation repair.</td><td><code>vision</code> · <code>work</code> · <code>continue</code></td><td><code>plan:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-size</code></td><td><span class="chip c-worker">Worker</span></td><td>Could one fresh agent finish this whole task with room to spare?</td><td><code>work</code> · <code>continue</code></td><td><code>sizing:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-execute</code></td><td><span class="chip c-worker">Worker</span></td><td>Does one task in its own worktree and publishes it as a commit.</td><td><code>work</code></td><td><code>status:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-verify</code></td><td><span class="chip c-worker">Worker</span></td><td>Independent check of the published artifact against its acceptance.</td><td><code>work</code> · <code>pause</code> · <code>continue</code></td><td><code>verdict:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-land</code></td><td><span class="chip c-worker">Worker</span></td><td>Merges the exact verified SHA, re-runs the oracle, rolls back on failure.</td><td><code>work</code> · <code>pause</code> · <code>continue</code></td><td><code>landing:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-recover</code></td><td><span class="chip c-worker">Worker</span></td><td>Reads a torn worktree and names the exact resume point.</td><td><code>continue</code></td><td><code>verdict:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-drift</code></td><td><span class="chip c-worker">Worker</span> <span class="chip c-library">Library</span></td><td>Records that the plan was wrong; disposes of worktrees safely.</td><td><code>ai-execute</code> · <code>work</code> · <code>pause</code> · <code>continue</code></td><td><code>status:</code></td></tr>
+        <tr data-c="worker"><td class="tight"><code>ai-verify-finding</code></td><td><span class="chip c-worker">Worker</span></td><td>Checks a claim raised outside a worker’s own task. Never the finder.</td><td><code>work</code> · <code>continue</code></td><td><code>finding:</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<section id="matrix">
+  <h2><span class="num">03</span>Who dispatches whom</h2>
+  <p class="sub">Every subagent Rune can spawn, and which route spawns it. <code>hello</code> is absent on
+  purpose — it is a pure router that writes nothing and dispatches nothing. The last column is the case people
+  miss: three skills are loaded by <em>another worker</em> rather than by a route.</p>
+
+  <div class="scroll">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>Worker</th><th>init</th><th>vision</th><th>work</th><th>pause</th><th>handoff</th><th>continue</th>
+          <th>from a worker</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ai-survey</code></td><td class="dot">●</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="mono" style="font-size:10.5px">amend</td><td class="dash">—</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-oracle</code></td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-triage</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-bug</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="mono" style="font-size:10.5px">ai-decompose</td></tr>
+        <tr><td><code>ai-decompose</code></td><td class="dash">—</td><td class="mono" style="font-size:10.5px">graph</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="mono" style="font-size:10.5px">repair</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-size</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-execute</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-verify</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-land</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dot">●</td><td class="dot">●</td><td class="mono" style="font-size:10.5px">cleanup</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-recover</code></td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-drift</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="mono" style="font-size:10.5px">abandon</td><td class="dash">—</td><td class="dot">●</td><td class="mono" style="font-size:10.5px">ai-execute</td></tr>
+        <tr><td><code>ai-investigate</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td></tr>
+        <tr><td><code>ai-research</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="mono" style="font-size:10.5px">ai-investigate</td></tr>
+        <tr><td><code>ai-verify-finding</code></td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td><td class="dash">—</td><td class="dot">●</td><td class="dash">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="why"><b>Why <code>continue</code> touches almost everything.</b> It is the only route that
+  reconciles a dead session, and every phase can die mid-flight. Its dispatches are recovery variants of the
+  same workers: a verifier for a publication whose return was lost, a lander in <code>cleanup</code> mode for
+  an orphan worktree, <code>ai-drift</code> in <code>discard-empty</code> for a worktree with nothing in it,
+  and <code>ai-recover</code> for the one case needing judgement.</div>
+</section>
+
+<section id="loop">
+  <h2><span class="num">04</span>The execution loop</h2>
+  <p class="sub">What <code>/rune:work</code> actually does. Every box is a separate subagent with its own
+  context; the parent only holds the ledger and the short returns.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 800 912" role="img" aria-label="The work loop: triage classifies the request; a bug branches to ai-bug to reproduce first while an investigation exits with no task row; two or three ai-decompose planners draft in parallel; a user gate runs before any final task file; one reconciler writes the task files; ai-size checks each one; up to three ai-execute workers run concurrently; ai-verify checks each published commit; ai-land merges it. Verify failures and landing failures both return the task to a fresh executor.">
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- ============ spine boxes ============ -->
+        <rect x="250" y="24" width="230" height="52" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="46" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-triage</text>
+        <text x="365" y="63" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">one subagent per issue, concurrently</text>
+
+        <rect x="250" y="200" width="230" height="56" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="222" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-decompose × 2–3</text>
+        <text x="365" y="239" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">independent planner drafts, in parallel</text>
+
+        <rect x="250" y="296" width="230" height="50" rx="6" fill="currentColor" fill-opacity=".11" stroke="currentColor" stroke-width="2"/>
+        <text x="365" y="317" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" font-weight="600" fill="currentColor">GATE · the user</text>
+        <text x="365" y="333" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">no flag skips this</text>
+
+        <rect x="250" y="386" width="230" height="50" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="407" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-decompose × 1</text>
+        <text x="365" y="424" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">reconciler — the only writer of tasks/</text>
+
+        <rect x="250" y="476" width="230" height="50" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="497" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-size</text>
+        <text x="365" y="514" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">one per new task, read cold</text>
+
+        <rect x="250" y="586" width="230" height="56" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="608" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-execute × ≤3</text>
+        <text x="365" y="625" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">disjoint file surfaces, own worktrees</text>
+
+        <rect x="250" y="682" width="230" height="50" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="703" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-verify</text>
+        <text x="365" y="720" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">fresh context, never the executor</text>
+
+        <rect x="250" y="772" width="230" height="50" rx="6" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="365" y="793" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12.5" fill="currentColor">ai-land</text>
+        <text x="365" y="810" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">one at a time, merges the verified SHA</text>
+
+        <rect x="296" y="858" width="138" height="34" rx="17" fill="currentColor" fill-opacity=".09" stroke="currentColor" stroke-opacity=".6"/>
+        <text x="365" y="880" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">done</text>
+
+        <!-- ============ branch boxes ============ -->
+        <rect x="16" y="112" width="200" height="56" rx="6" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-dasharray="4 3"/>
+        <text x="116" y="134" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">ai-bug</text>
+        <text x="116" y="151" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">reserve T-nnn, reproduce</text>
+
+        <rect x="520" y="112" width="264" height="56" rx="6" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-dasharray="4 3"/>
+        <text x="652" y="134" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">ai-investigate (+ ai-research)</text>
+        <text x="652" y="151" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">read-only, ends in an answer</text>
+
+        <rect x="16" y="588" width="200" height="48" rx="6" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-dasharray="4 3"/>
+        <text x="116" y="608" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">ai-drift</text>
+        <text x="116" y="624" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">the plan was wrong</text>
+
+        <rect x="16" y="680" width="200" height="48" rx="6" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-dasharray="4 3"/>
+        <text x="116" y="700" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">ai-verify-finding</text>
+        <text x="116" y="716" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">swept once per batch</text>
+
+        <!-- ============ spine edges ============ -->
+        <line x1="365" y1="76" x2="365" y2="200" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="186" font-size="10.5" fill="currentColor" fill-opacity=".7">feature · refactor</text>
+
+        <!-- triage branch bar -->
+        <polyline points="365,94 116,94 116,112" fill="none" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="240" y="88" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">bug</text>
+        <polyline points="365,94 652,94 652,112" fill="none" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="510" y="88" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">investigation</text>
+
+        <!-- bug rejoins -->
+        <polyline points="116,168 116,182 365,182" fill="none" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="240" y="176" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">reproduced + committed check</text>
+
+        <!-- investigation terminates -->
+        <line x1="652" y1="168" x2="652" y2="188" stroke="currentColor"/>
+        <line x1="634" y1="188" x2="670" y2="188" stroke="currentColor" stroke-width="2"/>
+        <text x="652" y="204" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">exits — no task row</text>
+
+        <line x1="365" y1="256" x2="365" y2="296" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="280" font-size="10.5" fill="currentColor" fill-opacity=".7">2–3 complete cuts</text>
+        <line x1="365" y1="346" x2="365" y2="386" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="370" font-size="10.5" fill="currentColor" fill-opacity=".7">no open decision</text>
+        <line x1="365" y1="436" x2="365" y2="476" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="460" font-size="10.5" fill="currentColor" fill-opacity=".7">registered unsized</text>
+        <line x1="365" y1="526" x2="365" y2="586" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="552" font-size="10.5" fill="currentColor" fill-opacity=".7">sizing: pass → pending</text>
+        <text x="374" y="566" font-size="10.5" fill="currentColor" fill-opacity=".45">split → re-cut</text>
+        <line x1="365" y1="642" x2="365" y2="682" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="666" font-size="10.5" fill="currentColor" fill-opacity=".7">done + published range</text>
+        <line x1="365" y1="732" x2="365" y2="772" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="756" font-size="10.5" fill="currentColor" fill-opacity=".7">pass → verified_commit</text>
+        <line x1="365" y1="822" x2="365" y2="858" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="374" y="844" font-size="10.5" fill="currentColor" fill-opacity=".7">landed · oracle green</text>
+
+        <!-- ============ executor side exits ============ -->
+        <polyline points="250,606 232,606 232,612 216,612" fill="none" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="233" y="580" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".7">drifted</text>
+        <polyline points="250,632 234,632 234,704 216,704" fill="none" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="246" y="668" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".7">claims</text>
+
+        <!-- ============ the one return path ============ -->
+        <polyline points="480,707 730,707" fill="none" stroke="currentColor"/>
+        <text x="600" y="700" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">fail · failures++</text>
+        <polyline points="480,797 730,797" fill="none" stroke="currentColor"/>
+        <text x="600" y="790" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".7">refused · conflict · reverted</text>
+        <polyline points="730,797 730,614 480,614" fill="none" stroke="currentColor" marker-end="url(#a2)"/>
+        <text x="722" y="655" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".7">back to pending —</text>
+        <text x="722" y="669" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".7">a fresh executor, given</text>
+        <text x="722" y="683" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".7">the record that rejected it</text>
+      </svg>
+    </div>
+    <figcaption><b>Nine dispatches between a request and a merged commit.</b> The dashed boxes are conditional:
+    only a bug reserves a worktree before planning, and only an investigation leaves the loop entirely. The
+    single return path is deliberate — a verifier <code>fail</code> and a lander <code>refused</code> /
+    <code>conflict</code> / <code>reverted</code> mean the same thing operationally, so both send the task back
+    to <code>pending</code> with the record that rejected it attached as a second pointer.</figcaption>
+  </figure>
+
+  <div class="note"><b>Judgment fans out, mechanics do not.</b> Decomposition gets 2–3 parallel planners
+  because a bad cut does not announce itself — it surfaces later as executors colliding on files that were
+  supposed to be disjoint. Running a command or writing a file from a settled spec gets one agent, because a
+  second one returns the same string and costs the same again.</div>
+</section>
+<section id="doors">
+  <h2><span class="num">05</span>The seven doors</h2>
+  <p class="sub">The only skills a user can call by name. All seven are the same parent role — they read
+  coordination state, talk to the user, and dispatch. None of them reads source code.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-head"><h3>hello</h3><span class="chip c-route">Route</span><span class="role">the front door</span></div>
+      <p>A router, and nothing else. Reads seven cheap files, decides where the request belongs, says where it
+      is sending you and why, then hands over.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd><code>/rune:hello</code>, or any request where the user does not know which command they want.</dd>
+        <dt>Dispatches</dt><dd><b>Nothing.</b> The shortest allow-list in Rune — two bounded probes, the named <code>.rune/</code> reads, at most 20 top-level entry names, one question if genuinely ambiguous.</dd>
+        <dt>Writes</dt><dd>Nothing. The only possible write is <code>ai-root</code>’s bounded migration, internal to that skill.</dd>
+      </dl>
+      <hr class="rule">
+      <h4>State outranks intent</h4>
+      <p>Some conditions answer the question regardless of what was asked — a deliberate stop, an open
+      decision, or work in flight gets surfaced first, because the user may not know it is there.</p>
+      <div class="scroll" style="margin-bottom:0">
+        <table>
+          <thead><tr><th>State on disk</th><th>Routes to</th></tr></thead>
+          <tbody>
+            <tr><td><code>.rune/PAUSED</code> exists</td><td><code>pause</code> — never route around a deliberate stop</td></tr>
+            <tr><td>schema-1 or schema-0 ledger</td><td><code>continue</code> — migrate before anything trusts it</td></tr>
+            <tr><td>a decision is <code>open</code></td><td>surface it; nothing can proceed</td></tr>
+            <tr><td>a task is <code>awaiting</code></td><td>surface it; an executor is blocked on the reply</td></tr>
+            <tr><td><code>diagnosing</code> / <code>in_progress</code>, fresh session</td><td><code>continue</code> — reconcile first</td></tr>
+            <tr><td>a report slot is pending or blocked</td><td><code>continue</code></td></tr>
+            <tr><td>no <code>.rune/</code>, repo has code</td><td><code>init</code> → <code>vision</code></td></tr>
+            <tr><td>no <code>.rune/</code>, empty directory</td><td><code>vision</code> — init comes after the stack exists</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px;margin-bottom:0"><b>It never classifies bug vs feature itself.</b> That is the
+      one distinction needing evidence from code, and it belongs to <code>work</code>’s triage dispatch.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>init</h3><span class="chip c-route">Route</span><span class="role">establish ground truth</span></div>
+      <p>Mechanical, no interview, re-runnable. Finds and <em>runs</em> the pass/fail command that proves the
+      codebase works, maps modules and conventions, flags danger zones, scaffolds <code>.rune/</code>.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd>First use on a repo · <code>vision</code> finding no <code>rune.yml</code> · a re-run once setup measures stale.</dd>
+        <dt>Dispatches</dt><dd><code>ai-survey</code> (<code>work: survey</code>) and <code>ai-oracle</code> (<code>work: init/commands</code>). Both because their output is unbounded and this is the session every other route starts from.</dd>
+        <dt>Writes</dt><dd><code>rune.yml</code> · the empty schema-2 <code>ledger.md</code> · the <code>.rune/</code> scaffold · one <code>.gitignore</code> line · the marked <code>rune</code> block in <code>CLAUDE.md</code>.</dd>
+      </dl>
+      <hr class="rule">
+      <h4>Staleness is measured, never judged</h4>
+      <p>So two sessions looking at the same repository reach the same answer. Any <em>one</em> of these is stale:</p>
+      <ul class="tight">
+        <li>the recorded commit no longer resolves in this repository</li>
+        <li><b>50 or more</b> commits since it</li>
+        <li><b>25 or more</b> files changed since it</li>
+        <li>the recorded oracle command is no longer in the project manifests</li>
+      </ul>
+      <p>A <code>stale</code> verdict is a recommendation with its numbers shown, never an automatic re-run.</p>
+      <div class="why"><b>Write order is load-bearing.</b> The ledger transition is persisted <em>before</em>
+      <code>rune.yml</code> is installed, so the manifest can never claim initialization while the
+      authoritative ledger still reads <code>oracle: —</code>. A crash between the two is a recognized state
+      only <code>init</code> may finish.</div>
+      <p style="margin-bottom:0"><b>Three rules.</b> Never invent an oracle — if nothing verifies this
+      codebase, that <em>is</em> the finding. Report confidence per item. Never fix anything: init observes,
+      and repairs need acceptance criteria init has no mandate to invent.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>vision</h3><span class="chip c-route">Route</span><span class="role">decide what is being built</span></div>
+      <p>A conversation, not a generation task. The parent’s context exists for the interview — the one thing
+      here that genuinely cannot be delegated.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd>A project with no plan: a new idea with no code, or an in-progress codebase that has drifted.</dd>
+        <dt>Dispatches</dt><dd><code>ai-survey</code> (Mode B only) · <code>ai-decompose</code> with <code>work: vision/graph</code> to write <code>milestones.md</code>.</dd>
+        <dt>Writes</dt><dd><code>vision.md</code> and <code>decisions.md</code>, <b>incrementally</b>, as each section settles — plus the ledger’s <code>vision</code> phase.</dd>
+      </dl>
+      <hr class="rule">
+      <h4>Two modes</h4>
+      <p><b>Mode A · new project</b> walks seven topics in order, one at a time: what and why · the v1 line ·
+      shape · data · stack · constraints · done. The v1 line is the most valuable question in the interview and
+      the one users most want to skip.</p>
+      <p><b>Mode B · in-progress</b> surveys first, presents what actually exists including the awkward parts,
+      interviews against reality, and produces the discrepancy table — intended vs actual vs gap. Each
+      non-<code>none</code> row becomes a milestone or part of one.</p>
+      <div class="note"><b>Suggest. Never assume.</b> Every choice with more than one defensible answer becomes
+      a <code>DEC-nnn</code> record, and <b>no milestone may be generated that depends on an
+      <code>open</code> decision</b>. That gate is what converts “make no assumptions” from a personality
+      instruction into a checkable property. “You decide” is fine — recorded as <code>decided</code> with
+      <code>rationale: delegated to agent</code>. Invisible delegation is not.</div>
+      <p style="margin-bottom:0"><b>The phase marker is the ledger, not the file.</b>
+      <code>vision: absent | drafting | complete</code> lives in <code>ledger.md</code>; <code>drafting</code>
+      is persisted before the first question and <code>complete</code> before graph dispatch, so a crash at any
+      point is deterministic. The graph is generated from the files — anything that settled in conversation but
+      never reached disk is invisible to the worker, which is a bug in the note-taking, not a reason to write
+      the graph yourself.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>work</h3><span class="chip c-route">Route</span><span class="role">the execution loop</span></div>
+      <p>Triage → diagnose → plan → gate → size → dispatch → verify → land → reconcile. See
+      <a href="#loop">§04</a> for the shape; this is what governs it.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd>Building a feature, fixing a bug, refactoring, or advancing the current milestone.</dd>
+        <dt>Preconditions</dt><dd><code>PAUSED</code> → stop and report · no <code>rune.yml</code> → <code>init</code> · no milestones and a broad request → <code>vision</code> · a specific request with no vision → proceed.</dd>
+        <dt>Dispatches</dt><dd>All nine worker types in the loop, plus <code>ai-drift</code> and <code>ai-verify-finding</code>.</dd>
+        <dt>Writes</dt><dd><code>ledger.md</code> · assigned decision records · the run’s immutable <code>protocol.md</code> · atomic promotions of worker reports.</dd>
+      </dl>
+      <hr class="rule">
+      <h4>The permission list is derived from a reason</h4>
+      <p>The parent exists to tell the user what is happening. Anything not needed to report status, route
+      correctly, or record what happened is a dispatch — <em>stated that way round on purpose</em>, because a
+      list of forbidden actions can always be stepped around by an action nobody thought to forbid. That is
+      exactly how task files ended up being written in the parent’s context once.</p>
+      <div class="why"><b>The parent does not merge.</b> That was once the single command it was allowed to
+      run. It came off the list because a merge cannot be separated from what has to follow it: the suite is
+      re-run against the merged tree, and if it fails the merge has to come back out. Only the first of those
+      three is bounded — so the sequence is one <code>ai-land</code> dispatch, not a command with two
+      dispatches around it.</div>
+      <h4>One agent, one issue</h4>
+      <p>Three bug reports is three triage subagents, never one holding a list. This governs <b>scope, not
+      concurrency</b> — dispatching three at once is fine and usually right. It holds without exception
+      because: evidence bleeds between issues and nothing in the returned text shows it; failure stops being
+      isolated; a wrong answer cannot be attributed; and one agent holding three issues holds three working
+      sets, which is the accumulation the ≤200 token rule exists to prevent.</p>
+      <h4>The pre-reconciliation gate — always</h4>
+      <p>Work stops after the draft fan-out and <em>before</em> any final task file exists. There is no flag
+      that skips it. The ask is for <b>additions</b>, not “proceed?” — which only ever gets a yes.</p>
+      <ul class="tight">
+        <li><b>Implementation assumptions, stated.</b> Permitted only when internal, reversible, and unable to change behaviour, scope, acceptance, data retention, error semantics, or a public interface.</li>
+        <li><b>Exclusions, stated.</b> Users often assume something is included.</li>
+        <li><b>An open question, not a yes/no.</b> “Anything to add?” gets the thing they had been meaning to mention.</li>
+      </ul>
+      <p>Anything user-visible found there becomes a parent-owned <code>DEC-nnn</code>, and planning restarts
+      as a <em>fresh run</em> so every planner reads the settled input. Drafts built before their durable
+      inputs existed are never reconciled.</p>
+      <h4>When drift stops the loop</h4>
+      <p>Measured, never felt. Stop and hand back to the user when any one holds:</p>
+      <ul class="tight">
+        <li><b>N ≥ 3</b> — unfinished tasks retired</li>
+        <li><b>N / M ≥ ½</b> — share of the milestone retired</li>
+        <li>the drift record names the milestone’s own acceptance as invalid</li>
+      </ul>
+      <p style="margin-bottom:0">Both numbers are written once, into the ledger’s <code>quiescing</code> entry,
+      and never recomputed — so a later session reads the original measurement rather than re-deriving one from
+      a tree that has since moved.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>pause</h3><span class="chip c-route">Route</span><span class="role">stop cleanly</span></div>
+      <p>Stops the loop and leaves the repository in a state you can walk away from or take over by hand.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd>“stop”, “hold on”, or a check of whether work is already paused. Running it twice is safe.</dd>
+        <dt>Dispatches</dt><dd><code>ai-verify</code> and <code>ai-land</code> while draining · <code>ai-drift</code> in <code>abandon</code> mode, one per recorded worktree, after confirmation.</dd>
+        <dt>Writes</dt><dd><code>PAUSED</code> · <code>ledger.md</code> to settle drained rows · assigned decisions and report promotions.</dd>
+      </dl>
+      <hr class="rule">
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Mode</th><th>In-flight work</th><th>Use when</th></tr></thead>
+          <tbody>
+            <tr><td><code>drain</code> <span class="chip ok" style="border-color:currentColor">default</span></td><td>finishes, verifies, merges — then stops</td><td>almost always</td></tr>
+            <tr><td><code>abandon</code></td><td>worktrees discarded, tasks reset to queued</td><td>the current batch is going somewhere wrong</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="why"><b>Why there is no “stop now”.</b> Rune dispatches a worker and waits for its return.
+      There is no channel back to one already running — no handle, no acknowledgement, no way to know a signal
+      arrived. A mode claiming to interrupt live workers would promise something neither Claude Code nor
+      OpenCode can deliver. What is real is that the flag goes down <em>first</em>, so nothing new starts; and
+      whatever is already running has two honest endings: wait for it, or throw it away.</div>
+      <p style="margin-bottom:0"><b>The invariant it guarantees:</b> when pause returns, no task is left
+      <code>in_progress</code> or <code>landing</code>. A paused ledger claiming work in progress is a lie about
+      the state of the world, exactly as after a crash. <em>Not</em> a rollback — merged stays merged. <em>Not</em>
+      a way to abandon a plan — milestones and task files survive.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>handoff</h3><span class="chip c-route">Route</span><span class="role">move to a fresh session</span></div>
+      <p>Most state is already on disk — that is the whole design. This skill exists for the part that is not:
+      everything the user said, corrected, ruled out, or preferred, living only in a conversation about to end.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd>Context above roughly 70% · a session drifted across several milestones · handing the project to someone else · a break long enough to forget the thread.</dd>
+        <dt>Dispatches</dt><dd><code>ai-survey</code> in <code>amend</code> mode — <b>one fact per dispatch, one dispatch at a time</b> · plus <code>ai-verify</code> / <code>ai-land</code> if it has to drain first.</dd>
+        <dt>Writes</dt><dd><code>sessions/&lt;stamp&gt;.md</code> · <code>vision.md</code> · <code>decisions.md</code> · <code>ledger.md</code> while draining.</dd>
+      </dl>
+      <hr class="rule">
+      <p><b>Do not wait for the ceiling.</b> A handoff written at 70% is thorough; one written at 95% is rushed
+      and lossy, which defeats the point.</p>
+      <h4>Triage of what is in your head</h4>
+      <div class="scroll" style="margin-bottom:0">
+        <table>
+          <thead><tr><th>What you found</th><th>Where it goes</th></tr></thead>
+          <tbody>
+            <tr><td>a convention the user corrected you on</td><td>dispatch <code>ai-survey</code> <code>amend</code> → <code>map.md</code></td></tr>
+            <tr><td>a codebase gotcha you discovered</td><td>dispatch <code>ai-survey</code> <code>amend</code> → a Serena memory</td></tr>
+            <tr><td>a choice made verbally</td><td>the parent writes it → <code>decisions.md</code>, <code>decided</code></td></tr>
+            <tr><td>a constraint on the project</td><td>the parent writes it → <code>vision.md</code></td></tr>
+            <tr><td>something wanted later</td><td><code>vision.md</code> as a want — <em>not</em> <code>milestones.md</code></td></tr>
+            <tr><td>approaches tried and rejected; judgement calls</td><td>the handoff doc</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px"><b>The test:</b> would this still be true and useful three sessions from now?
+      If yes, it belongs in a permanent file. The handoff doc is for what stops being relevant once the work
+      moves on.</p>
+      <div class="why"><b>Why the amend dispatches are serial.</b> Two amend workers editing <code>map.md</code>
+      at once would each preserve the file as they found it and silently discard the other’s edit. And never
+      dispatch <code>mode: full</code> from here — a full survey re-derives the whole codebase to file a
+      sentence, overwriting the map while doing it.</div>
+      <p style="margin-bottom:0"><b>Rules.</b> Never invent history — if you cannot remember why something was
+      decided, say the reasoning is lost; a plausible reconstruction becomes fact the moment the next session
+      reads it. Do not summarise the ledger. One handoff per session.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>continue</h3><span class="chip c-route">Route</span><span class="role">resume and repair</span></div>
+      <p>Everything comes from disk; nothing is remembered. <b>Reconcile before reporting</b> — a ledger left
+      by a dead session contains claims that are no longer true, and reporting them as status propagates the lie.</p>
+      <dl class="meta">
+        <dt>Triggers</dt><dd>A fresh session, a crash, or a cleared context.</dd>
+        <dt>Dispatches</dt><dd><code>ai-recover</code> · <code>ai-drift</code> · <code>ai-verify</code> · <code>ai-land</code> · <code>ai-bug</code> · <code>ai-size</code> · <code>ai-decompose</code> · <code>ai-investigate</code> · <code>ai-research</code> · <code>ai-verify-finding</code>.</dd>
+        <dt>Writes</dt><dd><code>ledger.md</code> repairs · recovered decisions · report promotions · deletes <code>PAUSED</code> only on a confirmed resume.</dd>
+      </dl>
+      <hr class="rule">
+      <ol class="steps">
+        <li><b>Read state</b> — the cheap coordination files only. Never source, never a task file unless about to act on it.</li>
+        <li><b>Validate or migrate the ledger.</b> Schema 2 must validate completely; schema 1 and schema 0 have migration paths; an unknown schema stops. A nonempty legacy <code>## Amendments</code> footer on an unfinished task fails closed into a migration drift record — the only pre-migration worker dispatch there is.</li>
+        <li><b>Reconcile the vision phase</b> from the ledger field, never from file shape.</li>
+        <li><b>Reconcile report assignments first</b> — every pending or blocked <code>DRF-</code>/<code>INV-</code>/<code>RES-</code> slot, by file order rather than guesswork.</li>
+        <li><b>Reconcile <code>diagnosing</code> rows before executable ones.</b> No task file exists yet, so they must never reach <code>ai-execute</code> or <code>ai-recover</code>.</li>
+        <li><b>Every <code>in_progress</code> row is a lie</b> — nobody is holding it. Resolve each by the table below.</li>
+      </ol>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>What is on disk</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>valid complete publication, no return</td><td><code>verifying</code>, <code>v++</code>, dispatch <code>ai-verify</code></td></tr>
+            <tr><td>handoff note present</td><td>follow its worktree instruction and the state it implies</td></tr>
+            <tr><td>no handoff · empty diff · branch ahead</td><td><code>pending</code>, <code>resume_at: publish</code></td></tr>
+            <tr><td>no handoff · empty diff · branch not ahead</td><td>dispatch <code>ai-drift</code> <code>discard-empty</code></td></tr>
+            <tr><td>no handoff · non-empty diff</td><td><b>dispatch <code>ai-recover</code></b> — the one judgement case</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>It also sweeps:</b> orphaned worktrees → <code>ai-land</code> <code>cleanup</code>; stale
+      <code>verifying</code> and <code>landing</code> rows; interrupted decomposition runs; unregistered replan
+      transactions; <code>unsized</code> rows → <code>ai-size</code>; mitigation-repair assignments; staged
+      worker questions (assigned <code>DEC</code> ids serially, in numeric order); and unverified claims →
+      <code>ai-verify-finding</code>.</p>
+      <div class="note"><b>Discard freely.</b> Under Serena a fresh executor re-acquires its working set for
+      about 10k. Partial work of unknown provenance is worth less than the clean base it is occupying — the
+      task file, not the worktree, was always the durable state. The exception is a bug’s
+      <code>diagnosis_commit</code>, which is durable evidence and is preserved as the task baseline.</div>
+      <p style="margin-bottom:0"><b>It does not start work.</b> Reconcile, report what was <em>repaired</em>,
+      hand to <code>work</code> or <code>vision</code>. Continue answers <em>where are we</em>; the other routes
+      answer <em>what next</em>.</p>
+    </div>
+  </div>
+</section>
+<section id="libraries">
+  <h2><span class="num">06</span>Parent libraries</h2>
+  <p class="sub">Followed in place, never dispatched. These carry the rules that would otherwise have to be
+  repeated in every skill that depends on them.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-head"><h3>ai-root</h3><span class="chip c-library">Library</span><span class="role">coordination-root identity</span></div>
+      <p>The single seam for “which <code>.rune</code> is canonical, and can the legacy <code>.agent/</code>
+      directory be migrated safely”. Followed by all seven routes before any coordination read or write —
+      <code>init</code>, <code>vision</code>, <code>pause</code>, <code>handoff</code> with
+      <code>mode: initialize</code>; <code>hello</code>, <code>work</code>, <code>continue</code> with
+      <code>mode: resolve</code>.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Filesystem state</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>both <code>.rune/</code> and <code>.agent/</code> exist</td><td class="stop"><b>stop</b> — report both absolute paths, change neither</td></tr>
+            <tr><td>only <code>.rune/</code></td><td>resume any marked migration, return it</td></tr>
+            <tr><td>only <code>.agent/</code></td><td>validate ownership and worktree safety, then migrate</td></tr>
+            <tr><td>neither, <code>initialize</code></td><td>create it, ensure <code>worktrees/</code> is ignored, return</td></tr>
+            <tr><td>neither, <code>resolve</code></td><td>return the path without creating it</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Filenames are not ownership.</b> The generic name may belong to another tool, so migration requires
+      at least one independent Rune signal — an initialized <code>rune.yml</code>, a recognizable ledger, a
+      <code># Vision</code> / <code># Decisions</code> pair, a <code># Map — &lt;project&gt;</code> record, a
+      session handoff or PAUSED record, or an artifact matching an <code>ai-taskfmt</code> schema. Unknown
+      top-level entries make ownership ambiguous, and it stops rather than guessing.</p>
+      <p><b>Registered worktrees block the rename.</b> One bounded probe counts worktrees at or below the
+      legacy root; any positive count stops migration rather than stranding Git metadata and possibly live work.</p>
+      <p style="margin-bottom:0"><b>Migration is resumable</b> through a durable marker
+      (<code>prepared</code> → <code>rewriting</code>) and an exclusive lock directory that moves with the
+      rename. A failed run leaves both in place, so partial state can never be mistaken for an available
+      migration; locks are never stolen or aged out. It never does a global text replacement — only exact
+      absolute legacy paths, enumerated pointer fields, Markdown link targets, ledger pointer columns, and the
+      exact <code>.gitignore</code> line.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-taskfmt</h3><span class="chip c-library">Library</span><span class="role">the spine</span></div>
+      <p>The largest skill in Rune and the one everything else references. Every durable fact lives on disk
+      under <code>.rune/</code>; no agent may rely on conversation memory for anything another agent will need.
+      <b>Assume every reader is a stranger with an empty context.</b></p>
+      <h4>What it owns</h4>
+      <ul class="tight">
+        <li>every file schema — task file, milestone, decision record, planner draft, replacement map, handoff note, progress file, vision document</li>
+        <li>the <b>dispatch envelope</b> — <code>follow</code>, <code>work</code>, <code>attempt</code>, <code>main_root</code>, <code>worktree_path</code>, <code>pointers</code>, <code>reports</code></li>
+        <li>the <b>return envelope</b> — <code>work</code>, one-line <code>summary</code>, <code>worktree</code>, one outcome field, <b>≤200 tokens with no per-job exceptions</b></li>
+        <li>the <b>single-writer table</b>, and the concurrency rule that generates it</li>
+        <li>the <b>checkout identity contract</b> — current working directory is never an identity</li>
+        <li>report staging and atomic no-replace promotion</li>
+        <li><b>findings</b> — a claim is not a fact until a fresh subagent confirms it</li>
+        <li>the published artifact interface — <code>base_commit</code> / <code>artifact_commit</code> / <code>verified_commit</code></li>
+        <li>bounded state probes, listed by name per skill so qualifying is a lookup, not a judgement call</li>
+      </ul>
+      <div class="why"><b>Pointers, not payloads.</b> The parent names where things are; the worker reads them
+      itself. Passing content down means the parent had to hold it first — the exact cost the whole system
+      exists to avoid — and it keeps every dispatch the same size no matter how big the job is.</div>
+      <p><b>ID spaces never collide.</b> <code>M-</code> milestone · <code>T-</code> task ·
+      <code>DEC-</code> decision · <code>DRF-</code> drift · <code>INV-</code> investigation ·
+      <code>RES-</code> research · <code>FND-</code> finding. Local planning ids — <code>R-nnn</code> run,
+      <code>P-nn</code> planner slot, <code>D-nnn</code> proposed task — never enter the final namespace.</p>
+      <p style="margin-bottom:0"><b>Ids are burned permanently.</b> An unused, blocked, or interrupted
+      reservation is never recycled, because a late worker may still hold its staging pointer. Gaps are the
+      correct outcome, not a bookkeeping failure.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-ledger</h3><span class="chip c-library">Library</span><span class="role">mutable routing state</span></div>
+      <p><code>ledger.md</code> holds all authoritative mutable routing state. One writer: the parent. Workers
+      never touch it — they report, the parent records. This skill owns what the statuses mean and what the
+      file looks like; the <em>routes</em> own the procedures.</p>
+      <h4>The task row</h4>
+      <p class="mono" style="font-size:12.5px;color:var(--ink-2);overflow-x:auto">id · milestone · title · status · blocked_by · worktree · attempts (dN/eN/vN/lN) · failures · latest_finding · blocker · resume_at · replaced_by</p>
+      <p>Counters are incremented <b>in the same update that claims the phase, before dispatch</b> — so a
+      worker that dies still visibly consumed an attempt. <code>failures</code> counts verifier
+      <code>fail</code> verdicts only; <code>unverified</code>, landing failures, and dead dispatches do not
+      raise it.</p>
+      <h4>Atomic transitions</h4>
+      <ol class="tight">
+        <li>Re-read and validate the complete ledger at its declared schema.</li>
+        <li>Produce <em>one</em> candidate containing every changed field plus the returned dispatch row.</li>
+        <li>Validate the candidate, then replace <code>ledger.md</code> in one write.</li>
+        <li>Only then dispatch the next worker.</li>
+      </ol>
+      <p>Never write <code>status</code> first and fill in its required fields later — a crash between those
+      edits creates a state no fresh session can route.</p>
+      <div class="note"><b>Log every dispatch — the point is not the audit trail.</b> It is that
+      <em>absence becomes visible</em>. Reconciled task files with no planner and reconciler rows means the
+      parent wrote them; a <code>commands</code> phase with no <code>ai-oracle</code> row means the parent ran
+      the suite; a <code>survey</code> with no <code>ai-survey</code> row means the parent read the codebase.
+      Each of those was a real defect in Rune before this table existed — and otherwise almost impossible to
+      notice, because the files all exist and the ledger looks healthy.</div>
+      <p style="margin-bottom:0"><code>## Drift</code> is <b>routing state</b> — a <code>quiescing</code> entry
+      freezes its closure and suppresses every new dispatch for those ids. <code>## Findings</code> is a
+      <b>record, never routing state</b> — findings block nothing, gate nothing, and <code>refuted</code>
+      entries are kept permanently on purpose.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-report</h3><span class="chip c-library">Library</span><span class="role">talking to the user</span></div>
+      <p>Two rules govern everything: report at the moments that matter, and say it in the fewest words that
+      stay accurate.</p>
+      <p><b>Speak at these points and not between them:</b> a task finished and was verified · a milestone
+      completed · a batch was dispatched, and again when it lands · the plan turned out wrong in a way that
+      affects other tasks · something needs a decision · work stopped, for any reason. Between them, stay
+      quiet — no narrating dispatches, tool calls, or reasoning in progress.</p>
+      <p><b>Every report opens with a TL;DR</b> of two or three lines: what happened, what is next, what needs
+      them. A reader who stops there should still know where things stand and whether they are needed.</p>
+      <h4>Translate the internal vocabulary</h4>
+      <div class="scroll" style="margin-bottom:0">
+        <table>
+          <thead><tr><th>Internal</th><th>Say instead</th></tr></thead>
+          <tbody>
+            <tr><td>the oracle passes</td><td>the tests pass</td></tr>
+            <tr><td>red-then-green confirmed</td><td>the test failed before the fix, passes now</td></tr>
+            <tr><td>green-baseline confirmed</td><td>the same tests passed before and after the refactor</td></tr>
+            <tr><td>T-014 is diagnosing</td><td>T-014’s failing bug test is being established</td></tr>
+            <tr><td>drift / DRF-003</td><td>the plan was wrong about X</td></tr>
+            <tr><td>T-016 is <code>retired</code>, <code>replaced_by: T-020,T-021</code></td><td>T-016’s plan was replaced by T-020 and T-021</td></tr>
+            <tr><td>decomposed the milestone</td><td>split the work into 4 tasks</td></tr>
+            <tr><td>the executor returned status budget</td><td>the task ran long and stopped partway</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px;margin-bottom:0"><b>Only report a <code>confirmed</code> finding.</b> A claim
+      still waiting on its verifier is not news, and telling the user makes them act on something nobody has
+      checked. Refuted findings are not reported at all — somebody guessed wrong and a second agent caught it,
+      which is the system working.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-serena</h3><span class="chip c-library">Library</span><span class="role">reading code without spending the budget</span></div>
+      <p>Followed by every worker that reads code. <code>ai-execute</code> loads it explicitly;
+      <code>ai-triage</code>, <code>ai-survey</code>, <code>ai-decompose</code>, <code>ai-size</code>,
+      <code>ai-investigate</code>, <code>ai-verify-finding</code>, and <code>ai-refactor</code> all invoke it
+      by name.</p>
+      <div class="note"><b>Agents do not blow budgets reading what they need. They blow them exploring.</b></div>
+      <h4>The ladder — stop at the first rung that answers the question</h4>
+      <ol class="tight">
+        <li><code>get_symbols_overview(file)</code> — what is in this file. Almost always enough to orient.</li>
+        <li><code>find_symbol(name_path)</code>, <code>include_body=false</code> — where a thing lives, its shape.</li>
+        <li><code>find_symbol(…, include_body=true)</code> — the actual code, <b>one symbol at a time</b>.</li>
+        <li><code>Read(file)</code> — last resort. Justify it.</li>
+      </ol>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Instead of</th><th>Use</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>Read</code> whole file</td><td><code>get_symbols_overview</code> then <code>find_symbol</code></td><td>10–50× less context</td></tr>
+            <tr><td><code>grep -r</code> for callers</td><td><code>find_referencing_symbols</code></td><td>precise; no hits in comments or strings</td></tr>
+            <tr><td>Read then <code>Edit</code></td><td><code>replace_symbol_body</code></td><td>never loads the untouched remainder</td></tr>
+            <tr><td>many same-shape edits</td><td><code>replace_in_files</code>, dry run first</td><td>one call, and no over-broad replacements</td></tr>
+            <tr><td>guessing whether it compiles</td><td><code>get_diagnostics_for_file</code></td><td>the language server already knows</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Never read a file “to get orientated.”</b> Orientation comes from <code>map.md</code>, which exists
+      precisely so nobody re-derives it. A missing or stale map is an <code>init</code> problem, not something
+      to solve by browsing.</p>
+      <p style="margin-bottom:0"><b>Budget discipline.</b> At roughly 60%, stop taking on new ground: finish
+      the step in flight, write the handoff, return. Returning early with a good handoff is a success. Running
+      out of context is not.</p>
+    </div>
+  </div>
+</section>
+<section id="workers">
+  <h2><span class="num">07</span>The workers</h2>
+  <p class="sub">Fourteen skills, each dispatched as its own subagent, each carrying exactly one issue. None
+  of them can talk to the user; none of them writes the ledger.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-head"><h3>ai-survey</h3><span class="chip c-worker">Worker</span><span class="role">map the codebase</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>init</code> · <code>vision</code> Mode B · <code>handoff</code> (amend)</dd>
+        <dt>Writes</dt><dd><code>map.md</code> (sole writer) and Serena memories</dd>
+        <dt>Returns</dt><dd><code>survey: mapped | amended | unchanged | conflict | blocked</code></dd>
+      </dl>
+      <hr class="rule">
+      <p><b>Always a subagent.</b> Surveying burns context by design; that cost is quarantined in a worker that
+      returns a digest and dies.</p>
+      <h4>mode: full — breadth before depth</h4>
+      <p>A surveyor that starts reading files in <code>src/</code> learns a great deal about one corner and
+      nothing about the shape. Perimeter → entry points → module map → conventions (sampled; report what the
+      code <em>does</em>, not what a style guide says) → danger zones → <b>completeness</b>.</p>
+      <p>That last pass is the most valuable output on an in-progress codebase: <b>stubs</b> ·
+      <b>orphans</b> (no inbound references) · <b>half-wired</b> paths · <b>contradictions</b> (two
+      implementations of one concept) · <b>abandoned directions</b>. Each with a file reference, stated as
+      observation with evidence. “<code>AuthService.refresh</code> returns null and has no callers” is useful;
+      “the auth is a mess” is not.</p>
+      <h4>mode: amend — one fact, and usually no write at all</h4>
+      <div class="scroll" style="margin-bottom:0">
+        <table>
+          <thead><tr><th>What it found</th><th>Returns</th><th>Writes</th></tr></thead>
+          <tbody>
+            <tr><td>the fact is not there</td><td class="ok"><code>amended</code></td><td>adds it in the right section</td></tr>
+            <tr><td>already there, in substance</td><td><code>unchanged</code></td><td>nothing</td></tr>
+            <tr><td>the map contradicts it</td><td class="warn"><code>conflict</code></td><td>nothing — quotes both lines</td></tr>
+            <tr><td>target missing or unreadable</td><td class="stop"><code>blocked</code></td><td>nothing</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px;margin-bottom:0"><b>A conflict is not the worker’s to resolve.</b> It has one
+      sentence from a conversation it did not see; the map has a line somebody surveyed the codebase to write.
+      Only the user knows which is true. Three of the four outcomes write nothing, and that is normal —
+      overwriting a surveyed observation to make a dispatch look productive is the failure this mode is most
+      likely to produce.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-oracle</h3><span class="chip c-worker">Worker</span><span class="role">find and run the pass/fail check</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>init</code> (<code>work: init/commands</code>). Its <em>rules</em> also apply inside <code>ai-verify</code> and <code>ai-land</code> without a separate dispatch.</dd>
+        <dt>Writes</dt><dd><code>notes/init-commands.md</code> — full output, every command, exit codes</dd>
+        <dt>Returns</dt><dd><code>oracle: passing | failing | none</code> plus per-command verdicts and durations</dd>
+      </dl>
+      <hr class="rule">
+      <div class="why"><b>Why it exists.</b> Rune executors grade their own homework, in a context nobody else
+      can see, and models are optimistic. Without an independent check you get a ledger of green rows over a
+      codebase that does not run.</div>
+      <p><b>Run it, do not infer it.</b> A command in <code>package.json</code> proves nothing about whether it
+      works in this checkout, on this machine, today. Inference is what the dispatcher could already do for
+      free; running it is the entire reason this is a separate dispatch.</p>
+      <h4>Two oracles</h4>
+      <p><b>Project-global</b> — “did I break anything else”. Established once, recorded in
+      <code>rune.yml</code>, run after every task. <b>Task-local</b> — “did my specific thing work”, produced
+      <em>by</em> the task. A project with no test suite still accrues one, task by task, through the local
+      oracles: that is what makes degraded mode survivable rather than hopeless.</p>
+      <h4>Three outcomes</h4>
+      <ul class="tight">
+        <li><b class="ok">passing</b> — normal operation; the regression check for every task.</li>
+        <li><b class="warn">failing on arrival</b> — record the exact <b>known-red baseline</b>. A task regresses only by adding a failure not in it. Getting the suite green is legitimate work — propose it as a milestone, do not smuggle it into an unrelated task.</li>
+        <li><b class="stop">none found</b> — say so loudly, <code>oracle.status: none</code>, degraded mode. Deliberately noisy, so the absence is felt on every task rather than forgotten by task three.</li>
+      </ul>
+      <p style="margin-bottom:0"><b>Vacuous checks</b> are the most common way verification silently fails: a
+      test asserting nothing or asserting <code>true</code>; a subject mocked so thoroughly only the mock is
+      exercised; a behaviour test added after the change and never observed red; a refactor whose baseline was
+      never run. <b>Absence of proof is not proof</b> — that is <code>unverified</code>, not <code>pass</code>.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-triage</h3><span class="chip c-worker">Worker</span><span class="role">classify one request</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> — one per issue, concurrently, <code>work: request-N</code></dd>
+        <dt>Writes</dt><dd>Nothing. Read-only.</dd>
+        <dt>Returns</dt><dd><code>type: bug | feature | refactor | investigation</code> + evidence, shape, milestone fit</dd>
+      </dl>
+      <hr class="rule">
+      <p>It exists because classification needs evidence the dispatcher cannot gather: <i>“is this a bug, or
+      was it never implemented?”</i> cannot be answered from the user’s sentence, and on an unfinished codebase
+      it is the most common ambiguity there is.</p>
+      <div class="why"><b>Read-only is on you.</b> Nothing in the harness stops a triage worker editing, and a
+      bug it has just diagnosed is often a two-line fix — fixing it <em>feels</em> like helping. It is not: that
+      fix lands unplanned, unverified, outside every acceptance criterion in the ledger, and invisible to the
+      gate that was supposed to show the user what was about to change.</div>
+      <div class="scroll" style="margin-bottom:0">
+        <table>
+          <thead><tr><th>Class</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td><b>bug</b></td><td>behaviour exists and is wrong</td></tr>
+            <tr><td><b>feature</b></td><td>behaviour does not exist</td></tr>
+            <tr><td><b>refactor</b></td><td>behaviour is correct, structure is not</td></tr>
+            <tr><td><b>investigation</b></td><td>the request is a question, not a change</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px;margin-bottom:0">When genuinely torn, say so and pick the more conservative
+      reading — <b>investigation over change, feature over bug</b>. The protocol that receives it will look
+      harder and can reclassify; correcting early is cheap.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-bug</h3><span class="chip c-worker">Worker</span><span class="chip c-protocol">Protocol</span><span class="role">reproduce before planning</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> after triage returns <code>bug</code> · <code>continue</code> when a diagnosis worker died · <b>loaded as a protocol</b> by <code>ai-decompose</code></dd>
+        <dt>Writes</dt><dd>the first <code>notes/T-nnn.progress</code> diagnosis block · the reproduction commit on <code>task/T-nnn</code></dd>
+        <dt>Returns</dt><dd><code>diagnosis: reproduced | not_reproduced | reclassified | blocked</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="note"><b>Governing rule: no fix without a failing reproduction.</b> Not a description of the
+      failure. Not a stack trace. An executable case that fails now and will pass after.</div>
+      <p><b>Identity comes before diagnosis.</b> The parent reserves <code>T-nnn</code>, writes the run’s
+      immutable <code>protocol.md</code> with <code>reserved_task</code>, and adds a <code>diagnosing</code>
+      ledger row <em>before</em> dispatch. The worker then creates or validates that exact worktree before
+      writing anything. It never reads the ledger or allocates an id.</p>
+      <ol class="steps">
+        <li><b>Reproduce.</b> Establish the failing case as code. Confirm it fails <em>now</em>, capture the exact output, and establish the <b>boundary</b> — what inputs fail, what adjacent inputs succeed. A bug you can only trigger one way is under-characterised, and you will not know if the fix was general.</li>
+        <li><b>Root cause, not symptom.</b> The reproduction tells you where it surfaces; that is rarely where it is caused. Ask “why is the input wrong” one level up until the answer is “because this code is wrong” rather than “because it was given bad data”.</li>
+        <li><b>Commit the reproduction</b> on the task branch and record <code>diagnosis_base_commit</code> and <code>diagnosis_commit</code>. Red-then-green is free here — red was observed in step 1, before any production change existed.</li>
+      </ol>
+      <p><b>Symptom fixes are identifiable</b>: null-guards at the point of crash, try/catch around the failing
+      call, defaulting a value that should never have been absent. If the fix tolerates bad state rather than
+      preventing it, it is a symptom. Sometimes that is the right call — but it must be <em>explicit</em>:
+      <code>remediation: mitigation</code> with <code>root_cause_followup</code> naming a separate root-cause
+      task. Diagnosis may <em>recommend</em> it; it never silently authorizes it.</p>
+      <div class="why"><b><code>diagnosis_commit</code> is not an artifact.</b> It has no
+      <code>artifact_commit</code>, cannot be verified, and cannot be landed on its own — verification and
+      landing must refuse to treat it as completed work. It is the starting baseline the eventual publication
+      range contains.</div>
+      <p style="margin-bottom:0"><b>Watch for misclassification.</b> Triage guessed from a sentence; you have
+      now looked at the code. Two common corrections: <i>it was never implemented</i> (a feature — features
+      need decomposition and possibly decisions, bugs do not), and <i>it works as designed and the design is
+      wrong</i> (a decision to surface, then a feature or refactor). A failed or reclassified diagnosis burns
+      the reserved id forever, so a late return cannot attach evidence to a different task.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-decompose</h3><span class="chip c-worker">Worker</span><span class="role">four different jobs</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>vision</code> (graph) · <code>work</code> (drafts, reconcile) · <code>continue</code> (mitigation repair)</dd>
+        <dt>Writes</dt><dd><code>milestones.md</code> · one <code>P-nn.md</code> draft · the final <code>tasks/T-nnn.md</code> files · <code>replacements.md</code> · <code>mitigation-repair.md</code></dd>
+        <dt>Returns</dt><dd><code>plan: graph | drafted | reconciled | blocked</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Job</th><th>Work id</th><th>Writes</th></tr></thead>
+          <tbody>
+            <tr><td><b>Milestone graph</b></td><td><code>vision/graph</code></td><td><code>milestones.md</code> — sole writer, no promotion step</td></tr>
+            <tr><td><b>Planner draft</b></td><td><code>M-nn/R-nnn/P-nn</code></td><td>one immutable draft at its assigned path</td></tr>
+            <tr><td><b>Reconcile</b></td><td><code>M-nn/R-nnn</code></td><td>the final task files (+ <code>replacements.md</code> on a replan)</td></tr>
+            <tr><td><b>Mitigation repair</b></td><td>the fresh run id</td><td>one root-cause task + the repair artifact</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>The protocol binds first.</b> Every planner and reconciler reads the run’s <code>protocol.md</code>
+      and accepts only <code>bug → ai-bug</code>, <code>feature → ai-feature</code>,
+      <code>refactor → ai-refactor</code>. <b>The record decides</b> — not the request wording, not the
+      milestone title. It also carries <code>decisions: [...]</code>; every listed record must resolve as
+      <code>decided</code>, and conversation context never fills the gap.</p>
+      <div class="note"><b>Why just-in-time.</b> A task must name real files and real symbols. For a milestone
+      three steps out those files do not exist yet — they get created by the milestones in between — so
+      anything written now is fiction composed against imagined code, and every line of it drifts on contact.
+      <em>Plan the whole road during vision. Pave one section at a time.</em></div>
+      <h4>Cutting rules</h4>
+      <ul class="tight">
+        <li><b>Behaviour-changing work is vertical</b> (<code>red_then_green</code>). “Token rotation end to end” is a task; “all the interfaces, then all the implementations, then all the tests” is three tasks of which none can demonstrate the change alone.</li>
+        <li><b>Refactors are horizontal</b> (<code>green_baseline</code>) — additive, then mechanical, then subtractive. Every intermediate state compiles and preserves the same baseline.</li>
+        <li><b>Characterization is a separate test-only task</b> when a refactor has no adequate net.</li>
+        <li><b>Ceiling: 5 files, one subsystem, one verifiable outcome.</b></li>
+        <li><b>Independence over elegance.</b> Two slightly redundant tasks that run in either order beat one clever task that couples them — redundancy costs tokens, coupling costs correctness.</li>
+      </ul>
+      <div class="why"><b>The <code>forbidden</code> list is the one that matters</b> and the one planners skip.
+      Executors do not blow budgets reading what they need — they blow them exploring. The planner is the only
+      agent positioned to know that <code>src/api/**</code> is irrelevant to this task and would cost 40k tokens
+      if opened. The executor cannot know that, and <em>will</em> look, because looking feels responsible.
+      Always give the reason: <code>src/legacy/** — being deleted in M-05</code> tells the executor it is not
+      missing something; a bare path makes it wonder.</div>
+      <p style="margin-bottom:0"><b>Planners cut independently.</b> Where independent cuts agree, the milestone
+      divided cleanly; where they disagree, that seam is the genuinely hard part. A planner that hedges toward
+      what it imagines the others will produce erases exactly the information the fan-out was dispatched to buy.
+      <b>No planner registers tasks in the ledger</b> — the parent is its sole writer.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-size</h3><span class="chip c-worker">Worker</span><span class="role">will one agent actually finish this?</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> for every newly registered <code>unsized</code> task · <code>continue</code> when a sizer died</dd>
+        <dt>Writes</dt><dd><code>notes/T-nnn.sizing.md</code> — one appended block per attempt</dd>
+        <dt>Returns</dt><dd><code>sizing: pass | split | blocked</code></dd>
+      </dl>
+      <hr class="rule">
+      <p>The planner already applied the five-file rule while cutting. This asks the different question that
+      rule cannot answer: <b>would one fresh agent get all the way through this — understanding,
+      implementation, tests, handoff — and still have room left over?</b> Five small files in one module and
+      five files across three subsystems both pass the rule and are not the same job.</p>
+      <div class="why"><b>Deliberately starved of context.</b> No planner drafts, no cut notes, no conversation
+      — because the reasoning that produced the task is exactly the reasoning that would talk a reviewer into
+      accepting it.</div>
+      <h4>What actually makes a task too big</h4>
+      <p>Not line counts. Breadth of the change surface · how much must be understood before anything can be
+      written · decisions still open inside the task (“handle the error appropriately” is a question, not a
+      step) · sequencing assumptions the file does not state · the whole lifecycle including the failing check
+      and the handoff · how likely it is to need work outside its declared surface.</p>
+      <div class="note"><b>Headroom is the point.</b> Ask whether it fits <em>with the first approach
+      failing</em>. If the honest answer is “yes, if nothing goes wrong”, that is a <code>split</code>.</div>
+      <p><b>When in doubt, split.</b> A wrong <code>split</code> costs one more planning round. A wrong
+      <code>pass</code> costs a burned executor, a partially implemented task, a worktree somebody has to
+      reconcile, and often a change that crossed its declared surface to get finished — none of which surfaces
+      until the context is already gone.</p>
+      <p style="margin-bottom:0"><b>Your verdict gates dispatch, so do not hedge it.</b> There is no “pass with
+      concerns”. A <code>split</code> must name the seam, which part comes first, and what the second depends
+      on — otherwise it is just an objection.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-execute</h3><span class="chip c-worker">Worker</span><span class="role">do one task</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> only — with <code>attempt</code>, <code>main_root</code>, <code>worktree_path</code>, task pointers, and one fresh drift-report reservation</dd>
+        <dt>Loads</dt><dd><code>ai-taskfmt</code> · <code>ai-serena</code> · <code>ai-drift</code></dd>
+        <dt>Writes</dt><dd><code>notes/T-nnn.progress</code> · the handoff note · staged decision and finding records · commits on <code>task/T-nnn</code></dd>
+        <dt>Returns</dt><dd><code>status: done | drifted | budget | blocked | question</code></dd>
+      </dl>
+      <hr class="rule">
+      <p><b>It is stateless.</b> Before touching source it reads whatever exists — and two of those files are
+      the ones people skip:</p>
+      <ul class="tight">
+        <li><b><code>notes/T-nnn.verify.md</code>, last block first.</b> The task came back from verification. <b>Answering the last block <em>is</em> the work.</b> Running the original steps again earns the same verdict a second time — which is how a task reaches two failures and lands on the user’s desk with nothing learned.</li>
+        <li><b><code>notes/T-nnn.landing.md</code>.</b> The task was verified and then broke the main tree on merge. That record holds the exact failures, quoted, and whether they fell inside the declared change surface.</li>
+      </ul>
+      <p>Both can exist at once — they fail at different gates, and the later one is the live problem.</p>
+      <h4>Two checkout identities, bound first</h4>
+      <p><code>main_root</code> must resolve to itself; <code>worktree_path</code> must be a registered worktree
+      of the same repository, on <code>task/T-nnn</code>. Never search for a similar worktree, accept the
+      harness’s current directory, or allocate a new path on a retry. <b>The ledger path is the task
+      checkout.</b></p>
+      <div class="why"><b>Source into the worktree; coordination into <code>&lt;main_root&gt;/.rune/</code>.</b>
+      The progress file, handoff, drift and decision records must be visible to the dispatcher, the verifier,
+      and the next session <em>before</em> anything merges. Written inside the worktree they would appear only
+      on merge — which is precisely when nobody needs them any more.</div>
+      <h4>The rules that hold because you keep them</h4>
+      <ul class="tight">
+        <li><b>Stay inside your change surface.</b> Adapt freely within it; stop the instant the work requires a file the task did not name.</li>
+        <li><b>Edit first, then tick.</b> If you die between the two, a missing tick self-heals — the next executor finds the step already applied. The reverse order leaves a tick with no edit, which makes the record lie and causes real work to be skipped.</li>
+        <li><b>Stop at ~60% of budget.</b> Finish the step in flight, write the handoff, keep the worktree, return <code>budget</code>.</li>
+        <li><b>Never mark yourself done.</b> A separate verification decides that, in a context that never saw your reasoning.</li>
+        <li><b>Never widen scope to be helpful.</b> An unrelated fix lands unreviewed, unverified, and outside every acceptance criterion in the ledger.</li>
+      </ul>
+      <h4>Publishing — <code>done</code> means a commit exists</h4>
+      <p>Stage only declared files, commit on the task branch, prove <code>base_commit</code> is an ancestor of
+      <code>artifact_commit</code>, the range is non-empty, and the worktree is clean — then <b>append</b> the
+      publication block. Never replace an earlier one: verification failures and landing failures send a task
+      round the loop, and each attempt must say exactly which immutable range it produced.</p>
+      <p style="margin-bottom:0"><b>Noticing something outside your task</b> has exactly three readings: it
+      makes the task’s plan false → <b>drift</b>; it needs a user choice → <b>question</b>; it is simply noticed
+      and the task works either way → <b>write a claim to <code>findings/open/</code> and carry on</b>. Writing
+      it down is the whole of your involvement — do not look into it, widen your surface to check, or fix it.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-verify</h3><span class="chip c-worker">Worker</span><span class="role">the independent check</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> on every <code>done</code> claim · <code>pause</code> while draining · <code>continue</code> for a publication that survived a dead session</dd>
+        <dt>Writes</dt><dd><b>exactly one file</b> — <code>notes/T-nnn.verify.md</code>, one appended block per attempt</dd>
+        <dt>Returns</dt><dd><code>verdict: pass | fail | unverified</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="note"><b>Three hard rules.</b> Verify in a <b>clean context</b> — you must not have the
+      executor’s reasoning, only its artifacts. <b>Never verify your own work.</b> And <b>exactly one task per
+      agent</b> — a batch of three produces three correlated verdicts, because after passing the first two it
+      is judging the third against its own accumulated sense of what this batch looks like rather than against
+      the spec.</div>
+      <p><b>It does not read the executor’s summary.</b> That is the claim under examination, and reading it
+      primes you to agree with it.</p>
+      <h4>Eight steps, run in full on every attempt</h4>
+      <ol class="steps">
+        <li><b>Bind to the published artifact.</b> HEAD equals <code>artifact_commit</code>; worktree clean; <code>base_commit</code> an ancestor; the diff non-empty. From here, “the diff” means only that range.</li>
+        <li><b>Does the diff match the declared change surface?</b> Files outside it are a finding, not a detail.</li>
+        <li><b>Run the task-local check.</b> Its declared after-result must hold.</li>
+        <li><b>Check the declared evidence mode</b> is present, matching, and internally consistent.</li>
+        <li><b>Hunt vacuous checks using the mode</b> — including a revert-sensitivity probe in a <em>disposable</em> worktree where one is cheap. Never mutate the artifact you are verifying.</li>
+        <li><b>Run the project oracle</b> in the worktree, against the known-red baseline — not against zero failures.</li>
+        <li><b>Audit the ticks.</b> Spot-check two against the diff. A ticked step with no corresponding change means the record is lying, and the next executor would skip real work.</li>
+        <li><b>Walk the acceptance criteria</b> one at a time. No partial credit, no “essentially done”.</li>
+      </ol>
+      <p><b>Why all eight even on attempt 4.</b> Narrowing to “did they fix the last finding” is how the second
+      defect in a task ships: the executor answered the finding, you confirmed the finding was answered, and
+      nobody looked at the rest.</p>
+      <div class="why"><b>Write the record before you return.</b> A <code>fail</code> that exists only in a
+      return value dies in the parent’s context — and the next executor reads the task file, the handoff, and
+      the diff, none of which say why the last attempt was rejected. It would repeat that attempt move for
+      move. A <code>pass</code> block is written too; it is what closes the chain and lets a later reader tell a
+      resolved history from a live one.</div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Verdict</th><th>Means</th><th>What the parent does</th></tr></thead>
+          <tbody>
+            <tr><td class="ok"><b>pass</b></td><td>every criterion met; <code>verified_commit</code> names the exact artifact</td><td>claim landing, dispatch <code>ai-land</code> with that SHA</td></tr>
+            <tr><td class="warn"><b>fail</b></td><td>a criterion is not met</td><td><code>pending</code>, <code>failures++</code>, hand the record to a fresh executor</td></tr>
+            <tr><td class="stop"><b>unverified</b></td><td>the truth could not be established — <b>not a soft pass</b></td><td>routed by <code>reason</code>: <code>artifact</code> → republish · <code>evidence</code>/<code>acceptance</code> → drift record and re-decomposition · <code>oracle</code> → blocked</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-bottom:0"><b>Bias toward <code>fail</code> and <code>unverified</code>.</b> A false
+      <code>fail</code> costs one re-run. A false <code>pass</code> propagates into every task built on top of
+      it, and by the time it surfaces nobody knows which of the green rows was the lie. <b>You are not a
+      reviewer</b> — no style comments, no improvements, and above all no fixes: a verifier that fixes what it
+      found has destroyed the only independent check in the system.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-land</h3><span class="chip c-worker">Worker</span><span class="role">merge the exact verified commit</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> (one at a time, in finish order) · <code>pause</code> · <code>continue</code> (<code>cleanup</code>, stale <code>landing</code> rows, <code>drift-observe</code>)</dd>
+        <dt>Writes</dt><dd><code>notes/T-nnn.landing.md</code> — one appended block per attempt</dd>
+        <dt>Returns</dt><dd><code>landing: landed | refused | conflict | reverted | stuck | not_landed | cleaned</code> + <code>main: green | red</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="note"><b>The only worker allowed to change the main tree.</b> Every other worker is confined
+      to a worktree — so this is the one place a mistake is not contained by a worktree boundary. The sequence
+      is fixed for that reason: do not improvise inside it, and do not add a step because the situation seems to
+      call for one.</div>
+      <p><b>Why landing is not the last step of verification.</b> The verifier proved the task against the tree
+      it was cut from; a merge into a tree it never saw is a new claim needing new evidence. Two tasks can each
+      pass verification and still break the project together — task A renames something task B calls, neither
+      touches the other’s files, git merges both without complaint.</p>
+      <ol class="steps">
+        <li><b>Main tree clean outside <code>.rune/</code>.</b> Otherwise a rollback could not tell stray source changes from the merge. → <code>stuck</code>.</li>
+        <li><b>Bind to the verified artifact.</b> Latest verdict <code>pass</code>; commits match the latest publication; <code>verified_commit</code> equals <code>artifact_commit</code>; the range is non-empty. Any mismatch → <code>refused</code>, touching nothing.</li>
+        <li><b>Record the rollback point.</b> One line, captured before anything is touched.</li>
+        <li><b>Merge the SHA — never the branch name.</b> The branch is checked only to prove it still names the artifact; the SHA is what passed verification.</li>
+        <li><b>Run the project oracle</b> in the main tree. Skipped only on a genuine fast-forward — a git fact you check, not a call you make.</li>
+        <li><b>On failure, roll back <em>first</em>, record second.</b> Same write-order rule, same reason: a missing record is recoverable, a record with the bad merge still in the tree is not.</li>
+        <li><b>Run the oracle again</b> to prove the rollback restored the tree.</li>
+        <li><b>Record success, then clean up.</b> Cleanup is last because the worktree is the recovery asset for every earlier failure.</li>
+      </ol>
+      <div class="why"><b>Never undo the merge with <code>revert -m 1</code>.</b> It leaves the merge in
+      history, so git treats the branch as already merged — and the fixed worktree would then land as an empty
+      diff. Re-landing the same branch is the entire point of the loop, and that one command quietly breaks it.</div>
+      <div class="note"><b>Step 7 is the one most worth not skipping.</b> A rollback assumed to have worked and
+      did not leaves main red while your return value says green — the exact failure this skill exists to
+      prevent, moved one step later where nobody is looking for it.</div>
+      <h4>Escalation: ordered rules, first match wins</h4>
+      <div class="scroll" style="margin-bottom:0">
+        <table>
+          <thead><tr><th class="tight">#</th><th>If</th><th>Then</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>this is attempt 5</td><td class="stop"><b>escalate</b> — ceiling</td></tr>
+            <tr><td>2</td><td>the outcome is <code>stuck</code></td><td class="stop"><b>escalate</b> — the tree is red and the rollback did not fix it</td></tr>
+            <tr><td>3</td><td>a test in <code>failing</code> also appears in the previous block</td><td class="stop"><b>escalate</b> — the fix did not address what it was sent to address</td></tr>
+            <tr><td>4</td><td><code>in_surface: no</code> on this block and the one before</td><td class="stop"><b>escalate</b> — this is drift, not a defect in the task</td></tr>
+            <tr><td>5</td><td>otherwise</td><td class="ok"><code>escalate: no</code> — let the loop run</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px;margin-bottom:0">Nothing asks whether the fix “seems to be converging” — that
+      was a judgement two agents could answer differently from the same record. <b><code>main: red</code> stops
+      everything</b>: no task claimed, no batch started, nothing landed. It is cleared by a human, not by the
+      next agent that finds it inconvenient.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-recover</h3><span class="chip c-worker">Worker</span><span class="role">salvage an abandoned task</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>continue</code> only — for one case: <b>marked in progress, no handoff, and a worktree with real changes in it</b></dd>
+        <dt>Writes</dt><dd><code>notes/T-nnn.md</code> — the handoff the dead executor never wrote</dd>
+        <dt>Returns</dt><dd><code>verdict: salvage | discard | partial</code> + the exact resume token</dd>
+      </dl>
+      <hr class="rule">
+      <p><code>continue</code> handles the easy cases mechanically. This skill is for the one that needs
+      judgement — and it runs as a subagent because reading a torn diff is exactly the unbounded reading the
+      parent must not do.</p>
+      <div class="note"><b>The diff is the truth, the ticks are a floor.</b> Because executors edit first and
+      tick second, the only reachable desync is a step done but not recorded. A <b>ticked</b> step is definitely
+      done; an <b>unticked</b> one may still be done — check the diff; a <b>tick with no change</b> means the
+      write-order rule was violated and the whole progress file is unreliable.</div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th class="tight">#</th><th>If</th><th class="tight">Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>any changed file is outside the declared change surface</td><td class="stop"><b>discard</b></td></tr>
+            <tr><td>2</td><td>the diff contradicts itself, or you cannot say what it was trying to do</td><td class="stop"><b>discard</b></td></tr>
+            <tr><td>3</td><td>the task’s premise looks false in light of the diff</td><td class="stop"><b>discard</b> + <code>premise_drift</code></td></tr>
+            <tr><td>4</td><td>fewer than 20 changed lines</td><td class="stop"><b>discard</b></td></tr>
+            <tr><td>5</td><td>relevant edits but no required pre-change evidence</td><td class="warn"><b>partial</b></td></tr>
+            <tr><td>6</td><td>any declared step is fully or partly applied</td><td class="ok"><b>salvage</b> at the first unfinished step</td></tr>
+            <tr><td>7</td><td>otherwise</td><td class="stop"><b>discard</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>“Was it nearly done” and “is this coherent enough” were the old criteria</b>, and two agents reading
+      one diff could answer them differently — which is the whole failure this ordered table removes.</p>
+      <p><b>Why 20 lines.</b> Below that, restarting from clean is cheaper than any agent reading and reasoning
+      about an abandoned edit. The exact number matters less than that it <em>is</em> a number.</p>
+      <p style="margin-bottom:0"><b>Do not finish the task</b> — you are diagnosing, not executing, and a fresh
+      executor does the work with a proper budget. <b>Do not guess at intent</b> — a confident wrong
+      reconstruction is worse than starting over, because the next executor will trust it. A bug’s
+      <code>diagnosis_commit</code> is never “abandoned implementation”: every discard resets only the work
+      after it.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-drift</h3><span class="chip c-worker">Worker</span><span class="chip c-library">Library</span><span class="role">when the plan is wrong</span></div>
+      <dl class="meta">
+        <dt>Loaded by</dt><dd><code>ai-execute</code> in place (<b>detect</b>) · dispatched by <code>work</code>, <code>pause</code>, <code>continue</code> in four bounded modes</dd>
+        <dt>Writes</dt><dd>the assigned <code>drift/open/DRF-nnn.md</code> staging record · the task handoff (detect only)</dd>
+        <dt>Returns</dt><dd><code>status: drifted | recorded | quiesced | abandoned | discarded | refused | budget | question</code></dd>
+      </dl>
+      <hr class="rule">
+      <p><b>On any real codebase this is the common path, not an edge case.</b> Task specs are written from a
+      survey, and surveys are optimistic about what is finished. Drift handled well is information; drift
+      handled badly is a ledger that stops describing reality.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Mode</th><th>Dispatched by</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><b>detect</b></td><td><em>in-worker</em></td><td>writes the causal record + handoff, discards its own worktree</td></tr>
+            <tr><td><b>record-only</b></td><td><code>work</code> · <code>continue</code></td><td>writes the record from coordination artifacts alone — no source, no worktree</td></tr>
+            <tr><td><b>quiesce</b></td><td><code>work</code> · <code>continue</code></td><td>discards one frozen task’s unpublished worktree and branch</td></tr>
+            <tr><td><b>abandon</b></td><td><code>pause</code></td><td>discards one worktree after the user accepted the loss</td></tr>
+            <tr><td><b>discard-empty</b></td><td><code>continue</code></td><td>removes a proven-empty dead executor’s worktree, re-proving both preconditions first</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>The tripwire</h4>
+      <p><b>Adapt freely inside your declared change surface. Stop the moment the fix requires a file the task
+      did not name.</b> The boundary is drawn at <em>files</em> rather than judgement so it cannot be
+      rationalised away under pressure.</p>
+      <ul class="tight">
+        <li>signature differs from what the spec assumed, but the file is yours → <b>adapt</b>, note it, continue</li>
+        <li>a helper you expected does not exist, and you can add it inside your surface → <b>adapt</b></li>
+        <li>the fix requires editing a file outside your change surface → <b class="stop">stop</b></li>
+        <li>the fix requires reading something on the <code>forbidden</code> list → <b class="stop">stop</b></li>
+        <li>the task’s premise is simply false → <b class="stop">stop</b></li>
+      </ul>
+      <p><i>“I had to leave my sandbox” is exactly the signal that the plan needs revisiting, not just this
+      task.</i></p>
+      <h4>Stopping properly — three things, in this order</h4>
+      <ol class="tight">
+        <li><b>Write the drift record</b> to the assigned staging path. <code>invalidates</code> is the load-bearing field: you are the only agent who has seen this, so name every downstream task whose premise it breaks.</li>
+        <li><b>Write the handoff</b> for a stranger with an empty context — no “as discussed”, no pronouns pointing at a conversation that will not exist.</li>
+        <li><b>Discard the worktree.</b></li>
+      </ol>
+      <div class="why"><b>Why the worktree goes even when a step looks useful.</b> A drifted task’s contract
+      will be retired and any replacement gets a new id, branch, worktree, and evidence chain. Keeping or
+      transferring the old diff would make source written for T-016 appear under T-020 with no truthful
+      publication history. Name the useful step in the handoff instead; the replacement implements and verifies
+      it under the new contract.</div>
+      <p style="margin-bottom:0"><b>Asking the user has its own tripwire:</b> ask only when the answer changes
+      behaviour the user would notice <em>and</em> neither the task spec nor an existing convention settles it.
+      An agent that asks about things it could have determined is worse than one that guesses, because it
+      spends the user’s attention — the scarcest thing in the system. <b>Always give a recommendation.</b></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-investigate</h3><span class="chip c-worker">Worker</span><span class="role">answer, do not build</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> when triage returns <code>investigation</code> · <code>continue</code> from a durable assignment</dd>
+        <dt>Writes</dt><dd>the assigned <code>notes/open/INV-nnn.md</code> staging report — nothing else</dd>
+        <dt>Returns</dt><dd><code>investigation: answered | blocked</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="note"><b>Why it exists:</b> a system that only knows how to make plans will turn “why is this
+      slow?” into an implementation plan. That is the failure mode this protocol prevents.</div>
+      <p><b>Step 1 is making the question answerable.</b> “Why is the dashboard slow” → “which operation
+      dominates dashboard load time, and by how much”. “Is the auth secure” → too broad; narrow it or split it.
+      State the question at the top of the output — if the answer does not address it, you drifted.</p>
+      <p><b>Running things is allowed. Changing them is not.</b> The suite, a profiler, a read-only query, a
+      build — all fine. No source edits, no test edits, no package installs, no migrations, no “just try” a fix
+      to see if it helps. Scratch files go outside the working tree. <b>No worktree. No diff.</b> When you are
+      done the tree is exactly as you found it.</p>
+      <p><b>Outside evidence</b> goes through exactly one of: the reserved <code>RES-nnn</code> assignment (load
+      <code>ai-research</code> and follow it), or a recovery pointer to an already-promoted RES report. Never
+      improvise research — a remembered fact presented as a looked-up one is precisely what both protocols exist
+      to prevent.</p>
+      <p><b>Four mandatory sections:</b> answer · evidence · <b>confidence</b> · <b>what I did not check</b>.
+      The last two are what make an investigation trustworthy: one that reports uniform certainty over a
+      codebase it sampled is worse than one that names its blind spots, because the reader cannot tell which
+      parts to re-check.</p>
+      <p style="margin-bottom:0"><b>It does not schedule work.</b> Proposed next steps are proposals — they do
+      not enter the ledger, do not become task files, and get no <code>T-</code> id. The gap between “here is
+      what I found” and “I have begun changing your codebase” is the entire purpose of the protocol.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-research</h3><span class="chip c-worker">Worker</span><span class="role">evidence from outside the repo</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> for a pure outside-repo question · <code>continue</code> on recovery · <b>followed in place</b> by <code>ai-investigate</code></dd>
+        <dt>Writes</dt><dd>the assigned <code>notes/open/RES-nnn.md</code> staging report</dd>
+        <dt>Returns</dt><dd><code>research: answered | blocked</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="note"><b>Governing rule:</b> every claim traces to a source you actually retrieved, and every
+      source is graded. <i>An ungraded claim is an opinion wearing a citation.</i></div>
+      <div class="why"><b>The exact failure it exists to stop.</b> A model asked a factual question will answer
+      from training data, write it in the confident register of something looked up, and attach a
+      plausible-looking link it never opened. The answer is often roughly right — which is what makes it
+      dangerous. It is wrong in the details that made the question worth asking, and nothing in the output
+      distinguishes it from real research.</div>
+      <p><b>It names no tools</b> and must not be edited to name any — Rune runs under more than one harness.
+      It requires three capabilities: <b>search</b>, <b>retrieve</b>, <b>record</b>. If the first two are
+      unavailable or blocked, <b>it stops and says so</b>.</p>
+      <h4>The discipline</h4>
+      <ul class="tight">
+        <li><b>Fix the question first</b> — scope, inclusion criteria, what would change the answer, and a budget, all before the first query. Searching first guarantees the question drifts to match what you happened to find.</li>
+        <li><b>At least five distinct formulations</b>: plain language · term of art · <b>the negative case</b> (mandatory — advocacy is over-published and criticism under-indexed) · <b>primary source</b> · time-bounded · adjacent field.</li>
+        <li><b>Follow the citation graph both ways</b> — backward to what a good source cites, forward to the retraction, correction, or advisory filed since.</li>
+        <li><b>Grade every source</b> on five tiers. <b>Tier 5 is not evidence</b> — it may be a lead. Tier is per claim, not per domain: a vendor’s docs are Tier 1 for what their product does and Tier 5 for whether it beats a competitor.</li>
+        <li><b>Triangulate, and check independence properly.</b> Ten pages saying the same thing usually means one origin and nine copies. Shared origin, author, funder, or wording means one source with two mouths.</li>
+        <li><b>Spend part of the budget trying to break your own answer</b> — real queries, run after you know your conclusion, aimed squarely at it.</li>
+        <li><b>Stop on saturation or budget, and record which.</b> Stopping because you found an answer you like is not a stopping rule.</li>
+      </ul>
+      <p><b>Fabrication rules are absolute:</b> never cite a source not retrieved this session · never
+      reconstruct an address from memory · load-bearing claims carry a verbatim quote · mark every statement
+      sourced or inferred · <b>training data is a lead generator, never a source</b> · if retrieval is
+      unavailable, stop.</p>
+      <p style="margin-bottom:0"><b>Five mandatory sections:</b> answer · certainty · <b>what contradicts
+      this</b> · <b>what I could not establish</b> · <b>search log</b>. An answer with uniform confidence,
+      nothing against itself, and no way to re-derive it is exactly what a fabricated one looks like — so a
+      real one must be visibly different.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>ai-verify-finding</h3><span class="chip c-worker">Worker</span><span class="role">check a claim somebody else made</span></div>
+      <dl class="meta">
+        <dt>Dispatched by</dt><dd><code>work</code> (one per swept claim) · <code>continue</code> (recovery)</dd>
+        <dt>Writes</dt><dd>the assigned <code>findings/open/FND-nnn.md</code> staging record — one file, nothing else</dd>
+        <dt>Returns</dt><dd><code>finding: confirmed | refuted | inconclusive</code> + <code>actionable: yes | no</code></dd>
+      </dl>
+      <hr class="rule">
+      <div class="note"><b>The one qualification that matters is that you were not there.</b> You did not write
+      the code the claim is about, you have no memory of reading it, and you have nothing invested in the claim
+      being right. The finder had all three — which is exactly why it could not do this itself.</div>
+      <ol class="steps">
+        <li><b>Restate the claim as something that can be false.</b> “The purge query sweeps sessions with a null expiry” can be checked; “the session code is fragile” cannot — and that is <code>inconclusive</code>, because it was never a claim.</li>
+        <li><b>Look at the actual code</b>, narrowly. You are answering one question, not reviewing a subsystem.</li>
+        <li><b>Try to prove it wrong first.</b> A claim that survives a genuine attempt to refute it is worth something; a claim you only tried to confirm is worth nothing, because you would have found supporting detail either way.</li>
+        <li><b>Run a cheap check where one settles it</b> — in a scratch location, then thrown away. Do not add it to the suite; that is a task, and tasks go through decomposition.</li>
+        <li><b>Decide, and say what would change your mind.</b></li>
+      </ol>
+      <p><b><code>refuted</code> is the most valuable of the three.</b> It is the one that stops a wrong belief
+      from being planned against for the next three months — which is why all three verdicts are promoted and
+      kept permanently.</p>
+      <p><b>Narrow the claim rather than failing it.</b> “Purge deletes sessions that never expire”, when it
+      only does so with a default-off flag on, is <code>confirmed</code> with the claim restated to what is
+      actually true.</p>
+      <p style="margin-bottom:0"><b>Never soften a refutation.</b> “Technically not true, but a reasonable
+      concern” is a confirmed finding wearing a disguise. If the claim is false, say it is false and say what
+      the finder missed — the finder is not owed a consolation prize and the user is owed a straight answer.</p>
+    </div>
+  </div>
+</section>
+
+<section id="protocols">
+  <h2><span class="num">08</span>Planning protocols</h2>
+  <p class="sub">Loaded by a decomposition worker, never dispatched on their own. Which one binds is decided by
+  the run’s immutable <code>protocol.md</code> — not by the request’s wording and not by the milestone title.</p>
+
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(310px,1fr))">
+    <div class="card">
+      <div class="card-head"><h3>ai-bug</h3><span class="chip c-protocol">Protocol</span></div>
+      <p><b>No fix without a failing reproduction.</b> By the time the task is written, diagnosis — the
+      expensive half — is already done, so most bugs are <b>one task</b>. A second task appears only when a
+      mitigation is accepted, or when the cause spans subsystems.</p>
+      <p class="mono" style="font-size:12.5px;color:var(--ink-2)">verification: red_then_green</p>
+      <p style="margin-bottom:0"><b>Acceptance always includes the boundary cases</b> from the reproduction —
+      that third line is what stops a fix that special-cases the one input you happened to try.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>ai-feature</h3><span class="chip c-protocol">Protocol</span></div>
+      <p><b>Vertical slices, not horizontal layers.</b> “All the interfaces / all the implementations / all the
+      tests” is three tasks of which none can be verified alone, and the whole milestone stays unverifiable
+      until the last one lands.</p>
+      <p class="mono" style="font-size:12.5px;color:var(--ink-2)">verification: red_then_green</p>
+      <p>Features fail by <b>expanding</b> — “add user profiles” quietly becomes avatars, then image upload,
+      then a CDN decision. Write the exclusions down; they become the milestone’s <code>out:</code> scope and
+      the tasks’ <code>forbidden</code> entries.</p>
+      <p style="margin-bottom:0"><b>The first slice is the thinnest end-to-end path</b> — one field, one route,
+      one test. It validates the design against real code before four tasks are built on an assumption. Every
+      feature task also <b>names its integration point</b>, or it produces an orphan the next survey flags as
+      abandoned work.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>ai-refactor</h3><span class="chip c-protocol">Protocol</span></div>
+      <p><b>If you had to change a test, it was not a refactor.</b> That is the whole discipline; everything
+      else is machinery for making it true.</p>
+      <p class="mono" style="font-size:12.5px;color:var(--ink-2)">verification: green_baseline</p>
+      <p><b>Require the safety net first.</b> A refactor with no coverage over the affected code is a rewrite
+      with extra steps and no way to know it worked. If coverage is absent, the first task is a
+      <code>characterization</code> task — tests that pin current behaviour <em>whatever it is</em>, including
+      behaviour that looks wrong. Pin it as-is and file the bug separately; fixing it during a refactor destroys
+      the only signal you have.</p>
+      <p><b>Acceptance is inverted:</b> the existing checks pass, unmodified, and <b>no test file appears in the
+      artifact diff</b>. That line is mechanical and it is the point.</p>
+      <p style="margin-bottom:0"><b>Additive → mechanical → subtractive</b>, one kind of change per task, with
+      the deletion task last and separate — it is the only irreversible one, and the one you want to be able to
+      skip if something surfaces.</p>
+    </div>
+  </div>
+</section>
+<section id="triggers">
+  <h2><span class="num">09</span>Trigger matrix</h2>
+  <p class="sub">The reverse index: a situation, and the skill that owns it.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Situation</th><th class="tight">Skill</th><th class="tight">Loaded how</th></tr></thead>
+      <tbody>
+        <tr><td>the user does not know which command they want</td><td><code>hello</code></td><td>invoked</td></tr>
+        <tr><td>first use on a repo; setup measures stale</td><td><code>init</code></td><td>invoked · auto from <code>vision</code></td></tr>
+        <tr><td>no plan yet; a drifted codebase needs a road to v1</td><td><code>vision</code></td><td>invoked</td></tr>
+        <tr><td>build, fix, refactor, advance the milestone</td><td><code>work</code></td><td>invoked</td></tr>
+        <tr><td>stop work, or check whether work is stopped</td><td><code>pause</code></td><td>invoked</td></tr>
+        <tr><td>context above ~70%; handing the project over</td><td><code>handoff</code></td><td>invoked</td></tr>
+        <tr><td>fresh session, crash, cleared context</td><td><code>continue</code></td><td>invoked</td></tr>
+        <tr><td>before any coordination read or write</td><td><code>ai-root</code></td><td>followed by all 7 routes</td></tr>
+        <tr><td>writing any file under <code>.rune/</code></td><td><code>ai-taskfmt</code></td><td>followed</td></tr>
+        <tr><td>reading or updating <code>ledger.md</code></td><td><code>ai-ledger</code></td><td>followed by the parent</td></tr>
+        <tr><td>about to write anything the user reads</td><td><code>ai-report</code></td><td>followed by the parent</td></tr>
+        <tr><td>before reading or editing any source file</td><td><code>ai-serena</code></td><td>followed by workers</td></tr>
+        <tr><td>an unfamiliar or in-progress codebase</td><td><code>ai-survey</code></td><td>dispatched</td></tr>
+        <tr><td>one fact learned in conversation, not on disk</td><td><code>ai-survey</code> <code>amend</code></td><td>dispatched, one at a time</td></tr>
+        <tr><td>how does this codebase prove itself correct</td><td><code>ai-oracle</code></td><td>dispatched</td></tr>
+        <tr><td>bug or feature? not decidable from the sentence</td><td><code>ai-triage</code></td><td>dispatched, one per issue</td></tr>
+        <tr><td>something that used to work no longer does</td><td><code>ai-bug</code></td><td>dispatched, then bound as protocol</td></tr>
+        <tr><td>the behaviour does not exist yet</td><td><code>ai-feature</code></td><td>bound as protocol</td></tr>
+        <tr><td>structure is wrong, behaviour is correct</td><td><code>ai-refactor</code></td><td>bound as protocol</td></tr>
+        <tr><td>the request is a question, not a change</td><td><code>ai-investigate</code></td><td>dispatched — exits the loop</td></tr>
+        <tr><td>the answer lies outside this repository</td><td><code>ai-research</code></td><td>dispatched or followed</td></tr>
+        <tr><td>milestone → tasks; the graph; a replan; a repair</td><td><code>ai-decompose</code></td><td>dispatched</td></tr>
+        <tr><td>a task file exists but nobody has sized it</td><td><code>ai-size</code></td><td>dispatched per task</td></tr>
+        <tr><td>a task is <code>pending</code> and eligible</td><td><code>ai-execute</code></td><td>dispatched, ≤3 concurrent</td></tr>
+        <tr><td>an executor claims <code>done</code></td><td><code>ai-verify</code></td><td>dispatched, fresh context</td></tr>
+        <tr><td>a verified commit needs to reach main</td><td><code>ai-land</code></td><td>dispatched, one at a time</td></tr>
+        <tr><td>reality contradicts the spec; any early stop</td><td><code>ai-drift</code></td><td>followed · dispatched</td></tr>
+        <tr><td>a torn worktree with no handoff</td><td><code>ai-recover</code></td><td>dispatched</td></tr>
+        <tr><td>a claim raised outside a worker’s own task</td><td><code>ai-verify-finding</code></td><td>dispatched per claim</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="walks">
+  <h2><span class="num">10</span>Four walkthroughs</h2>
+  <p class="sub">The same machinery, traced through the four paths that actually happen.</p>
+
+  <h3>A bug, end to end</h3>
+  <ul class="flow">
+    <li><span class="who">ai-triage</span> <span class="what">— <code>work: request-1</code> → <code>type: bug</code></span></li>
+    <li><span class="who">parent</span> <span class="what">— reserves <code>T-014</code>, writes <code>protocol.md</code> with <code>reserved_task: T-014</code>, adds a <code>diagnosing</code> row with <code>d1</code> and the absolute worktree path</span></li>
+    <li><span class="who">ai-bug</span> <span class="what">— creates <code>.rune/worktrees/T-014</code> on <code>task/T-014</code>, commits the failing check, records <code>diagnosis_base_commit</code> + <code>diagnosis_commit</code> → <code>reproduced</code></span></li>
+    <li><span class="who">ai-decompose × 2–3</span> <span class="what">— each reads the same protocol and the committed reproduction; exactly one proposed task is marked <code>reservation: primary</code></span></li>
+    <li><span class="who">the user</span> <span class="what">— <b>gate</b>: sees the candidate cut, the assumptions, the exclusions, and is asked what to add</span></li>
+    <li><span class="who">ai-decompose × 1</span> <span class="what">— maps <code>primary</code> onto the already-reserved <code>T-014</code>; allocates ids only for extra tasks. The parent registers rows; <code>T-014</code> moves <code>diagnosing → unsized</code>, keeping its <code>d1</code></span></li>
+    <li><span class="who">ai-size</span> <span class="what">— <code>pass</code> → the row becomes <code>pending</code> and is dispatchable</span></li>
+    <li><span class="who">ai-execute</span> <span class="what">— reconfirms red before the first production edit, then publishes <code>base_commit..artifact_commit</code></span></li>
+    <li><span class="who">ai-verify</span> <span class="what">— proves the published range contains the diagnosis commit → <code>pass</code>, <code>verified_commit</code></span></li>
+    <li><span class="who">ai-land</span> <span class="what">— merges that exact SHA, re-runs the oracle → <code>landed</code>, <code>main: green</code></span></li>
+  </ul>
+
+  <h3>A feature that hits a question</h3>
+  <ul class="flow">
+    <li><span class="who">ai-triage → ai-decompose × 3 → gate → reconcile → ai-size × N</span> <span class="what">— the ordinary path</span></li>
+    <li><span class="who">ai-execute</span> <span class="what">— hits a choice it has no authority to make. Writes <code>decisions/open/T-017-e2.md</code> with <b>no id</b>, keeps the worktree, returns <code>status: question</code></span></li>
+    <li><span class="who">parent</span> <span class="what">— assigns <code>DEC-nnn</code>, moves the record into <code>decisions.md</code>, deletes the staging file, sets the row <code>awaiting</code>, and asks the user. <b>The rest of the batch keeps running.</b></span></li>
+    <li><span class="who">the user decides</span> <span class="what">— the row returns to <code>pending</code>; a fresh executor picks up the handoff, the worktree diff, and the now-resolved decision</span></li>
+  </ul>
+  <div class="why"><b>Why the extra hop.</b> Three executors run at once, so a shared append target races — and both would reach for the same next id. And a question that exists only in a return value dies with the worker, while the <em>work</em> survives in the kept worktree. The question has to survive on the same terms.</div>
+
+  <h3>Drift and replan</h3>
+  <ul class="flow">
+    <li><span class="who">ai-execute</span> <span class="what">— returns <code>drifted</code>: staging record written, worktree discarded</span></li>
+    <li><span class="who">parent</span> <span class="what">— promotes the record, then in <b>one</b> ledger update adds a <code>quiescing</code> entry naming the exact frozen closure plus <code>closure: N of M unfinished</code>, and drift-blocks every inactive row in the set</span></li>
+    <li><span class="who">ai-drift quiesce · ai-land drift-observe</span> <span class="what">— drain each frozen row by its pre-freeze state. No frozen return may trigger a new verifier, retry, diagnosis, or lander</span></li>
+    <li><span class="who">ai-decompose × 2–3 → gate → reconcile</span> <span class="what">— a fresh <code>R-nnn</code> whose protocol carries <code>drift: DRF-003</code> and <code>retiring: [...]</code>; the reconciler writes new task files and <code>replacements.md</code></span></li>
+    <li><span class="who">parent</span> <span class="what">— <b>one atomic transaction</b>: new rows added <em>and</em> old rows moved to <code>retired</code> with their <code>replaced_by</code> lineage. If it fails, nothing retires and nothing becomes executable</span></li>
+    <li><span class="who">ai-size × N</span> <span class="what">— every replacement is sized like a first cut, because a replan is not evidence the new cut fits</span></li>
+  </ul>
+
+  <h3>Crash recovery</h3>
+  <ul class="flow">
+    <li><span class="who">ai-root</span> <span class="what">— resolve; finish any interrupted directory migration</span></li>
+    <li><span class="who">parent</span> <span class="what">— validate or migrate the ledger (schema 0 / 1 → 2); an unknown schema stops here</span></li>
+    <li><span class="who">parent</span> <span class="what">— reconcile report slots by file order: pending · recorded · unused · blocked</span></li>
+    <li><span class="who">ai-bug</span> <span class="what">— re-dispatched only when a <code>diagnosing</code> row has no terminal diagnosis block</span></li>
+    <li><span class="who">ai-verify · ai-drift · ai-recover</span> <span class="what">— one per <code>in_progress</code> row, chosen by what is actually on disk</span></li>
+    <li><span class="who">ai-land</span> <span class="what">— <code>cleanup</code> for orphan worktrees; a re-dispatch for a stale <code>landing</code> row that may or may not have merged</span></li>
+    <li><span class="who">ai-size · ai-verify-finding · ai-decompose</span> <span class="what">— unsized rows, unverified claims, and mitigation repairs swept last</span></li>
+    <li><span class="who">parent</span> <span class="what">— report what was <b>repaired</b>, not just what exists, then hand to <code>work</code> or <code>vision</code></span></li>
+  </ul>
+</section>
+
+<section id="ledger">
+  <h2><span class="num">11</span>Ledger states</h2>
+  <p class="sub">The status machine <code>ai-ledger</code> owns. The parent is the only writer; a task is never
+  <code>done</code> because the executor said so.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 1240 392" role="img" aria-label="Ledger status machine. A bug reservation starts at diagnosing and becomes unsized once reconciled; every new task is registered unsized and only a sizing pass moves it to pending. Claiming moves it to in_progress, publishing to verifying, a passing verdict to landing, and a successful merge to done. From in_progress a task can instead go to drifted, awaiting, or blocked, or return to pending on budget. A verifier fail and any landing failure both return it to pending. A drifted task ends at retired, which is terminal.">
+        <defs>
+          <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- row 1 -->
+        <rect x="10"   y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="70"   y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">diagnosing</text>
+        <rect x="190"  y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="250"  y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">unsized</text>
+        <rect x="370"  y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-opacity=".8" stroke-width="1.6"/>
+        <text x="430"  y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">pending</text>
+        <rect x="550"  y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="610"  y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">in_progress</text>
+        <rect x="730"  y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="790"  y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">verifying</text>
+        <rect x="910"  y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="970"  y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">landing</text>
+        <rect x="1090" y="68" width="120" height="52" rx="5" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".85"/>
+        <rect x="1094" y="72" width="112" height="44" rx="3" fill="none" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="1150" y="99" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">done</text>
+
+        <!-- forward arrows + labels -->
+        <line x1="130" y1="94" x2="184" y2="94" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="160" y="58" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">reproduced +</text>
+        <text x="160" y="136" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">reconciled</text>
+        <line x1="310" y1="94" x2="364" y2="94" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="340" y="58" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">sizing: pass</text>
+        <line x1="490" y1="94" x2="544" y2="94" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="520" y="58" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">claim; e++</text>
+        <line x1="670" y1="94" x2="724" y2="94" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="700" y="58" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">done; v++</text>
+        <line x1="850" y1="94" x2="904" y2="94" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="880" y="58" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">pass; l++</text>
+        <line x1="1030" y1="94" x2="1084" y2="94" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="1060" y="58" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">landed</text>
+
+        <!-- returns, above -->
+        <polyline points="790,68 790,36 442,36 442,64" fill="none" stroke="currentColor" stroke-dasharray="4 3" marker-end="url(#a3)"/>
+        <text x="616" y="30" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">fail · failures++</text>
+        <polyline points="970,68 970,16 424,16 424,64" fill="none" stroke="currentColor" stroke-dasharray="4 3" marker-end="url(#a3)"/>
+        <text x="697" y="10" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">refused · conflict · reverted</text>
+
+        <!-- budget arc back to pending -->
+        <path d="M556,120 C540,158 492,158 474,124" fill="none" stroke="currentColor" stroke-dasharray="4 3" marker-end="url(#a3)"/>
+        <text x="513" y="172" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">budget</text>
+
+        <!-- escapes -->
+        <polyline points="640,120 640,172 1116,172 1116,204" fill="none" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="890" y="166" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">blocked · external condition</text>
+        <polyline points="652,120 652,184 936,184 936,204" fill="none" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="800" y="178" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">question</text>
+        <polyline points="664,120 664,194 756,194 756,204" fill="none" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="712" y="188" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".65">drifted</text>
+
+        <!-- row 2 -->
+        <rect x="700"  y="208" width="120" height="48" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="760"  y="237" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">drifted</text>
+        <rect x="880"  y="208" width="120" height="48" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="940"  y="237" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">awaiting</text>
+        <rect x="1056" y="208" width="120" height="48" rx="5" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".5"/>
+        <text x="1116" y="237" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">blocked</text>
+
+        <!-- row 3 -->
+        <line x1="760" y1="256" x2="760" y2="306" stroke="currentColor" marker-end="url(#a3)"/>
+        <text x="770" y="285" font-size="9.5" fill="currentColor" fill-opacity=".65">atomic replan · new ids</text>
+        <rect x="700" y="310" width="120" height="48" rx="5" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".85"/>
+        <rect x="704" y="314" width="112" height="40" rx="3" fill="none" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="760" y="339" text-anchor="middle" font-family="ui-monospace,monospace" font-size="12" fill="currentColor">retired</text>
+
+        <!-- terminal key -->
+        <rect x="1020" y="322" width="16" height="14" rx="2" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".85"/>
+        <rect x="1023" y="325" width="10" height="8" rx="1" fill="none" stroke="currentColor" stroke-opacity=".55"/>
+        <text x="1044" y="333" font-size="10" fill="currentColor" fill-opacity=".6">terminal</text>
+        <line x1="1020" y1="352" x2="1036" y2="352" stroke="currentColor" stroke-dasharray="4 3"/>
+        <text x="1044" y="356" font-size="10" fill="currentColor" fill-opacity=".6">returns to the queue</text>
+      </svg>
+    </div>
+    <figcaption><b>Two states exist before a task is executable, and both are deliberate.</b>
+    <code>diagnosing</code> has no task spec yet — only <code>ai-bug</code> may hold it. <code>unsized</code>
+    has one nobody has confirmed is finishable. Neither is ever claimed, because the executable queue is the
+    set of <code>pending</code> rows — so sizing needs no separate flag that a route could forget to check.
+    A <code>split</code> verdict (not drawn) also ends at <code>retired</code>, with its replacements
+    registered <code>unsized</code> like any first cut.</figcaption>
+  </figure>
+
+  <h3>Required state, by status</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="tight">Status</th><th>Required state</th></tr></thead>
+      <tbody>
+        <tr><td><code>diagnosing</code></td><td>absolute worktree · <code>d ≥ 1</code> · resume is <code>diagnose</code> or the bound <code>plan:M-nn/R-nnn</code> · blocker <code>—</code> or <code>external:*</code></td></tr>
+        <tr><td><code>unsized</code></td><td>no worktree · <code>e0/v0/l0</code> · zero failures · resume <code>fresh</code> · blocker <code>—</code> until a <code>sizing: blocked</code> verdict records one</td></tr>
+        <tr><td><code>pending</code></td><td>blocker <code>—</code> · resume is <code>fresh</code>, <code>step:N</code>, <code>evidence:&lt;mode&gt;</code>, or <code>publish</code> · a missing worktree is valid only with <code>fresh</code></td></tr>
+        <tr><td><code>in_progress</code></td><td>absolute worktree · <code>e ≥ 1</code> · blocker <code>—</code> · resume <code>recover</code></td></tr>
+        <tr><td><code>verifying</code></td><td>absolute worktree · <code>e ≥ 1</code>, <code>v ≥ 1</code> · resume <code>verify</code></td></tr>
+        <tr><td><code>landing</code></td><td>absolute worktree · <code>v ≥ 1</code>, <code>l ≥ 1</code> · resume <code>land</code></td></tr>
+        <tr><td><code>done</code></td><td>worktree <code>merged</code> or a cleanup-pending path · blocker <code>—</code> · resume <code>—</code></td></tr>
+        <tr><td><code>drifted</code></td><td>blocker <code>drift:DRF-nnn</code> · finding points at that record · resume <code>replan</code></td></tr>
+        <tr><td><code>awaiting</code></td><td>absolute worktree · blocker <code>decision:DEC-nnn</code> · finding points at the decision</td></tr>
+        <tr><td><code>blocked</code></td><td>a nonempty <code>external:*</code>, <code>drift:*</code>, or <code>main:red</code> blocker · finding points at its durable detail</td></tr>
+        <tr><td><code>retired</code></td><td>worktree <code>discarded</code> · finding points at the causal drift · <code>replaced_by</code> names successors or explicitly says <code>none</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><b>Why <code>landing</code> exists at all.</b> Passing verification and surviving the merge
+  are two separate claims, and there was previously no state between them — so a task that had landed and
+  broken the build was indistinguishable from one that had never been tried.</div>
+</section>
+<section id="invariants">
+  <h2><span class="num">12</span>Invariants and concurrency caps</h2>
+  <p class="sub">The rules that hold across every skill. Most of them are here because breaking them is easy
+  and the damage shows up somewhere else, in a context that cannot see what you did.</p>
+
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Context is the budget</h3></div>
+      <p style="margin-bottom:0">The main session never reads source code — one “just checking” file read
+      brings back the exact cost the design exists to avoid. Subagents return 200 tokens or less; anything
+      longer goes to disk. An agent in trouble writes a handoff and <em>exits</em> rather than pausing, because
+      resuming an agent keeps its context, which is the opposite of what you want.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Changes before records</h3></div>
+      <p style="margin-bottom:0">Always make the edit, then tick. The only reachable desync is a
+      <em>missing</em> record, and that self-heals — the next executor finds the step already applied. The
+      reverse order permits a record with no change behind it, which makes real work get skipped. One direction
+      is recoverable; the other is silent corruption.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Single writer per file</h3></div>
+      <p style="margin-bottom:0">Writers are <b>roles, not skills</b> — the parent is one writer across all
+      seven routes. Any output two workers could write at once is split into a unique artifact per writer, which
+      is why the progress file, staged questions, report staging paths, and planner slots are shaped the way
+      they are.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Checkout identity is explicit</h3></div>
+      <p style="margin-bottom:0">Current working directory is never an identity. Every worker gets absolute
+      <code>main_root</code>; task-bound workers also get one absolute <code>worktree_path</code>, allocated
+      before the first source write and unchanged through diagnosis, retries, verification, recovery, and
+      landing. A clean anonymous checkout is <em>not</em> the task checkout.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Work is checked, not claimed</h3></div>
+      <p style="margin-bottom:0">A task’s test must be seen <em>failing</em> before the change, with the
+      evidence recorded — a test written after the fix and never seen red proves nothing, and a reviewer in a
+      fresh context cannot tell the two apart. The executor publishes one immutable range, a different agent
+      verifies its head, and the lander merges that same head.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">A wrong plan stays legible</h3></div>
+      <p style="margin-bottom:0">Drift never patches or overwrites a task specification. The obsolete task
+      becomes a terminal <code>retired</code> row, replacements get new ids and files, and the ledger records
+      the immediate old-to-new relationship — or that no replacement is needed. Completed tasks remain
+      completed history.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Ids are burned, never recycled</h3></div>
+      <p style="margin-bottom:0">An unused, blocked, or interrupted reservation keeps its number, because a
+      late worker may still hold its staging pointer. Gaps are permanent and correct. Spending numbers is
+      cheaper than letting two detectors race for one filename.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 style="font-family:var(--f-sans);font-size:1rem">Enforcement is prose, not walls</h3></div>
+      <p style="margin-bottom:0">Agent definitions bought a tool allowlist and a model tier; skills buy
+      portability. The trade is real and stated plainly: <b>a verifier that <em>could not</em> edit is now a
+      verifier that is <em>told not to</em></b> — so the skills relying on it say so at the top, in the places
+      where breaking the rule would be easiest.</p>
+    </div>
+  </div>
+
+  <h3>Concurrency caps</h3>
+  <p><b>One agent, one issue</b> bounds what a single agent holds; it says nothing about how many run at once.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Fan-out</th><th class="tight">Cap</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>planner drafts per run</td><td class="tight"><b>2–3</b> in parallel</td><td>disagreement between independent cuts is the only cheap signal the call was hard</td></tr>
+        <tr><td>reconcilers per run</td><td class="tight"><b>1</b></td><td>the only worker allowed to write <code>tasks/</code>; two would race on ids</td></tr>
+        <tr><td>concurrent executors</td><td class="tight"><b>3</b></td><td>and only with disjoint change surfaces — past that, merge conflicts and cost dominate</td></tr>
+        <tr><td>concurrent landers</td><td class="tight"><b>1</b>, always</td><td>two landers are two writers on the main tree</td></tr>
+        <tr><td>survey <code>amend</code> workers</td><td class="tight"><b>1</b>, always</td><td>both would preserve <code>map.md</code> as they found it and erase the other’s edit</td></tr>
+        <tr><td>milestone-graph workers</td><td class="tight"><b>1</b> at a time</td><td>sole writer of <code>milestones.md</code>, with no promotion step</td></tr>
+        <tr><td>landing attempts per task</td><td class="tight"><b>5</b> ceiling</td><td>a task that has not landed in five tries is telling you about the plan</td></tr>
+        <tr><td>verifier failures before stopping</td><td class="tight"><b>2</b></td><td>a task failing twice is a signal about the plan, not the executor</td></tr>
+        <tr><td>issues per worker</td><td class="tight"><b>1</b>, no exceptions</td><td>evidence bleeds; failure stops being isolated; a wrong answer cannot be attributed</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="vocab">
+  <h2><span class="num">13</span>Outcome vocabularies</h2>
+  <p class="sub">Every return carries <code>work</code>, a one-line <code>summary</code>,
+  <code>worktree: none | kept | discarded</code>, and <b>exactly one</b> outcome field. They are deliberately
+  not collapsed into a generic <code>ok | failed</code> — a verifier’s outcome genuinely is not an executor’s,
+  and <code>ai-execute</code>’s values are the ones the ledger’s state machine consumes by name.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="tight">Skill</th><th class="tight">Field</th><th>Values</th></tr></thead>
+      <tbody>
+        <tr><td><code>ai-execute</code></td><td><code>status</code></td><td><code>done</code> <code>drifted</code> <code>budget</code> <code>blocked</code> <code>question</code></td></tr>
+        <tr><td><code>ai-verify</code></td><td><code>verdict</code></td><td><code>pass</code> <code>fail</code> <code>unverified</code></td></tr>
+        <tr><td><code>ai-land</code></td><td><code>landing</code></td><td><code>landed</code> <code>refused</code> <code>conflict</code> <code>reverted</code> <code>stuck</code> <code>not_landed</code> <code>cleaned</code></td></tr>
+        <tr><td><code>ai-recover</code></td><td><code>verdict</code></td><td><code>salvage</code> <code>discard</code> <code>partial</code></td></tr>
+        <tr><td><code>ai-triage</code></td><td><code>type</code></td><td><code>bug</code> <code>feature</code> <code>refactor</code> <code>investigation</code></td></tr>
+        <tr><td><code>ai-bug</code></td><td><code>diagnosis</code></td><td><code>reproduced</code> <code>not_reproduced</code> <code>reclassified</code> <code>blocked</code></td></tr>
+        <tr><td><code>ai-oracle</code></td><td><code>oracle</code></td><td><code>passing</code> <code>failing</code> <code>none</code></td></tr>
+        <tr><td><code>ai-decompose</code></td><td><code>plan</code></td><td><code>graph</code> <code>drafted</code> <code>reconciled</code> <code>blocked</code></td></tr>
+        <tr><td><code>ai-investigate</code></td><td><code>investigation</code></td><td><code>answered</code> <code>blocked</code></td></tr>
+        <tr><td><code>ai-research</code></td><td><code>research</code></td><td><code>answered</code> <code>blocked</code></td></tr>
+        <tr><td><code>ai-drift</code></td><td><code>status</code></td><td><code>drifted</code> <code>recorded</code> <code>quiesced</code> <code>abandoned</code> <code>discarded</code> <code>refused</code> <code>budget</code> <code>question</code></td></tr>
+        <tr><td><code>ai-survey</code></td><td><code>survey</code></td><td><code>mapped</code> <code>amended</code> <code>unchanged</code> <code>conflict</code> <code>blocked</code></td></tr>
+        <tr><td><code>ai-root</code></td><td><code>migration</code></td><td><code>none</code> <code>completed</code> <code>resumed</code> <code>blocked</code></td></tr>
+        <tr><td><code>ai-verify-finding</code></td><td><code>finding</code></td><td><code>confirmed</code> <code>refuted</code> <code>inconclusive</code></td></tr>
+        <tr><td><code>ai-size</code></td><td><code>sizing</code></td><td><code>pass</code> <code>split</code> <code>blocked</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="why"><b>Check results have their own two enums, and no synonyms.</b>
+  <code>passing | failing | unavailable</code> scores an individual command;
+  <code>passing | failing | none</code> is the project oracle’s verdict or absence. Task-local acceptance stays
+  <code>pass | fail</code>, because those words score individual criteria rather than a command.
+  <code>unavailable</code> means a candidate command could not run; <code>none</code> means no project oracle
+  exists — it never means a configured command was skipped or its result forgotten.</div>
+</section>
+
+<section id="writers">
+  <h2><span class="num">14</span>Who writes what</h2>
+  <p class="sub">Every file in <code>.rune/</code> has exactly one writer. Nothing races, nothing needs locking,
+  and no two files can disagree about the same fact.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Path</th><th class="tight">Sole writer</th></tr></thead>
+      <tbody>
+        <tr><td><code>rune.yml</code> · <code>ledger.md</code> · <code>PAUSED</code> · <code>vision.md</code> · <code>decisions.md</code> · <code>sessions/&lt;stamp&gt;.md</code></td><td class="tight">the parent</td></tr>
+        <tr><td>the <code>rune</code> block in <code>CLAUDE.md</code></td><td class="tight">the parent, only on <code>init</code></td></tr>
+        <tr><td><code>map.md</code> + Serena memories</td><td class="tight">an <code>ai-survey</code> worker</td></tr>
+        <tr><td><code>milestones.md</code></td><td class="tight">the one <code>ai-decompose</code> graph worker</td></tr>
+        <tr><td><code>drafts/M-nn/R-nnn/protocol.md</code></td><td class="tight">the parent, once, before dispatch</td></tr>
+        <tr><td><code>drafts/M-nn/R-nnn/P-nn.md</code></td><td class="tight">the planner assigned that slot</td></tr>
+        <tr><td><code>replacements.md</code> · <code>mitigation-repair.md</code></td><td class="tight">that run’s single reconciler</td></tr>
+        <tr><td><code>tasks/T-nnn.md</code></td><td class="tight">the reconciling <code>ai-decompose</code> worker</td></tr>
+        <tr><td><code>notes/T-nnn.progress</code></td><td class="tight"><code>ai-bug</code>, then <code>ai-execute</code></td></tr>
+        <tr><td><code>notes/T-nnn.md</code> (handoff)</td><td class="tight">the worker holding T-nnn</td></tr>
+        <tr><td><code>notes/T-nnn.sizing.md</code></td><td class="tight">an <code>ai-size</code> worker</td></tr>
+        <tr><td><code>notes/T-nnn.verify.md</code></td><td class="tight">an <code>ai-verify</code> worker</td></tr>
+        <tr><td><code>notes/T-nnn.landing.md</code></td><td class="tight">an <code>ai-land</code> worker</td></tr>
+        <tr><td><code>notes/init-commands.md</code></td><td class="tight">an <code>ai-oracle</code> worker</td></tr>
+        <tr><td><code>decisions/open/T-nnn-eN.md</code> · <code>findings/open/T-nnn-eN-K.md</code></td><td class="tight">the worker holding that exact attempt</td></tr>
+        <tr><td><code>*/open/{DRF,INV,RES,FND}-nnn.md</code></td><td class="tight">the worker assigned that id and path</td></tr>
+        <tr><td>final <code>{DRF,INV,RES,FND}-nnn.md</code></td><td class="tight">worker content, atomically promoted by the parent</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><b>Coordination always lands at <code>&lt;main_root&gt;/.rune/</code></b>, even when written
+  from inside a task worktree. Written into the worktree it would appear only on merge — which is precisely
+  when nobody needs it any more.</div>
+</section>
+
+<section id="notes">
+  <h2><span class="num">15</span>Notes on this map</h2>
+  <p class="sub">Three things surfaced while reading every skill end to end. They are documentation-accuracy
+  gaps, not behavioural defects — the skills themselves are internally consistent.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="tight">Where</th><th>What it says</th><th>What is on disk</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="tight"><code>README.md</code></td>
+          <td>“Rune is 26 skills”</td>
+          <td><b>28</b> — 7 user-invocable and 21 <code>ai-*</code>. The “seven” and “twenty-one” counts in the same paragraph are both correct; only the total is off.</td>
+        </tr>
+        <tr>
+          <td class="tight"><code>README.md</code> · Layout</td>
+          <td>lists <b>19</b> <code>ai-*</code> skills</td>
+          <td>omits <code>ai-size</code> and <code>ai-verify-finding</code> — both load-bearing, since one gates every dispatch and the other gates every reported finding.</td>
+        </tr>
+        <tr>
+          <td class="tight"><code>ai-taskfmt</code> · dispatch table</td>
+          <td>lists <b>11</b> jobs</td>
+          <td>omits the same two plus <code>ai-drift</code>’s four dispatched modes, though all three are dispatched by name elsewhere and appear in that skill’s own return-envelope table.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--ink-3);font-size:13.5px;margin-top:26px;padding-top:20px;border-top:1px solid var(--rule)">
+  Compiled from all 28 <code>SKILL.md</code> files at <code>rune v0.12.1</code>. The same content lives in the
+  repository as <code>docs/skill-map.md</code>.</p>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var map = {};
+  links.forEach(function (a) {
+    var el = document.querySelector(a.getAttribute('href'));
+    if (el) map[a.getAttribute('href').slice(1)] = a;
+  });
+  var spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) { a.classList.remove('on'); });
+      var a = map[e.target.id];
+      if (a) a.classList.add('on');
+    });
+  }, { rootMargin: '-8% 0px -80% 0px', threshold: 0 });
+  Object.keys(map).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) spy.observe(el);
+  });
+
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#all28 tbody tr'));
+  var btns = Array.prototype.slice.call(document.querySelectorAll('.filters button'));
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = b.getAttribute('data-f');
+      btns.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      rows.forEach(function (r) {
+        var c = r.getAttribute('data-c') || '';
+        r.hidden = !(f === 'all' || c.split(' ').indexOf(f) !== -1);
+      });
+    });
+  });
+})();
+</script>
