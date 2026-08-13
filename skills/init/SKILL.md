@@ -1,9 +1,10 @@
 ---
 name: init
+user-invocable: false
 description: Use when starting Rune on a repository for the first time, or re-running once recorded setup measures stale against the current commit. Establishes the pass/fail oracle, verifies build and test commands, maps modules and conventions, flags danger zones, and scaffolds .rune/.
 ---
 
-# rune:init
+# init
 
 Establishes ground truth so nothing downstream has to re-derive it. Mechanical, no
 interview. Re-runnable.
@@ -13,7 +14,7 @@ interview. Re-runnable.
 **You establish ground truth and report it.** Everything you are allowed to do follows
 from that, and this list is exhaustive:
 
-- **Follow** `ai-root`; its root rename, migration marker, pointer rewrites, and exact
+- **Follow** `root`; its root rename, migration marker, pointer rewrites, and exact
   `.gitignore` update are part of initialization.
 - **Read** coordination files under `<main_root>/.rune/`, and manifests small enough to
   name a command from.
@@ -28,7 +29,7 @@ from that, and this list is exhaustive:
   below.
 - **Talk to the user** — the report at the end.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
-  `ai-taskfmt` says which skill does which job.
+  `taskfmt` says which skill does which job.
 
 **Anything not on that list is a dispatch**, including reading source code and running any
 command that is not one of the **bounded state probes named below**. Unbounded output is
@@ -71,12 +72,12 @@ git -C <main_root> init --quiet
 This is permitted only after `git rev-parse --show-toplevel` proves no repository exists
 and the user explicitly accepts initialization. It emits no normal output. Coordination
 creation and the `.gitignore` update are file operations; migration is internal to
-`ai-root`, and Git task lifecycle belongs to task-bound workers.
+`root`, and Git task lifecycle belongs to task-bound workers.
 
 ## When it runs
 
 - First use of Rune on a repo
-- `rune:vision` finds no `.rune/rune.yml` and triggers it automatically
+- `vision` finds no `.rune/rune.yml` and triggers it automatically
 - Re-run when setup has gone stale, measured by the rule below
 
 For a **new project with no code**, init runs *after* vision — there is nothing to
@@ -126,12 +127,12 @@ git rev-parse --show-toplevel       # stable main_root for dispatches and coordi
 git status --porcelain | head -20   # clean, or the user must accept the dirt
 ```
 
-Then follow `ai-root` with `work: coordination-root`, the absolute `main_root`, and
+Then follow `root` with `work: coordination-root`, the absolute `main_root`, and
 `mode: initialize`. It creates a
 fresh `.rune/`, migrates recognizable legacy state when safe, or fails closed with a
 diagnostic you report before doing anything else.
 
-Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+Before consuming any followed or dispatched result, validate `taskfmt`'s common
 return envelope: `work` must equal the assigned token, `summary` must be one line, and
 `worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
@@ -151,7 +152,7 @@ plainly, and offer the exact `git -C <main_root> init --quiet` lifecycle command
 Run it only on a clear yes. A newly initialized repository has no `HEAD`, so stop after
 success and ask the user to create its initial commit; do not restart step 1 or run
 `git rev-parse HEAD` against an unborn branch. The next init invocation begins normally
-after that commit exists. A decline stops init before `ai-root`.
+after that commit exists. A decline stops init before `root`.
 
 Uncommitted changes are not fatal but must be surfaced: they will show up in every task's
 `git diff` and corrupt the record of what each task actually changed.
@@ -163,16 +164,16 @@ runs after the survey supplies its fixed file and full name path. A cold or brok
 language server silently degrades every downstream agent into whole-file reading, which
 is precisely what the budget cannot absorb.
 
-Record whether it worked. If Serena is unavailable, note it — `ai-serena` fallbacks
+Record whether it worked. If Serena is unavailable, note it — `serena` fallbacks
 apply and the effective budget per task drops considerably.
 
 ### 3. Survey
 
-Dispatch a subagent that follows `ai-survey` with `work: survey`, `main_root`, and absolute
+Dispatch a subagent that follows `survey` with `work: survey`, `main_root`, and absolute
 output pointers.
 
 ```rune-dispatch
-follow: ai-survey
+follow: survey
 work: survey
 main_root: /workspace/acme
 pointers:
@@ -187,11 +188,11 @@ Require a mapped return to include
 symbol it resolved while surveying, or `serena_probe: unavailable`. For a supplied probe,
 run the exact `serena.find_symbol` operation above once and record whether it returned that
 one signature. Do not choose another symbol or retry with fuzzy matching. If unavailable
-or unsuccessful, record Serena as degraded and continue with `ai-serena` fallbacks.
+or unsuccessful, record Serena as degraded and continue with `serena` fallbacks.
 
 ### 4. Commands and the oracle
 
-**Dispatch a subagent that follows `ai-oracle`. You do not run these commands
+**Dispatch a subagent that follows `oracle`. You do not run these commands
 yourself.** Build and test output is unbounded — a failing suite is tens of thousands of
 tokens — and this is the session every other route starts from, so it is the worst
 possible place to absorb them.
@@ -202,14 +203,14 @@ name from the survey digest and manifests. It runs each one on that clean checko
 per-command verdict with durations plus the oracle result, in ≤200 tokens.
 
 ```rune-dispatch
-follow: ai-oracle
+follow: oracle
 work: init/commands
 main_root: /workspace/acme
 pointers:
   output: /workspace/acme/.rune/notes/init-commands.md
 ```
 
-The rule it enforces on your behalf, per `ai-oracle`: **run it, do not infer it.** Then
+The rule it enforces on your behalf, per `oracle`: **run it, do not infer it.** Then
 record what came back:
 
 - **Passing** → normal operation.
@@ -258,7 +259,7 @@ staleness:
 
 These enums are exact. Each `commands.<name>.status` is
 `passing | failing | unavailable`; `oracle.status` is `passing | failing | none`. Copy the
-transient `ai-oracle` verdicts without translating `passing` to `ok` or `failing` to
+transient `oracle` verdicts without translating `passing` to `ok` or `failing` to
 `fail`. `unavailable` means that candidate command could not be run, while `none` is
 reserved for the absence of any project oracle.
 
@@ -267,7 +268,7 @@ When an existing manifest uses the legacy command statuses, normalize only the e
 candidate, then atomically replace `rune.yml` once under this parent's existing ownership.
 Unknown command or oracle values stop initialization; never widen the map by analogy.
 
-Ensure every entry in `ai-root`'s authoritative `rune-directory-manifest` exists. This is
+Ensure every entry in `root`'s authoritative `rune-directory-manifest` exists. This is
 create-if-missing and idempotent: accept an existing real directory, never clear its
 contents, and stop on a symbolic link or non-directory at any required path. Only when no
 ledger exists, write this valid empty schema-2 ledger (fill the top-level values from the
@@ -296,10 +297,10 @@ main: green
 |---|---|---|---|
 ```
 
-Validate the complete candidate per `ai-ledger` before writing it. On a re-run, validate
+Validate the complete candidate per `ledger` before writing it. On a re-run, validate
 and preserve an existing schema-2 ledger. The sole narrow exception is the pre-init vision
 bootstrap: `rune.yml` is absent, `oracle: —`, no task row exists, and every dispatch row is
-one of `ai-ledger`'s exact coordination-only pre-init graph/survey/commands shapes. Replace
+one of `ledger`'s exact coordination-only pre-init graph/survey/commands shapes. Replace
 only its `oracle` and `main` values from the init result, preserving `vision` and those
 dispatch rows, then validate and replace the complete ledger once. Persist that validated
 ledger replacement **before** atomically installing the validated `rune.yml` candidate.
@@ -332,18 +333,14 @@ Rune runs planned work here: it cuts a request into small tasks, does each one i
 worktree, and has a second agent check it before it lands. State lives in `.rune/` — plain
 files, in git, yours to edit.
 
-### Which command
+### How to reach it
 
-| You want to | Run |
-|---|---|
-| know where things stand | `/rune:hello` |
-| decide what this project is for | `/rune:vision` |
-| build, fix, or change something | `/rune:work` |
-| pick up after a break or a crash | `/rune:continue` |
-| stop cleanly | `/rune:pause` |
-| move to a fresh session | `/rune:handoff` |
+`/rune:using-rune` is the only command. Say what you want in plain language — "where are
+we", "what is this project for", "fix the login bug", "stop", "I need a fresh session" —
+and it routes to the right skill. On OpenCode the command is `/rune-using-rune`.
 
-Unsure? `/rune:hello` picks for you. On OpenCode the names use a dash: `/rune-hello`.
+Every other Rune skill loads itself when the situation calls for it. Do not try to call
+them by name.
 
 ### How to talk to me
 
@@ -385,7 +382,7 @@ Writing the block is idempotent: a second init replaces it with the same bytes.
 
 ## Report
 
-Follow `ai-report`. TL;DR first, plain words, detail stays on disk.
+Follow `report`. TL;DR first, plain words, detail stays on disk.
 
 ```
 TL;DR
@@ -403,7 +400,7 @@ Unfinished
 
 Confidence  module map high · conventions medium (sampled 4 files)
 
-Next: /rune:vision to map the road, or /rune:work if you already know what you want.
+Next: map the road, or tell me what to build if you already know what you want.
 ```
 
 Say "tests pass", never "the oracle is green". The internal vocabulary is for the skills,
@@ -420,5 +417,5 @@ agent how much weight to put on the map. Uniform claimed certainty is not credib
 hides exactly the corners that will produce drift.
 
 **Never fix anything.** Init observes. A failing lint, a broken build, a stub — these are
-recorded, not repaired. Repairs are work, work goes through `rune:work`, and work needs
+recorded, not repaired. Repairs are work, work goes through `work`, and work needs
 acceptance criteria that init has no mandate to invent.

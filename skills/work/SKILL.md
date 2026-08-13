@@ -1,9 +1,10 @@
 ---
 name: work
+user-invocable: false
 description: Use when building a feature, fixing a bug, refactoring, or advancing the current milestone. Triages the request against real code, decomposes it into tasks, dispatches isolated executors, and verifies each one independently.
 ---
 
-# rune:work
+# work
 
 The execution loop. Triage → diagnose bugs → plan → dispatch → verify → reconcile.
 
@@ -13,7 +14,7 @@ The execution loop. Triage → diagnose bugs → plan → dispatch → verify �
 from that, and this list is exhaustive:
 
 - **Run** only the exact bounded state probes named below.
-- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+- **Follow** `root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's ledger and protocol records.
 - **Read** `<main_root>/.rune/` coordination files — enough to report status accurately.
 - **Write** `<main_root>/.rune/ledger.md`, and **append** the drain result to
@@ -36,7 +37,7 @@ from that, and this list is exhaustive:
   id. You never edit it after any worker can see it.
 - **Talk to the user** — reports, the gate, questions.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
-  `ai-taskfmt` says which skill does which job.
+  `taskfmt` says which skill does which job.
 
 ## Permitted commands and probes
 
@@ -48,23 +49,23 @@ This is the complete command interface for the parent route.
 git rev-parse --show-toplevel
 ```
 
-The probe returns exactly one line. `ai-root` may run only its own separately bounded
+The probe returns exactly one line. `root` may run only its own separately bounded
 migration probe while this route follows it. Every source, diff, verification, oracle,
 merge, and cleanup operation is a named worker dispatch.
 
 ### Mutating lifecycle commands
 
-`none` — `ai-execute` creates task worktrees, `ai-land` merges and cleans landed work, and
-`ai-drift` discards unpublished work. The parent never runs their Git commands.
+`none` — `execute` creates task worktrees, `land` merges and cleans landed work, and
+`drift` discards unpublished work. The parent never runs their Git commands.
 
 ## Coordination-root preflight
 
 Before any coordination read or dispatch, resolve `main_root` once with
-`git rev-parse --show-toplevel`, then follow `ai-root` with `work: coordination-root`,
+`git rev-parse --show-toplevel`, then follow `root` with `work: coordination-root`,
 that absolute root, and `mode: resolve`. Stop and report any failure it returns. Resolve every `.rune/...` read
 against the returned root and carry the same `main_root` in every dispatch.
 
-Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+Before consuming any followed or dispatched result, validate `taskfmt`'s common
 return envelope: `work` must equal the assigned token, `summary` must be one line, and
 `worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
@@ -75,7 +76,7 @@ case where it is quicker to just do it yourself.
 **You do not merge.** That was once on this list, as the single command you were allowed to
 run. It came off because a merge cannot be separated from what has to follow it: the suite
 is re-run against the merged tree, and if it fails the merge has to come back out. Only the
-first of those three is bounded, so the sequence is one dispatch — `ai-land` — and not a
+first of those three is bounded, so the sequence is one dispatch — `land` — and not a
 command of yours with two dispatches around it.
 
 Stated this way round on purpose. A list of forbidden actions can always be stepped
@@ -88,13 +89,13 @@ Two consequences are load-bearing:
 
 - Every subagent returns **≤200 tokens**. Anything longer goes to disk; you read it only
   if you must act on it.
-- Validate every return through `ai-taskfmt`'s common envelope before its outcome table:
+- Validate every return through `taskfmt`'s common envelope before its outcome table:
   assigned `work`, one-line `summary`, one primary outcome, and
   `worktree: none | kept | discarded` with a path exactly when required. Apply the
   deterministic legacy `task` normalization only to historical returns.
 - You **re-read `ledger.md` from disk** between dispatches. Never carry ledger state in
   context — a stale in-memory copy is how you dispatch a task someone already finished.
-- Validate schema 2 on every read and every candidate replacement, per `ai-ledger`. An
+- Validate schema 2 on every read and every candidate replacement, per `ledger`. An
   invalid or unknown ledger is a stop condition, not permission to infer missing state.
 
 If either slips, the parent hits its ceiling around task 25 no matter how clean the
@@ -132,12 +133,12 @@ worker's.
 ## Preconditions
 
 - **`<main_root>/.rune/PAUSED` exists → stop.** Report that work is paused, when and why, and that
-  `rune:pause` lifts it. Do not dispatch. Do not quietly resume because the user asked for
+  `pause` lifts it. Do not dispatch. Do not quietly resume because the user asked for
   something — they may have forgotten the pause is set, and silently overriding a
   deliberate stop makes it worthless.
-- No `<main_root>/.rune/rune.yml` → run `rune:init` first.
+- No `<main_root>/.rune/rune.yml` → run `init` first.
 - No `milestones.md` and the request is broad ("continue the project") → route to
-  `rune:vision`. Do not invent a plan; that is vision's job and it requires the user.
+  `vision`. Do not invent a plan; that is vision's job and it requires the user.
 - A specific request ("fix the login bug") with no vision → proceed. Not everything needs
   a milestone graph.
 
@@ -147,7 +148,7 @@ Classification often cannot be done from the user's sentence. "Is this a bug or 
 simply not implemented?" is undecidable without evidence — and it is the most common
 ambiguity on an unfinished codebase.
 
-Since you cannot read code, **dispatch a subagent that follows `ai-triage`** — **one per
+Since you cannot read code, **dispatch a subagent that follows `triage`** — **one per
 issue**, per *One agent, one issue* above. If the user reported three things, that is
 three triage dispatches, run concurrently. Never hand one triage agent a
 list, even when the issues sound related: "sounds related" is a hypothesis, and batching
@@ -172,17 +173,17 @@ Then load the matching protocol:
 
 | type | skill | first move |
 |---|---|---|
-| bug | `ai-bug` | reserve its task and reproduce in that worktree before planning |
-| feature | `ai-feature` | scope boundary, then decisions |
-| refactor | `ai-refactor` | confirm a characterization net exists |
-| investigation | `ai-investigate` | read-only, terminates in an answer |
+| bug | `bug` | reserve its task and reproduce in that worktree before planning |
+| feature | `feature` | scope boundary, then decisions |
+| refactor | `refactor` | confirm a characterization net exists |
+| investigation | `investigate` | read-only, terminates in an answer |
 
 **Investigation exits here.** Before dispatch, allocate the next unused `INV-nnn` and one
-exact staging/final path pair per `ai-taskfmt`. Also reserve a `RES-nnn` pair when outside
+exact staging/final path pair per `taskfmt`. Also reserve a `RES-nnn` pair when outside
 evidence may be needed; if that cannot be known cheaply, reserve it and let the worker
 return it unused. Record every reservation as a pending `report-slot` row before the
-worker starts, then dispatch `ai-investigate` with those assignments. A pure outside-repo
-question may dispatch `ai-research` with only its `RES-` assignment.
+worker starts, then dispatch `investigate` with those assignments. A pure outside-repo
+question may dispatch `research` with only its `RES-` assignment.
 
 Accept `answered` only when every returned id and staging pointer matches its pending row.
 Validate each complete staging artifact and atomically promote it to the assigned final
@@ -208,20 +209,20 @@ After triage returns `bug`:
 
 1. Choose the next unused decomposition run and next globally unused `T-nnn`. An id is
    used if it appears anywhere under `.rune/`, not only in `tasks/` or the ledger.
-2. Write the run's immutable `protocol.md` with `type: bug`, `protocol: ai-bug`, triage
+2. Write the run's immutable `protocol.md` with `type: bug`, `protocol: bug`, triage
    evidence and shape, and `reserved_task: T-nnn`.
 3. In one validated ledger update add a provisional row with the milestone, title,
    `status: diagnosing`, the absolute `<main_root>/.rune/worktrees/T-nnn` path,
    `attempts: d1/e0/v0/l0`, zero failures, no finding or blocker, and
    `resume_at: diagnose`, `replaced_by: —`. This reserves identity and claims diagnosis;
    no task spec exists and the row is not executable.
-4. Dispatch one `ai-bug` worker with `work: T-nnn`, `attempt: 1`, `main_root`,
+4. Dispatch one `bug` worker with `work: T-nnn`, `attempt: 1`, `main_root`,
    `worktree_path`, and
    absolute protocol and `notes/T-nnn.progress` pointers. The worker creates or validates
    the exact worktree before writing the reproduction check.
 
 ```rune-dispatch
-follow: ai-bug
+follow: bug
 work: T-nnn
 attempt: 1
 main_root: /workspace/acme
@@ -255,7 +256,7 @@ fresh and cannot inherit the protocol you loaded here.
 Check first that no `open` decision blocks this milestone. If one does, surface it to the
 user and stop. The gate is not negotiable.
 
-**Dispatch workers that follow `ai-decompose`. You do not read source or write planner
+**Dispatch workers that follow `decompose`. You do not read source or write planner
 drafts or task files.** Include `main_root` and absolute pointers under
 `<main_root>/.rune/`, per the canonical dispatch envelope. Decomposition requires real
 code — the one thing you may not read — so a task file composed in your context is fiction.
@@ -266,10 +267,10 @@ Use this exact two-phase protocol:
    directory. Never reuse a run, including one left incomplete by a dead session. For a
    confirmed bug, reuse the exact run whose protocol and `reserved_task` produced the
    diagnosis; for every other type, create the run here. Write `protocol.md` using the
-   canonical schema in `ai-taskfmt`: the final `type`, exact protocol skill, and triage
+   canonical schema in `taskfmt`: the final `type`, exact protocol skill, and triage
    evidence and shape, plus `decisions: [...]` containing every decided record that
-   constrains this milestone/request. The only valid mappings are `bug -> ai-bug`,
-   `feature -> ai-feature`, and `refactor -> ai-refactor`. Then assign `P-01` through
+   constrains this milestone/request. The only valid mappings are `bug -> bug`,
+   `feature -> feature`, and `refactor -> refactor`. Then assign `P-01` through
    `P-03`; the parent is the only allocator for the run, protocol record, bug reservation,
    and planner slots.
 2. Dispatch two or three planners in parallel. Each gets one work id such as
@@ -329,7 +330,7 @@ answer — whether **one fresh agent could finish this whole task with room left
 Five files in one module and five files across three subsystems both pass the rule and are
 not the same job.
 
-Dispatch one worker following `ai-size` per new task, with the task, milestone, map, and
+Dispatch one worker following `size` per new task, with the task, milestone, map, and
 `notes/T-nnn.sizing.md` pointers. They are independent and read-only, so run them
 concurrently. Never send a planner or reconciler from this run: the reasoning that produced
 the task is exactly what would talk a reviewer into accepting it.
@@ -381,18 +382,18 @@ contracts:
    reads those numbers, so a later session never re-derives them.
 2. Drain every frozen row by its pre-freeze state; ordinary outcome routing is suspended:
    - `pending`, `awaiting`, `blocked`, or already `drifted`: leave it drift-blocked. If it
-     owns an absolute worktree, dispatch `ai-drift` in quiesce mode after its prior worker
+     owns an absolute worktree, dispatch `drift` in quiesce mode after its prior worker
      is confirmed stopped; otherwise its worktree is already `discarded`.
    - `diagnosing`, `in_progress`, or `verifying`: wait for the already-dispatched worker
      or reconcile its durable return, but never advance that return to planning,
      verification, retry, or landing. A task that returned drifted and discarded is
-     complete; otherwise dispatch `ai-drift` quiesce on its registered worktree, then set
+     complete; otherwise dispatch `drift` quiesce on its registered worktree, then set
      `drifted`, the causal drift blocker and pointer, `resume_at: replan`, and
      `worktree: discarded` in one update.
    - `landing`: wait for the live lander. `landed` with a green main becomes `done` and is
      removed from the retirement set; its code is part of the replan baseline. Any
-     non-landed return starts no retry and goes through `ai-drift` quiesce. If the return
-     was lost, increment `l` and dispatch `ai-land` with `mode: drift-observe`: an artifact
+     non-landed return starts no retry and goes through `drift` quiesce. If the return
+     was lost, increment `l` and dispatch `land` with `mode: drift-observe`: an artifact
      already reachable from main is oracle-checked and becomes `done`; `not_landed` is
      quiesced without merging; `stuck` sets `main: red` and stops the route.
    A refused cleanup or any source state whose publication cannot be proven is a stop
@@ -413,7 +414,7 @@ contracts:
    least once, leaves no live dependency on a retiring id, and every mitigation links a
    validated same-milestone root-cause task in the replacement set. Never overwrite or
    delete any old task file.
-5. After every new file exists, perform the one ledger transaction from `ai-ledger`: add
+5. After every new file exists, perform the one ledger transaction from `ledger`: add
    the new `unsized` rows (or finalize the fresh reproduced bug reservation as `unsized`)
    and move all
    old rows to terminal `retired` with their immediate `replaced_by` values. If validation
@@ -528,7 +529,7 @@ Anything to add before I start?
 ### Choosing a batch
 
 A task is eligible when it is `pending` and its `blocked_by` are all resolved. `unsized`
-rows are not eligible and never become so by waiting — they are waiting on `ai-size`, not
+rows are not eligible and never become so by waiting — they are waiting on `size`, not
 on a dependency. Among eligible tasks, dispatch several at once when — and only when —
 **their change surfaces are disjoint.**
 
@@ -542,7 +543,7 @@ at merge, and the time lost untangling that exceeds anything parallelism won.
 - One task left, or all eligible tasks overlap? Run it alone. Serial is the fallback, not
   a failure.
 
-Tell the user what went out, per `ai-report`:
+Tell the user what went out, per `report`:
 
 ```
 Dispatched 3 in parallel: T-014 (auth), T-017 (worker), T-019 (api).
@@ -551,7 +552,7 @@ No shared files. T-015 waits on T-014.
 
 ### What each executor gets
 
-- **`ai-execute` to follow**, which loads `ai-taskfmt`, `ai-serena` and `ai-drift` itself.
+- **`execute` to follow**, which loads `taskfmt`, `serena` and `drift` itself.
 - **`main_root`**, the same absolute orchestration checkout used by the parent.
 - **`worktree_path`**, preallocated as the absolute
   `<main_root>/.rune/worktrees/T-nnn` and recorded in the ledger before dispatch.
@@ -559,7 +560,7 @@ No shared files. T-015 waits on T-014.
 - One task id and absolute pointers to its task file plus any handoff, verification, or
   landing record it must consume.
 
-For a confirmed bug, `ai-bug` already created `worktree_path` and committed the failing
+For a confirmed bug, `bug` already created `worktree_path` and committed the failing
 check there; the first executor validates and reuses it. For every other task, the first
 executor creates the path if absent. Every later worker reuses that exact path. Do not
 request harness isolation that creates an anonymous worktree; use it only if the harness
@@ -589,7 +590,7 @@ Executors report ≤200 tokens:
 work: T-014
 summary: rotate() implemented and wired; required verification evidence recorded
 status: done | drifted | budget | blocked | question
-worktree: kept | discarded        # done requires kept until ai-land cleans it
+worktree: kept | discarded        # done requires kept until land cleans it
 worktree_path: /workspace/acme/.rune/worktrees/T-014
 attempt: 2
 base_commit: a3f91c2       # required for done; repeated from the progress file
@@ -618,7 +619,7 @@ the same publication to `<main_root>/.rune/notes/T-nnn.progress`. Do not read th
 worktree or accept an uncommitted success claim. The update to `verifying` and `v++` must
 land before the verifier is dispatched.
 
-The status meanings and row validity rules remain owned by `ai-ledger`; the table above is
+The status meanings and row validity rules remain owned by `ledger`; the table above is
 this route's atomic action for each returned outcome.
 
 For every executor status other than `drifted`, first prove both assigned report paths are
@@ -663,7 +664,7 @@ resume token and any live worktree in the same validated write.
 
 Verify each task independently first (step 5), then land them **one at a time, in the order
 they finished**. Before each landing, atomically set `landing`, increment `l`, and set
-`resume_at: land`. Each landing is a **dispatch to `ai-land`** carrying one task id, that
+`resume_at: land`. Each landing is a **dispatch to `land`** carrying one task id, that
 recorded attempt, and
 the same `main_root` and `worktree_path`, plus absolute pointers to its progress and
 verification records — never two at once, because two landers are two writers on the main
@@ -704,7 +705,7 @@ done, its worktree still holds real work, and something has to change *in that w
 before it can land. The landing record distinguishes publication failure, integration
 conflict, and a post-merge regression so the next executor works the right problem.
 
-So dispatch a fresh executor on `ai-execute` for the same task, and give it
+So dispatch a fresh executor on `execute` for the same task, and give it
 `<main_root>/.rune/notes/T-nnn.landing.md` as a second absolute pointer alongside its
 task file. Reuse the ledger's exact `worktree_path`; never ask the harness for a fresh
 checkout. That record and that kept worktree are the only things standing between the
@@ -723,7 +724,7 @@ record-based escalation rules. Apart from that mechanical ceiling, act on the `e
 line it returns rather than judging whether another loop seems worthwhile.
 
 - `escalate: no` → round the loop again.
-- `escalate: yes` → **stop and go to the user**, per `ai-report`. Give them the reason the
+- `escalate: yes` → **stop and go to the user**, per `report`. Give them the reason the
   lander named and what has already been tried. The record holds the detail if they want it.
 
 **`stuck` stops everything at once.** The main tree is in a state no agent can safely act
@@ -749,14 +750,14 @@ match. **Assign the
 because id allocation cannot be done safely by three concurrent workers.
 
 Reconcile all simultaneously returned question artifacts in numeric task-id/attempt order
-and serially apply `ai-taskfmt`'s crash-safe transaction: persist the assigned decision
+and serially apply `taskfmt`'s crash-safe transaction: persist the assigned decision
 with unique `source: T-nnn/eN`, then persist the `awaiting` row and pointer, then delete
 that exact staging file. On recovery, reuse a record with the same source; never allocate
 a second id. A conflicting source/path/attempt stops the route.
 
 Do not answer it yourself. In the same update that moves the task to `awaiting`, store
 `decision:DEC-nnn`, point `latest_finding` at that record, and preserve the worker's
-`resume_at`. Surface it to the user per `ai-report` — question first,
+`resume_at`. Surface it to the user per `report` — question first,
 options, your recommendation — and keep the rest of the batch running while you wait. When
 the decision lands, re-dispatch the task; a fresh executor picks up the handoff, the
 worktree diff, and the now-resolved decision.
@@ -772,7 +773,7 @@ Every claim goes through the same three steps, in this order:
 
 1. **Allocate and dispatch.** In numeric task-id, attempt, then `K` order, give each claim
    an `FND-nnn`, reserve its staging and final paths in the ledger, and dispatch **a fresh
-   subagent following `ai-verify-finding`** with the claim pointer. One claim per
+   subagent following `verify-finding`** with the claim pointer. One claim per
    dispatch. Never send the finder, and never send an agent that worked on the task the
    claim came from — the point of the check is that nobody involved is doing it.
 2. **Promote the verdict.** Validate the returned staging file and atomically promote it
@@ -786,21 +787,21 @@ finding.** It becomes a task only when the user says so, through triage and deco
 like any other request. Quietly turning a finding into work is how a session that was
 asked to fix one bug returns having changed six files.
 
-Report only what came back verified, per `ai-report`. An unverified claim is not something
+Report only what came back verified, per `report`. An unverified claim is not something
 the user hears about — telling them about it makes them act on it, which is exactly what
 the verification step exists to prevent.
 
 ## 5. Verify
 
 Every `done` claim goes to a **separate** verifier in a **clean context** —
-`ai-verify`. Never the same agent, never the same context. An executor is the worst
+`verify`. Never the same agent, never the same context. An executor is the worst
 possible judge of its own work.
 
 - Before acting on the verdict, require its `artifact_commit` to match the executor's
   latest publication and require `verified_commit` to equal it on `pass`. A mismatch is
   `unverified`; never choose which SHA the verifier probably meant.
 - `pass` → keep the completed `v` counter, then atomically claim landing and increment `l`
-  before handing the task id, landing attempt, and pointers to `ai-land`. It is not `done`
+  before handing the task id, landing attempt, and pointers to `land`. It is not `done`
   until that returns `landed` — publishing, passing in a worktree, and surviving the merge
   are three different claims tied together by the same commit.
 - `fail` → back to `pending`, increment `failures`, set `latest_finding` to the verifier's
@@ -816,7 +817,7 @@ possible judge of its own work.
   or `acceptance` is a task-contract finding, but the verifier cannot write its causal
   record. Keep the row `verifying`, allocate one unused `DRF-nnn`, and append a pending
   report-slot row binding that verifier attempt to its exact staging and final drift
-  paths. Dispatch `ai-drift` in record-only mode with the assignment plus task and verifier
+  paths. Dispatch `drift` in record-only mode with the assignment plus task and verifier
   pointers. When the staging record returns, validate and atomically promote it, then use
   it as the evidence for one update that adds the exact unfinished dependency closure to
   the ledger drift freeze, sets the originating row and every inactive affected row to
@@ -835,7 +836,7 @@ from conversation memory or mistakes an `unverified` result for a failed criteri
 
 ## 6. Reconcile
 
-Per `ai-ledger`:
+Per `ledger`:
 
 - Update statuses.
 - Any drift record → drift-block the full unfinished dependency closure; do not delete or
@@ -856,7 +857,7 @@ Otherwise, loop to the next batch.
 
 ## Keeping the user informed
 
-Load `ai-report` and follow it. The cadence it defines is not optional — the user asked
+Load `report` and follow it. The cadence it defines is not optional — the user asked
 to hear from you at checkpoints, not only at the end.
 
 Report after **every** verified task, every completed batch, every milestone, and every

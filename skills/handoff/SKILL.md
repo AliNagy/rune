@@ -1,5 +1,6 @@
 ---
 name: handoff
+user-invocable: false
 description: Use when this session's context is getting large and work should move to a fresh one. Captures what is in the conversation but not on disk, files the durable parts where they belong, and produces a short block to paste into the new session.
 ---
 
@@ -26,7 +27,7 @@ rushed and lossy, which defeats the point.
 **You move what this conversation knows onto disk, then get out.** This list is exhaustive:
 
 - **Run** only the exact bounded state probes named below.
-- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+- **Follow** `root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's handoff records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/vision.md`, `decisions.md`, `ledger.md` while draining, and
@@ -50,7 +51,7 @@ This is the complete command interface for the parent route.
 git rev-parse --show-toplevel
 ```
 
-The probe returns exactly one line. `ai-root` may run only its own separately bounded
+The probe returns exactly one line. `root` may run only its own separately bounded
 migration probe while this route follows it. Drain state comes from the ledger and worker
 returns.
 
@@ -62,14 +63,14 @@ files are normal coordination-file operations, not Git lifecycle commands.
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
-follow `ai-root` with `work: coordination-root`, that absolute root, and
+follow `root` with `work: coordination-root`, that absolute root, and
 `mode: initialize` before reading or writing
 coordination state. Stop and report any failure it returns. Resolve every coordination
 path against the returned root and include `main_root` plus absolute pointers in every
 dispatch. If step 1 drains task work, reuse each ledger-recorded absolute `worktree_path`
 through verification and landing.
 
-Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+Before consuming any followed or dispatched result, validate `taskfmt`'s common
 return envelope: `work` must equal the assigned token, `summary` must be one line, and
 `worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
@@ -84,8 +85,8 @@ staged question into a parent-assigned decision and `awaiting` row, verify, and 
 Never hand a torn tree to a session that has no idea what caused it.
 
 If the user wants out immediately, a running worker still cannot be interrupted — `pause`
-says why. Either wait for it to return, or run `/rune:pause abandon` to discard that task's
-work, and then hand off. Say which one you did.
+says why. Either wait for it to return, or follow `pause` in abandon mode to discard that
+task's work, and then hand off. Say which one you did.
 
 ## 2. Triage what is in your head
 
@@ -99,8 +100,8 @@ twice.
 
 | What you found | Where it goes |
 |---|---|
-| a convention the user corrected you on | **dispatch `ai-survey` in `amend` mode** — one convention → `map.md` |
-| a codebase gotcha you discovered | **dispatch `ai-survey` in `amend` mode** — one gotcha → a Serena memory |
+| a convention the user corrected you on | **dispatch `survey` in `amend` mode** — one convention → `map.md` |
+| a codebase gotcha you discovered | **dispatch `survey` in `amend` mode** — one gotcha → a Serena memory |
 | a choice made verbally | you write it — `decisions.md`, `status: decided` |
 | a constraint on the project | you write it — `vision.md` |
 | something the user wants built later | you write it — `vision.md`, as a want |
@@ -109,7 +110,7 @@ Either survey update uses the same canonical assignment, carrying the one fact a
 kind:
 
 ```rune-dispatch
-follow: ai-survey
+follow: survey
 work: survey/amend
 mode: amend
 main_root: /workspace/acme
@@ -140,7 +141,7 @@ worst possible moment to open `map.md`, find the right section, and check a new 
 not contradict what is already there.
 
 A want goes to `vision.md`, **not** `milestones.md`. A passing remark is not a plan; the
-next `rune:vision` decides whether it becomes one, with the decision records that requires.
+next `vision` decides whether it becomes one, with the decision records that requires.
 
 **Session-transient → the handoff doc.** Approaches tried and rejected and why. Things the
 user said they would handle themselves. Threads left open that are not yet tasks. Judgement
@@ -177,8 +178,8 @@ M-03 session lifecycle, 3 of 4 done. T-016 queued. Tests pass, tree clean.
 ```
 
 Four sections, and the second is the one with real value. If it is empty, say so — that
-means everything is genuinely on disk and the new session needs nothing but
-`/rune:continue`.
+means everything is genuinely on disk and the new session needs nothing but the paste
+block.
 
 ## 4. Produce the paste block
 
@@ -190,7 +191,7 @@ including which project this is.
 Continuing work on <project> at <path>. The Rune plugin is installed.
 
 Read <path>/.rune/sessions/2026-08-05-1422.md first — it has context from the previous
-session that is not in the ledger. Then run /rune:continue.
+session that is not in the ledger. Then pick up where that left off.
 ```
 ````
 
@@ -200,12 +201,12 @@ step 2 — go back and file it.
 Where a specific next action is already known, name it:
 
 ```
-... Then run /rune:continue, and expect to pick up T-016.
+... Then pick up where that left off, and expect to start on T-016.
 ```
 
 ## 5. Report
 
-Per `ai-report`. TL;DR, then the block.
+Per `report`. TL;DR, then the block.
 
 ```
 TL;DR

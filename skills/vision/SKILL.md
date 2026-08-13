@@ -1,9 +1,10 @@
 ---
 name: vision
+user-invocable: false
 description: Use when a project has no plan yet - a new idea with no code, or an in-progress codebase that has drifted and needs its road to a working first version mapped. Interviews the user, surfaces every open decision, and produces the milestone graph.
 ---
 
-# rune:vision
+# vision
 
 Builds the vision, then the milestone graph that reaches v1. This is a **conversation**,
 not a generation task. Take the time it needs.
@@ -14,7 +15,7 @@ not a generation task. Take the time it needs.
 delegated — you are the only agent talking to the user. Everything else follows from it:
 
 - **Run** only the exact bounded state probes named below.
-- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+- **Follow** `root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's own files.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Inspect** at most 20 top-level entry names, excluding Git and Rune coordination roots,
@@ -22,11 +23,11 @@ delegated — you are the only agent talking to the user. Everything else follow
 - **Write** `<main_root>/.rune/vision.md` and `decisions.md`, incrementally, as the
   interview settles them.
 - **Create** the canonical empty schema-2 ledger only for the documented empty-project
-  bootstrap, then **write** only its top-level `vision` phase using `ai-ledger`; preserve
+  bootstrap, then **write** only its top-level `vision` phase using `ledger`; preserve
   every other field and row.
 - **Talk to the user** — this is the job.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
-  `ai-taskfmt` says which skill does which job.
+  `taskfmt` says which skill does which job.
 
 ## Permitted commands and probes
 
@@ -41,7 +42,7 @@ find <main_root> -mindepth 1 -maxdepth 1 ! -name .git ! -name .rune ! -name .age
 ```
 
 The first two each return exactly one line; the last returns at most 20 entry names.
-`ai-root` may run only its own separately bounded migration probe while this route follows
+`root` may run only its own separately bounded migration probe while this route follows
 it. Source inspection and survey output remain dispatched.
 
 ### Mutating lifecycle commands
@@ -52,13 +53,13 @@ operations; the graph worker owns `milestones.md`, and Git task lifecycle is dis
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel`, then
-follow `ai-root` with `work: coordination-root`, that absolute root, and
+follow `root` with `work: coordination-root`, that absolute root, and
 `mode: initialize` before any coordination
 read or write. Stop and report any failure it returns. Resolve every coordination path
 against the returned root and include `main_root`, plus absolute pointers, in every
 dispatch.
 
-Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+Before consuming any followed or dispatched result, validate `taskfmt`'s common
 return envelope: `work` must equal the assigned token, `summary` must be one line, and
 `worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
@@ -70,26 +71,26 @@ work a subagent could do is how the interview ends early.
 
 Check `<main_root>/.rune/rune.yml`.
 
-- **Missing, and the repo has code** → run `rune:init` first. Do not ask; just do it and
+- **Missing, and the repo has code** → run `init` first. Do not ask; just do it and
   say so. Vision without a map produces a plan disconnected from the codebase.
 - **Missing, and the repo is empty** → new project. Vision runs first; init runs after the
   stack is chosen and scaffolded. If `ledger.md` is also absent, the parent writes the
   canonical empty schema-2 shape from `init` with `oracle: —`, `main: green`, and
-  `vision: absent` immediately after `ai-root` scaffolds the coordination root. Validate
+  `vision: absent` immediately after `root` scaffolds the coordination root. Validate
   it before creation. This is the only pre-init bootstrap; init later fills the oracle and
   preserves the phase and history.
 - **Present, with `staleness.verdict: stale`** → say the recorded numbers, offer a re-run
-  of `rune:init`, and proceed if the user declines. That verdict comes from init's measured
+  of `init`, and proceed if the user declines. That verdict comes from init's measured
   rule; do not re-measure it here and do not soften or override it with your own
   impression of how much the codebase has moved.
 
-After the ground is ready, validate schema 2 per `ai-ledger`. Before asking the first
+After the ground is ready, validate schema 2 per `ledger`. Before asking the first
 interview question or writing either interview file, replace `vision: absent` with
 `vision: drafting` in one validated ledger write. Preserve `drafting` on resume. A
 `complete` phase never re-enters the interview; proceed only to open decisions or a
 missing milestone graph. No file-shape heuristic may override this field.
 
-Write `vision.md` incrementally using `ai-taskfmt`'s exact **Vision document** routing
+Write `vision.md` incrementally using `taskfmt`'s exact **Vision document** routing
 shape. A topic changes from `open` to `settled` only after its nonempty answer and complete
 decision-id list are durable. Mode B also requires the settled survey-reality and
 discrepancy sections. These fields let recovery verify durable inputs; they never replace
@@ -118,14 +119,14 @@ each answer reshapes what is worth asking next.
 
 ## Mode B · In-progress project
 
-1. **Survey** — dispatch a subagent that follows `ai-survey`, carrying `work: survey`,
+1. **Survey** — dispatch a subagent that follows `survey`, carrying `work: survey`,
    `main_root`, and
    absolute coordination pointers. Returns stack,
    modules, conventions, and the completeness assessment: stubs, orphans, half-wired
    paths, contradictions, abandoned directions.
 
 ```rune-dispatch
-follow: ai-survey
+follow: survey
 work: survey
 main_root: /workspace/acme
 pointers:
@@ -156,7 +157,7 @@ finishing and deleting are both legitimate, and the agent may not choose.
 **Suggest. Never assume.**
 
 Every choice with more than one defensible answer becomes a decision record in
-`<main_root>/.rune/decisions.md`, per `ai-taskfmt`:
+`<main_root>/.rune/decisions.md`, per `taskfmt`:
 
 ```markdown
 ## DEC-007 · State management
@@ -202,16 +203,16 @@ it dies after it, the interview is complete even when `milestones.md` is absent.
 Generate milestones only with `vision: complete` and once every blocking decision is
 `decided`.
 
-**Dispatch a subagent that follows `ai-decompose` with `work: vision/graph`, `main_root`,
+**Dispatch a subagent that follows `decompose` with `work: vision/graph`, `main_root`,
 and absolute pointers
 to write `<main_root>/.rune/milestones.md`. You do not write it yourself.** By this point
 everything the graph needs is already on disk — `vision.md` and
 `decisions.md`, which you have been writing as the interview settled, plus the survey
 digest and `map.md` in Mode B. It reads those, writes the milestone graph per
-`ai-taskfmt`, and returns the list in ≤200 tokens for you to show the user.
+`taskfmt`, and returns the list in ≤200 tokens for you to show the user.
 
 ```rune-dispatch
-follow: ai-decompose
+follow: decompose
 work: vision/graph
 main_root: /workspace/acme
 pointers:
@@ -221,7 +222,7 @@ pointers:
 
 Dispatch exactly one graph worker at a time. Accept `plan: graph` only when `artifact:` is
 the exact absolute `<main_root>/.rune/milestones.md` pointer and the completed file
-validates; log its return as `plan-graph | ai-decompose | vision/graph | graph: <absolute
+validates; log its return as `plan-graph | decompose | vision/graph | graph: <absolute
 milestones path>`. The parent records no copy and never edits or promotes the graph. Confirm a
 stopped predecessor before retrying the same final path.
 
@@ -242,7 +243,7 @@ Hand it these constraints:
 - **Acceptance criteria** phrased as things a person can observe.
 
 Do **not** break milestones into tasks here. A task must name real files and real
-symbols; for M-04 those do not exist yet, and anything written now is fiction. `rune:work`
+symbols; for M-04 those do not exist yet, and anything written now is fiction. `work`
 decomposes just-in-time. (M-01 is the exception — its ground state is known and it may be
 decomposed immediately.)
 
@@ -251,7 +252,7 @@ decomposed immediately.)
 A thorough interview is long. **Write `vision.md` and `decisions.md` incrementally**, as
 each section settles — never only at the end.
 
-If the session ends mid-interview, `rune:continue` picks up from the last settled
+If the session ends mid-interview, `continue` picks up from the last settled
 section and the open decision queue. Nothing is held in conversation memory.
 
 `ledger.md` decides whether the interview is unfinished. `vision.md` supplies its durable
@@ -259,7 +260,7 @@ answers but has no competing completion marker.
 
 ## Finishing
 
-Follow `ai-report`.
+Follow `report`.
 
 ```
 TL;DR
@@ -277,7 +278,7 @@ Decisions   9 settled, none outstanding
 Gaps        3 found between what you described and what exists
             billing: you chose to cut it
 
-Next: /rune:work to break M-01 into tasks and start.
+Next: say the word and I'll break M-01 into tasks and start.
 ```
 
 ## While the interview runs

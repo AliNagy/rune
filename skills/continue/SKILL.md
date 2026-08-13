@@ -1,9 +1,10 @@
 ---
 name: continue
+user-invocable: false
 description: Use when returning to a project in a fresh session, after a crash, or after a cleared context, and you need to know where things stand. Reconciles stale state left by a dead session before reporting anything.
 ---
 
-# rune:continue
+# continue
 
 Works out where things stand and resumes. Everything comes from disk; nothing is
 remembered.
@@ -17,7 +18,7 @@ no longer true, and reporting them as status propagates the lie. Repair first.
 from that, and this list is exhaustive:
 
 - **Run** only the exact bounded state probes named below.
-- **Follow** `ai-root`; its narrowly scoped coordination migration is the sole write
+- **Follow** `root`; its narrowly scoped coordination migration is the sole write
   exception outside this route's reconciliation records.
 - **Read** `<main_root>/.rune/` coordination files.
 - **Write** `<main_root>/.rune/ledger.md`, repairing the rows a dead session left behind.
@@ -31,7 +32,7 @@ from that, and this list is exhaustive:
   is `pause`.
 - **Talk to the user** — the status report, and the question if one is owed.
 - **Dispatch subagents**, naming the skill each one must follow. The dispatch table in
-  `ai-taskfmt` says which skill does which job.
+  `taskfmt` says which skill does which job.
 
 ## Permitted commands and probes
 
@@ -56,30 +57,30 @@ The bounds are: one line for root, heads, merge-base, and ahead-count;
 zero output plus an exit status for commit existence and ancestry; at most one dirty path;
 and at most 50 registered `path<TAB>branch-ref-or-detached` rows plus one total-count line.
 A total above 50 is a stop condition requiring a separately dispatched inspection.
-`ai-root` may run only its own separately bounded migration probe.
+`root` may run only its own separately bounded migration probe.
 
 ### Mutating lifecycle commands
 
 `none` — reconciliation changes parent-owned coordination files only. Cleanup of a proven
-landed orphan is dispatched to `ai-land` cleanup mode; unpublished discard is dispatched
-to `ai-drift`.
+landed orphan is dispatched to `land` cleanup mode; unpublished discard is dispatched
+to `drift`.
 
 ## Coordination-root preflight
 
 Resolve `main_root` once with the bounded probe `git rev-parse --show-toplevel` before
-reading state. Then follow `ai-root` with `work: coordination-root`, that absolute root,
+reading state. Then follow `root` with `work: coordination-root`, that absolute root,
 and `mode: resolve`; it
 resumes an interrupted directory migration before ledger recovery. Stop and report any
 failure it returns. Resolve every `.rune/...` path against the returned root. Every
 recovery, verification, or landing dispatch carries `main_root`, the absolute
 `worktree_path` recorded in the task's ledger row, and absolute coordination pointers.
 
-Before consuming any followed or dispatched result, validate `ai-taskfmt`'s common
+Before consuming any followed or dispatched result, validate `taskfmt`'s common
 return envelope: `work` must equal the assigned token, `summary` must be one line, and
 `worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
 **Anything not on that list is a dispatch** — above all reading a torn worktree's diff,
-which is the single most expensive thing you could do here and the reason `ai-recover`
+which is the single most expensive thing you could do here and the reason `recover`
 exists. You are the session that everything resumes from; arriving already full defeats
 the purpose of having resumed at all.
 
@@ -102,7 +103,7 @@ the purpose of having resumed at all.
 Cheap reads, all of them. Do not read source. Do not read task files unless you are about
 to act on one.
 
-`staleness` in `rune.yml` is the verdict from the last `rune:init` run, not a fresh
+`staleness` in `rune.yml` is the verdict from the last `init` run, not a fresh
 measurement. Report it as what it is — "setup was current as of that commit" — and leave
 re-measuring to `init`, which owns the rule and the probes.
 
@@ -113,7 +114,7 @@ Any other enum is damaged state and stops.
 
 ### Validate or migrate the ledger first
 
-Before treating any row as state, apply `ai-ledger`'s schema validation. `schema: 2` must
+Before treating any row as state, apply `ledger`'s schema validation. `schema: 2` must
 validate completely. An unknown schema stops here and is reported.
 
 Schema 1 is the recognized predecessor. Migrate it once, before reconciliation: validate
@@ -147,7 +148,7 @@ whitespace or its old placeholder comment follows the heading.
   their unioned unfinished reverse-dependency closure, and allocate one migration
   `DRF-nnn`. Before dispatching,
   append or recover the one pending `## Dispatches` assignment that binds that id to its
-  exact staging and final paths, then dispatch `ai-drift` in record-only mode with the
+  exact staging and final paths, then dispatch `drift` in record-only mode with the
   assignment, amended task pointers, and pre-migration ledger. The staging record names
   the selected origin, every other
   amended task and the closure, and all amended task files as evidence; it does not
@@ -166,13 +167,13 @@ immutable tasks predate `remediation`: non-bugs become `not_applicable`; bugs wi
 legacy `kind: mitigation` become `root_cause`; known legacy mitigations stay mitigations.
 Never rewrite the task bytes. A known mitigation without a valid different, same-milestone
 root-cause task is repair work: unfinished rows enter the drift/re-decomposition path
-above. For a completed row, include an `ai-taskfmt` mitigation-repair pending assignment
+above. For a completed row, include an `taskfmt` mitigation-repair pending assignment
 with a fresh run id, globally unused reserved root-cause id, and exact protocol, task, and
 repair paths in the complete schema-2 candidate. The parent writes the immutable protocol
 first and serializes multiple allocations in numeric legacy-task order; every protocol and
 pending/blocked/linked row burns its ids. Persist that candidate next; only then may normal
 schema-2 recovery dispatch the assigned fresh
-`ai-decompose` reconciliation. The reconciler alone writes the immutable root-cause task
+`decompose` reconciliation. The reconciler alone writes the immutable root-cause task
 and repair artifact; the parent validates them and atomically registers the new row plus
 the linked outcome. A missing or ambiguous legacy marker stops rather than silently
 classifying known temporary work as a fix.
@@ -188,8 +189,8 @@ replacement is schema 2 and later runs validate it instead of migrating again.
 ### Reconcile the vision phase
 
 Use only the validated ledger's `vision: absent | drafting | complete` field as phase.
-`absent` starts `rune:vision`; it does not infer progress from a stray file. For
-`drafting`, validate `ai-taskfmt`'s exact Vision-document headings, per-topic status,
+`absent` starts `vision`; it does not infer progress from a stray file. For
+`drafting`, validate `taskfmt`'s exact Vision-document headings, per-topic status,
 decision-id list, and nonempty content against `decisions.md`. Resume at the first open or
 missing required topic. If every required topic (and the two Mode B sections when
 applicable) validates because the session died after the final file write, replace only
@@ -205,7 +206,7 @@ rewritten merely for format. This avoids inventing completion while preserving o
 
 ## 2. Reconcile
 
-Per `ai-ledger`. The critical step, and the one that is easy to skip because
+Per `ledger`. The critical step, and the one that is easy to skip because
 everything *looks* fine.
 
 ### Reconcile report assignments first
@@ -226,8 +227,8 @@ For pending rows:
   prior session died after promotion
 - neither exists, but the paired worker has a durable non-report outcome → mark the slot
   `unused`
-- neither exists and a standalone `ai-drift` record-only, `ai-investigate`, or
-  `ai-research` dispatch can be reconstructed entirely from durable pointers → re-dispatch
+- neither exists and a standalone `drift` record-only, `investigate`, or
+  `research` dispatch can be reconstructed entirely from durable pointers → re-dispatch
   that report job with the same id and paths, never a new reservation
 - neither exists for an executor attempt → settle that slot only while reconciling the
   stopped attempt below; never pass it to a new executor attempt, which gets a fresh slot
@@ -251,14 +252,14 @@ any ledger pointer names the final artifact.
 
 Reconcile every `quiescing` entry under `## Drift` before the ordinary status rules below.
 Its frozen ids must not resume their old lifecycle: consume durable worker returns only as
-evidence, use `ai-drift` quiesce for unpublished registered worktrees, and use `ai-land`
+evidence, use `drift` quiesce for unpublished registered worktrees, and use `land`
 `drift-observe` for a stale `landing` row whose prior return is missing. Already-reachable
 green work becomes `done`; `not_landed` is discarded; ambiguous or red main state stops.
 A row with no worktree becomes `discarded` without a cleanup dispatch. Resume the replan
 only when every remaining frozen row is inactive and discarded.
 
 **Reconcile `diagnosing` rows before executable tasks.** No immutable task file exists yet,
-so never send one to `ai-execute` or `ai-recover`.
+so never send one to `execute` or `recover`.
 
 - A progress file ending in `diagnosis: reproduced` with valid diagnosis commit ids means
   diagnosis finished and the parent died before planning. Keep the exact worktree and row;
@@ -268,7 +269,7 @@ so never send one to `ai-execute` or `ai-recover`.
   artifacts so the id stays burned, and report or reroute as recorded.
 - `diagnosis: blocked` keeps the row and worktree. Report the recorded condition and
   re-dispatch only after it has cleared.
-- No terminal diagnosis block means the diagnosis worker died. Re-dispatch `ai-bug` with
+- No terminal diagnosis block means the diagnosis worker died. Re-dispatch `bug` with
   the same task id, protocol, progress, `main_root`, and exact `worktree_path`. First
   increment `d`, set `resume_at: diagnose`, validate, and persist; pass the new attempt.
   That skill owns recovery before a task contract exists.
@@ -280,7 +281,7 @@ session. For each:
    `base_commit` plus `artifact_commit` to its progress file, the task branch still points
    to that artifact, and its worktree is clean. It died after publication but before its
    short return reached the parent. In one update set the row to `verifying`, increment
-   `v`, and set `resume_at: verify`; then dispatch `ai-verify` with that attempt and the
+   `v`, and set `resume_at: verify`; then dispatch `verify` with that attempt and the
    row's exact `worktree_path`. Its artifact preflight proves the remaining invariants. Do
    not discard it because the uncommitted diff is empty — a completed artifact should have
    an empty diff.
@@ -301,13 +302,13 @@ session. For each:
      executor may have died between `git commit` and writing the publication block; a fresh executor inspects the
      committed range and either publishes that `HEAD` or resumes the task. For a diagnosed
      bug, `diagnosis_commit` alone is only the starting baseline and must never be published.
-   - empty diff, branch not ahead → dispatch `ai-drift` in `discard-empty` mode with the
+   - empty diff, branch not ahead → dispatch `drift` in `discard-empty` mode with the
      exact task id, registered path, branch ref, and main head from the probes above. Only
      its `status: discarded` return permits setting `pending`, `worktree: discarded`, and
      `resume_at: fresh`; a refusal leaves the absolute path in the row and is reported.
      No source work is lost because the worker re-proves both the empty diff and zero
      commits ahead immediately before cleanup.
-   - non-empty → work exists but is unexplained. **Dispatch `ai-recover`** with the same
+   - non-empty → work exists but is unexplained. **Dispatch `recover`** with the same
      `main_root`, exact `worktree_path`, and absolute task/progress pointers.
      It maps the diff onto the task's declared steps, decides whether the work is
      salvageable, names the resume point, and writes the handoff the dead executor never
@@ -315,7 +316,7 @@ session. For each:
      recovery never inherits it. Apply its verdict — `salvage`, `discard`, or `partial` —
      copy its schema token to `resume_at`, and point `latest_finding` at the handoff. If a
      discard also returns `premise_drift: true`, instead reserve a fresh DRF report slot
-     and dispatch `ai-drift` in record-only mode from the task and recovery handoff. Promote
+     and dispatch `drift` in record-only mode from the task and recovery handoff. Promote
      that report and apply the ordinary drift freeze before leaving `in_progress`.
 
    Do not inspect the diff yourself. Reading it is exactly the code-reading the dispatcher
@@ -324,7 +325,7 @@ session. For each:
 
 Also check:
 
-- orphaned worktrees with no ledger row → dispatch one `ai-land` worker in `cleanup` mode
+- orphaned worktrees with no ledger row → dispatch one `land` worker in `cleanup` mode
   with the exact bounded `path<TAB>branch-ref` row returned above. A detached checkout,
   malformed branch ref, path outside `<main_root>/.rune/worktrees/T-nnn`, or task-id
   mismatch is reported and left untouched. Remove it only when that worker proves the path
@@ -332,7 +333,7 @@ Also check:
 - `verifying` rows whose verifier never returned → first check for a durable block matching
   the row's current `v`. If it is `unverified` for `evidence` or `acceptance`, recover the
   pending record-only drift assignment: reconcile its assigned staging/final pair and
-  apply the freeze transition, or re-dispatch `ai-drift` with the same id and paths when
+  apply the freeze transition, or re-dispatch `drift` with the same id and paths when
   both files are absent. Never allocate a second DRF for the same verdict. Consume every
   other verdict with `work`'s complete mapping (including `failures++` only for `fail`, the finding
   pointer, and the returned dispatch row). If no verdict exists, increment `v`, persist,
@@ -367,7 +368,7 @@ Also check:
   its diagnosis evidence and replacement task file both validate for that same new id.
 - `unsized` rows → the task file exists but no fresh worker has said one executor could
   finish it. Read `notes/T-nnn.sizing.md`. No record, or no verdict block for the current
-  attempt, means the sizer died: redispatch `ai-size` for that one task after proving the
+  attempt, means the sizer died: redispatch `size` for that one task after proving the
   prior worker stopped. A recorded `pass` whose row never moved is a crash between the
   verdict and the ledger — apply it now. A recorded `split` routes to re-decomposition; a
   recorded `blocked` keeps the row and its blocker and is reported, not retried, until the
@@ -381,7 +382,7 @@ Also check:
   `remediation: root_cause`, and no further follow-up. For a completed legacy
   `kind: mitigation` task, consume exactly one mitigation-repair assignment. A linked row
   and matching immutable artifact supply the normalized follow-up. A pending row with no
-  outputs is redispatched to `ai-decompose` with the same `work`, reserved root id, and
+  outputs is redispatched to `decompose` with the same `work`, reserved root id, and
   paths after proving the prior worker stopped. Task-only validates and redispatches only
   to create the missing repair artifact. Artifact-only violates the required write order;
   mismatched, duplicate, or artifact-only state becomes a durable blocked outcome with
@@ -396,7 +397,7 @@ Also check:
 - **staged worker questions** → collect valid `decisions/open/T-nnn-eN.md` files, require
   `raised_by` and `source_attempt` to match the task's current executor attempt, and sort
   them by numeric task id then attempt. Process that stable order serially using
-  `ai-taskfmt`'s decision-allocation transaction. If no decision has that unique
+  `taskfmt`'s decision-allocation transaction. If no decision has that unique
   `source: T-nnn/eN`, assign the next unused `DEC-nnn` and persist the complete decision
   record first. Then set the task `awaiting`, store `decision:DEC-nnn`, point at that
   record, preserve the handoff's resume token, and delete the staging file last. If a
@@ -408,7 +409,7 @@ Also check:
   numeric task id, attempt, then `K`. A claim whose `FND-nnn` record is already promoted
   and recorded is a crash between promotion and cleanup: delete the claim and stop there.
   A claim with a reserved id but no promoted record is redispatched to
-  `ai-verify-finding` with the same id and paths, after proving the prior worker stopped.
+  `verify-finding` with the same id and paths, after proving the prior worker stopped.
   A claim with no reservation gets one now. Never verify a claim yourself, never delete
   one that has no promoted record, and never treat an unverified claim as true while
   reporting what you found — it is a claim precisely because nobody has checked it.
@@ -418,18 +419,18 @@ Also check:
 | State on disk | Phase | Resume with |
 |---|---|---|
 | `<main_root>/.rune/PAUSED` present | deliberately stopped | **ask first** — see below |
-| no `<main_root>/.rune/` | nothing started | `rune:init`, then `rune:vision` |
-| `rune.yml` only | ground mapped, no plan | `rune:vision` |
-| ledger `vision: absent` | interview not started | `rune:vision` — persist `drafting` before the first question |
-| ledger `vision: drafting` | interview interrupted | `rune:vision` — from the first unsettled topic |
+| no `<main_root>/.rune/` | nothing started | `init`, then `vision` |
+| `rune.yml` only | ground mapped, no plan | `vision` |
+| ledger `vision: absent` | interview not started | `vision` — persist `drafting` before the first question |
+| ledger `vision: drafting` | interview interrupted | `vision` — from the first unsettled topic |
 | ledger `vision: complete`, decisions `open` | blocked on the user | present the open decisions |
-| ledger `vision: complete`, decisions done, no milestones | graph pending | `rune:vision` — generate milestones |
-| task `diagnosing` | bug reproduction or planning interrupted | reconcile diagnosis, then `rune:work` |
-| protocol record or planner drafts, no registered tasks | planning interrupted | `rune:work` — allocate a fresh draft run |
-| milestones, none decomposed | ready to work | `rune:work` — decompose M-01 |
-| tasks pending | mid-milestone | `rune:work` — next available task |
-| tasks `drifted` or `blocked` by drift | plan needs repair | `rune:work` — re-decompose and atomically retire the obsolete contracts |
-| task `blocked` by executor | executor condition unresolved | report the reason and exact unblock condition; route to `rune:work` only after it is proven cleared |
+| ledger `vision: complete`, decisions done, no milestones | graph pending | `vision` — generate milestones |
+| task `diagnosing` | bug reproduction or planning interrupted | reconcile diagnosis, then `work` |
+| protocol record or planner drafts, no registered tasks | planning interrupted | `work` — allocate a fresh draft run |
+| milestones, none decomposed | ready to work | `work` — decompose M-01 |
+| tasks pending | mid-milestone | `work` — next available task |
+| tasks `drifted` or `blocked` by drift | plan needs repair | `work` — re-decompose and atomically retire the obsolete contracts |
+| task `blocked` by executor | executor condition unresolved | report the reason and exact unblock condition; route to `work` only after it is proven cleared |
 | every non-retired leaf task in all milestones is `done` | v1 reached | report; ask what is next |
 
 ### Resuming from a pause
@@ -461,7 +462,7 @@ Summarise what was settled in two or three lines so they can correct you, then c
 
 ## 4. Report
 
-Follow `ai-report`. Say what was **repaired**, not just what exists — silent repair looks
+Follow `report`. Say what was **repaired**, not just what exists — silent repair looks
 like nothing happened, and the user needs to know work was thrown away.
 
 A session restart never clears a blocker. If its objective condition is already proven by
@@ -504,5 +505,5 @@ occupying, and the task file — not the worktree — was always the durable sta
 For a diagnosed bug, the committed reproduction and progress block are also durable state:
 discard later implementation freely, but preserve `diagnosis_commit` as the task baseline.
 
-**Do not start work in this skill.** Reconcile, report, and hand to `rune:work` or
-`rune:vision`. Continue answers *where are we*; the other skills answer *what next*.
+**Do not start work in this skill.** Reconcile, report, and hand to `work` or
+`vision`. Continue answers *where are we*; the other skills answer *what next*.

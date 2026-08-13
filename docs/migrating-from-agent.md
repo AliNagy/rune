@@ -3,14 +3,14 @@
 Rune 0.11 changes its durable coordination root from `.agent/` to `.rune/`. This is a
 storage-format change: do not rename only the directory or update only `.gitignore`.
 
-Rune ships no migration program. Every public route follows the internal `ai-root` skill
+Rune ships no migration program. Every route follows the internal `root` skill
 before reading coordination state. That protocol gives the agent one consistent migration
 interface while keeping Rune a skills-only instruction set.
 
 ## Skill-guided migration
 
-After updating Rune, invoke any public Rune skill from the orchestration checkout. Before
-reading state, `ai-root` instructs the agent to:
+After updating Rune, run `/rune:using-rune` from the orchestration checkout. Before
+reading state, `root` instructs the agent to:
 
 1. check that only one coordination root exists;
 2. confirm the legacy directory contains recognizable Rune state and no unsafe links;
