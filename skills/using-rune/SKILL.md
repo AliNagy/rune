@@ -15,7 +15,7 @@ enough state to route correctly, route, and get out of the way.
 This list is exhaustive, and it is the shortest in Rune:
 
 - **Run** only the exact bounded state probes named below.
-- **Follow** `root`; its narrowly scoped coordination migration is the sole write
+- **Follow** `rune-root`; its narrowly scoped coordination migration is the sole write
   exception for this otherwise read-only route.
 - **Read** the `<main_root>/.rune/` files named in step 1. Nothing else.
 - **Inspect** at most 20 top-level entry names, excluding Git and Rune coordination roots,
@@ -23,7 +23,7 @@ This list is exhaustive, and it is the shortest in Rune:
 - **Talk to the user** — one question if the route is genuinely ambiguous.
 - **Route** to another skill.
 
-**You write nothing directly and dispatch nothing.** `root` may perform its bounded,
+**You write nothing directly and dispatch nothing.** `rune-root` may perform its bounded,
 recoverable storage migration before you read state; it is the sole exception. Every
 other route earns its context by doing something; you earn yours by handing over early and
 leaving it empty for whoever you hand to.
@@ -39,22 +39,22 @@ git rev-parse --show-toplevel
 find <main_root> -mindepth 1 -maxdepth 1 ! -name .git ! -name .rune ! -name .agent -print | head -20
 ```
 
-The first returns exactly one line; the second returns at most 20 entry names. `root`
+The first returns exactly one line; the second returns at most 20 entry names. `rune-root`
 may run only its own separately bounded migration probe while this route follows it.
 
 ### Mutating lifecycle commands
 
-`none` — this route writes nothing; any `root` migration is internal to that skill.
+`none` — this route writes nothing; any `rune-root` migration is internal to that skill.
 
 ## Coordination-root preflight
 
 Resolve `main_root` once from the harness workspace root or the bounded probe
-`git rev-parse --show-toplevel`. Before any coordination read, follow `root` with
+`git rev-parse --show-toplevel`. Before any coordination read, follow `rune-root` with
 `work: coordination-root`, that absolute `main_root`, and `mode: resolve`. Stop and report any failure it returns. Resolve
 every `.rune/...` path below against the returned root. Never route from a task
 worktree's relative `.rune/` directory.
 
-Before consuming any followed or dispatched result, validate `taskfmt`'s common
+Before consuming any followed or dispatched result, validate `rune-taskfmt`'s common
 return envelope: `work` must equal the assigned token, `summary` must be one line, and
 `worktree`/`worktree_path` must agree. Only then read the worker-specific outcome.
 
@@ -72,8 +72,8 @@ Cheap reads only. Never source code.
 <main_root>/.rune/sessions/     · a recent session handoff?
 ```
 
-If `ledger.md` exists, validate it per `ledger` before routing from any task row. A
-schema-1 ledger or one with no schema marker routes to `continue` for the one-time legacy
+If `ledger.md` exists, validate it per `rune-ledger` before routing from any task row. A
+schema-1 ledger or one with no schema marker routes to `rune-continue` for the one-time legacy
 migration. An unknown schema or invalid schema-2 row is surfaced as a blocker; never route
 work from a partial parse.
 
@@ -83,29 +83,29 @@ State beats intent. Some conditions answer the question regardless of what was a
 
 | State | Go to | Why |
 |---|---|---|
-| `<main_root>/.rune/PAUSED` exists | `pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
-| schema-1 or schema-0 ledger | `continue` | Migrate and validate durable state before any other route trusts it. |
+| `<main_root>/.rune/PAUSED` exists | `rune-pause` | Report the pause and ask before anything else. Never route around a deliberate stop. |
+| schema-1 or schema-0 ledger | `rune-continue` | Migrate and validate durable state before any other route trusts it. |
 | a decision is `open` | surface it | Nothing can proceed. Show it, get an answer. |
 | a task is `awaiting` | surface it | An executor asked something and is blocked on the reply. |
-| a task is `diagnosing`, fresh session | `continue` | Reconcile the reserved bug worktree before planning. |
-| tasks `in_progress`, fresh session | `continue` | Reconcile before doing anything new. |
-| a `DRF-`, `INV-`, or `RES-` report slot is pending or blocked | `continue` | Promote, recover, or surface its assigned artifact before reusing state. |
-| no `<main_root>/.rune/`, repo has code | `init` → `vision` | Nothing is known yet. |
-| no `<main_root>/.rune/`, empty directory | `vision` | New project; init comes after the stack exists. |
+| a task is `diagnosing`, fresh session | `rune-continue` | Reconcile the reserved bug worktree before planning. |
+| tasks `in_progress`, fresh session | `rune-continue` | Reconcile before doing anything new. |
+| a `DRF-`, `INV-`, or `RES-` report slot is pending or blocked | `rune-continue` | Promote, recover, or surface its assigned artifact before reusing state. |
+| no `<main_root>/.rune/`, repo has code | `rune-init` → `rune-vision` | Nothing is known yet. |
+| no `<main_root>/.rune/`, empty directory | `rune-vision` | New project; init comes after the stack exists. |
 
 Otherwise route on what they said:
 
 | They said something like | Goes to |
 |---|---|
-| "start a new project", "I want to build…" | `vision` |
-| "what's the state of this repo", "set it up" | `init` |
-| "carry on", "where were we" | `continue` |
-| "add X", "fix Y", "clean up Z", "why is W slow" | `work` |
-| "stop", "hold on", "pause" | `pause` |
-| "I need a fresh session", "context is full" | `handoff` |
+| "start a new project", "I want to build…" | `rune-vision` |
+| "what's the state of this repo", "set it up" | `rune-init` |
+| "carry on", "where were we" | `rune-continue` |
+| "add X", "fix Y", "clean up Z", "why is W slow" | `rune-work` |
+| "stop", "hold on", "pause" | `rune-pause` |
+| "I need a fresh session", "context is full" | `rune-handoff` |
 | "what can you do" | explain, below |
 
-`work` handles bugs, features, refactors, and questions — it triages against real code.
+`rune-work` handles bugs, features, refactors, and questions — it triages against real code.
 Do not try to classify those yourself; you have not looked at the code and it is the one
 distinction that genuinely needs evidence.
 
@@ -126,7 +126,7 @@ Conservative means: investigate over change, plan over build, ask over assume.
 
 ## 4. With no argument
 
-Report where things stand and offer the obvious next step. Follow `report`.
+Report where things stand and offer the obvious next step. Follow `rune-report`.
 
 ```
 TL;DR

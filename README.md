@@ -30,9 +30,13 @@ Run `/reload-plugins` if the install summary asks for it. Then use `/rune:using-
 npx skills install AliNagy/rune --all
 ```
 
-`--all` installs all 28 skills to every detected agent with no prompts. Drop it and you get
-a picker with nothing preselected. This path installs bare skill names, so the command is
-`/using-rune` and there is no `rune:` prefix.
+`--all` installs all 28 skills to every detected agent with no prompts; drop it and you get
+a picker where one keystroke on the **Rune** group selects the set. Here the command is
+`/using-rune`, without the `rune:` prefix.
+
+Note that `--all` skips the overwrite confirmation. The 27 internal skills are named
+`rune-*` so they cannot collide, but `using-rune` will replace any skill of yours by that
+name.
 
 **From a local clone:**
 
@@ -131,36 +135,40 @@ overlap.
 .claude-plugin/    plugin.json, marketplace.json
 
 skills/
-  using-rune      the only command; routes to everything below
+  using-rune           the only command; routes to everything below
 
-  root            coordination-root identity and legacy migration
-  taskfmt         the file formats everything else depends on
-  ledger          state updates, and cleaning up after a crash
-  report          when to talk to the user, and how
-  serena          reading code without spending much context
-  oracle          finding and running the pass/fail check
-  init            establishing the oracle and mapping the codebase
-  survey          looking around an unfamiliar codebase
-  vision          the interview, decisions, and the milestone graph
-  work            the build loop: triage, decompose, dispatch, verify, land
-  triage          bug, feature, refactor, or question
-  decompose       milestone to tasks, and how big a task should be
-  size            could one fresh executor actually finish this
-  execute         doing one task: worktree, evidence, publishing its commit
-  bug             reproduce in a reserved task worktree before planning
-  feature         thin end-to-end slices, open questions decided first
-  refactor        cover behaviour with tests first, then leave them alone
-  investigate     read-only, ends in an answer
-  research        evidence from outside the repo, graded and cited
-  verify          an independent second check
-  verify-finding  checking a claim nobody asked for
-  land            merging the exact verified commit, backing it out if checks break
-  drift           when the plan turns out to be wrong
-  recover         salvaging a task that stopped halfway
-  pause           stop cleanly, and check whether work is stopped
-  handoff         moving to a fresh session before context fills
-  continue        picking up in a fresh session
+  rune-root            coordination-root identity and legacy migration
+  rune-taskfmt         the file formats everything else depends on
+  rune-ledger          state updates, and cleaning up after a crash
+  rune-report          when to talk to the user, and how
+  rune-serena          reading code without spending much context
+  rune-oracle          finding and running the pass/fail check
+  rune-init            establishing the oracle and mapping the codebase
+  rune-survey          looking around an unfamiliar codebase
+  rune-vision          the interview, decisions, and the milestone graph
+  rune-work            the build loop: triage, decompose, dispatch, verify, land
+  rune-triage          bug, feature, refactor, or question
+  rune-decompose       milestone to tasks, and how big a task should be
+  rune-size            could one fresh executor actually finish this
+  rune-execute         doing one task: worktree, evidence, publishing its commit
+  rune-bug             reproduce in a reserved task worktree before planning
+  rune-feature         thin end-to-end slices, open questions decided first
+  rune-refactor        cover behaviour with tests first, then leave them alone
+  rune-investigate     read-only, ends in an answer
+  rune-research        evidence from outside the repo, graded and cited
+  rune-verify          an independent second check
+  rune-verify-finding  checking a claim nobody asked for
+  rune-land            merging the exact verified commit, backing it out if checks break
+  rune-drift           when the plan turns out to be wrong
+  rune-recover         salvaging a task that stopped halfway
+  rune-pause           stop cleanly, and check whether work is stopped
+  rune-handoff         moving to a fresh session before context fills
+  rune-continue        picking up in a fresh session
 ```
+
+The `rune-` prefix is what keeps a plain `npx skills install` from colliding with your own
+skills, or with Claude Code's bundled ones. Under the plugin the namespace does that job
+already, so the prefix is only ever visible to the agent.
 
 There is no `agents/` directory. Every worker is an ordinary subagent told which skill to
 follow, so a skill is the only thing Rune defines and the only thing a harness has to
@@ -174,8 +182,8 @@ break the `.rune/` file formats.
 
 ## Status
 
-**Not yet production-tested.** `v0.13.0` collapses the interface to one command and drops
-the `ai-` prefix from the internal skills. Rune has not been run end to end on a real
+**Not yet production-tested.** `v0.14.0` collapses the interface to one command and renames
+the 27 internal skills to `rune-*` so a non-plugin install cannot collide with anything. Rune has not been run end to end on a real
 repository. Expect to adjust the 200-token subagent return limit, Windows worktree paths,
 and whether the plan-approval stop lands at the right moments.
 

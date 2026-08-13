@@ -5,22 +5,18 @@ There is no generator, executable adapter, or runtime package in this repository
 
 ## Install
 
-Install the skill sources into OpenCode's skill directory while applying these mechanical
-naming changes:
+Copy this repository's `skills/` directory into OpenCode's skill directory. The names
+already carry the `rune-` prefix, so nothing has to be rewritten — keep the directory
+names, the frontmatter `name` fields, and `user-invocable: false` exactly as they are,
+even though OpenCode currently displays skills marked that way.
 
-1. Prefix every installed skill directory and its frontmatter `name` with `rune-`.
-2. Rewrite every internal skill reference to match — `` `work` `` becomes `` `rune-work` ``.
-3. Keep `user-invocable: false` in the copied frontmatter even though OpenCode currently
-   displays those skills.
-
-The canonical source remains this repository's `skills/` directory. The adaptation is an
-installation concern, not a second implementation checked into Rune. After updating the
-repository, repeat the same mechanical copy from the canonical skills.
+The canonical source remains this repository's `skills/` directory. After updating the
+repository, repeat the same copy.
 
 There is one user-facing command:
 
 ```text
-/rune-using-rune
+/using-rune
 ```
 
 `rune-root` performs the coordination-root protocol as agent instructions. It does not
@@ -61,7 +57,7 @@ checkout. A successful lander removes the worktree; abandoned paths remain under
 
 OpenCode may display all twenty-seven internal skills even though their frontmatter says
 `user-invocable: false`. They are model-facing protocols and should not be called directly
-by the user; `rune-using-rune` reaches them all.
+by the user; `using-rune` reaches them all.
 
 Do not deny them through skill permissions merely to hide them: that would also prevent
-`rune-using-rune` from loading the protocols it routes to.
+`using-rune` from loading the protocols it routes to.
