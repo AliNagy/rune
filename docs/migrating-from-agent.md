@@ -3,14 +3,14 @@
 Rune 0.11 changes its durable coordination root from `.agent/` to `.rune/`. This is a
 storage-format change: do not rename only the directory or update only `.gitignore`.
 
-Rune ships no migration program. Every public route follows the internal `ai-root` skill
+Rune ships no migration program. Every route follows the internal `rune-root` skill
 before reading coordination state. That protocol gives the agent one consistent migration
 interface while keeping Rune a skills-only instruction set.
 
 ## Skill-guided migration
 
-After updating Rune, invoke any public Rune skill from the orchestration checkout. Before
-reading state, `ai-root` instructs the agent to:
+After updating Rune, run `/rune:using-rune` from the orchestration checkout. Before
+reading state, `rune-root` instructs the agent to:
 
 1. check that only one coordination root exists;
 2. confirm the legacy directory contains recognizable Rune state and no unsafe links;
@@ -20,7 +20,7 @@ reading state, `ai-root` instructs the agent to:
    `.rune/` in one same-filesystem rename;
 5. rewrite known structured Rune pointers and the exact `.agent/worktrees/` ignore entry;
 6. validate a schema-2 ledger, or preserve a recognized schema-1/schema-0 ledger for
-   `continue` to upgrade, and remove the marker and lock only after every rewrite succeeds.
+   `rune-continue` to upgrade, and remove the marker and lock only after every rewrite succeeds.
    An unknown schema stops the migration.
 
 Re-running the protocol is safe. If the session stops, its lock remains so a concurrent
@@ -47,7 +47,7 @@ Rune's documented layout and contain an independent ownership signal such as ini
 configuration, a complete schema-2 Rune ledger, a recognizable schema-1/schema-0 Rune
 ledger, an interrupted vision-and-decisions pair, a Rune map or session handoff, or a
 schema-valid Rune task artifact. Unknown top-level entries make ownership ambiguous and
-stop the migration. A recognized older ledger is preserved for `continue` to upgrade
+stop the migration. A recognized older ledger is preserved for `rune-continue` to upgrade
 after root migration; it is not treated as schema 2.
 
 Only exact absolute paths under the legacy Rune root and enumerated structured pointer

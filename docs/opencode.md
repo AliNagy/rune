@@ -5,33 +5,21 @@ There is no generator, executable adapter, or runtime package in this repository
 
 ## Install
 
-Install the skill sources into OpenCode's skill directory while applying these mechanical
-naming changes:
+Copy this repository's `skills/` directory into OpenCode's skill directory. The names
+already carry the `rune-` prefix, so nothing has to be rewritten — keep the directory
+names, the frontmatter `name` fields, and `user-invocable: false` exactly as they are,
+even though OpenCode currently displays skills marked that way.
 
-1. Prefix every installed skill directory and its frontmatter `name` with `rune-`.
-2. Rewrite every `rune:<name>` reference to `rune-<name>`, preserving a leading `/` when
-   present.
-3. Rewrite internal `ai-<name>` references to `rune-ai-<name>`.
-4. Keep `user-invocable: false` in the copied frontmatter even though OpenCode currently
-   displays those skills.
+The canonical source remains this repository's `skills/` directory. After updating the
+repository, repeat the same copy.
 
-The canonical source remains this repository's `skills/` directory. The adaptation is an
-installation concern, not a second implementation checked into Rune. After updating the
-repository, repeat the same mechanical copy from the canonical skills.
-
-The user-facing commands become:
+There is one user-facing command:
 
 ```text
-/rune-hello
-/rune-init
-/rune-vision
-/rune-work
-/rune-pause
-/rune-handoff
-/rune-continue
+/using-rune
 ```
 
-`rune-ai-root` performs the coordination-root protocol as agent instructions. It does not
+`rune-root` performs the coordination-root protocol as agent instructions. It does not
 invoke a bundled resolver.
 
 ## Serena
@@ -56,20 +44,20 @@ Rune leans on Serena heavily. Add it to `opencode.json` if it is not already ava
 ### No harness-level worktree allocation
 
 The parent assigns every task one absolute worktree path before its first task-bound
-worker. For a bug, `rune-ai-bug` creates that exact checkout before writing its
+worker. For a bug, `rune-bug` creates that exact checkout before writing its
 reproduction; for other tasks, the first executor creates it. Every later executor,
 verifier, recoverer, and lander receives and validates the same path.
 
 All coordination reads and writes use the separately supplied absolute main-checkout path.
 Neither harness may substitute the worker's starting directory or a fresh anonymous
 checkout. A successful lander removes the worktree; abandoned paths remain under
-`.rune/worktrees/` until `/rune-continue` reconciles them.
+`.rune/worktrees/` until the next reconciliation run.
 
 ### Internal skills remain visible
 
-OpenCode may display the twenty-one `rune-ai-*` skills even though their frontmatter says
-`user-invocable: false`. They are model-facing protocols and should not normally be called
-directly by the user.
+OpenCode may display all twenty-seven internal skills even though their frontmatter says
+`user-invocable: false`. They are model-facing protocols and should not be called directly
+by the user; `using-rune` reaches them all.
 
-Do not deny `rune-ai-*` through skill permissions merely to hide them: that would also
-prevent Rune's parent skills from loading the protocols they depend on.
+Do not deny them through skill permissions merely to hide them: that would also prevent
+`using-rune` from loading the protocols it routes to.

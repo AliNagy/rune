@@ -1,93 +1,75 @@
 # Rune
 
-A Claude Code plugin for building software **without any single context window filling
-up**.
+A skill set for building software without any single context window filling up.
 
-The idea: you can't get small contexts by telling an agent to be brief. You get them by
-keeping the project's state on disk instead of in the conversation. The plan is the part
-that lasts; every agent is short-lived — it loads one slice of the plan, does the work,
-writes the result back, and exits.
-
-Target: under ~150k context per piece of work, on projects of any size.
+State lives on disk, not in the conversation. Every agent is short-lived: it loads one
+slice of the plan, does the work, writes the result back, and exits. Target is under ~150k
+context per piece of work, on projects of any size.
 
 ## Requirements
 
-| | |
-|---|---|
-| **Claude Code** | Recent enough to have `/plugin`. Run `/help` — if you don't see it, update. |
-| **git** | Required. Every task runs in its own worktree; partial work lives in `git diff`, while completed work is published as a commit that Rune verifies and lands by SHA. Without git there is no durable handoff or safe rollback. |
-| **[Serena](https://github.com/oraios/serena)** | Strongly recommended, as an MCP server. Looking up individual functions and classes beats reading whole files, and it saves more context than anything else here. Rune works without it, but each task gets much less room. |
+- **git** — every task runs in its own worktree
+- **[Serena](https://github.com/oraios/serena)** as an MCP server — strongly recommended;
+  symbol lookup instead of whole-file reads is the single biggest context saving here
+- **Claude Code** with `/plugin`, or any agent the `skills` CLI supports
 
 ## Install
+
+**Claude Code plugin** — keeps the `rune:` namespace:
 
 ```
 /plugin marketplace add AliNagy/rune
 /plugin install rune@rune
 ```
 
-If the install summary says to, run `/reload-plugins`.
+Run `/reload-plugins` if the install summary asks for it. Then use `/rune:using-rune`.
 
-To try it against a local clone before installing:
+**Any agent, via the skills CLI:**
+
+```bash
+npx skills install AliNagy/rune --all
+```
+
+`--all` installs all 28 skills to every detected agent with no prompts; drop it and you get
+a picker where one keystroke on the **Rune** group selects the set. Here the command is
+`/using-rune`, without the `rune:` prefix.
+
+Note that `--all` skips the overwrite confirmation. The 27 internal skills are named
+`rune-*` so they cannot collide, but `using-rune` will replace any skill of yours by that
+name.
+
+**From a local clone:**
 
 ```bash
 claude --plugin-dir /path/to/rune
 ```
 
-Everything installs together — there is nothing to copy by hand.
-
-### OpenCode
-
-Rune ships only skills, with no generator or runtime package. OpenCode can use the same
-skill sources after applying its `rune-` naming convention during installation. See
-[docs/opencode.md](docs/opencode.md) for the small manual adaptation and the remaining
-harness differences. Rune does not depend on an anonymous harness-created checkout: every
-task gets one stable absolute worktree path that diagnosis workers, executors, verifiers,
-recoverers, and landers reuse.
+For OpenCode, see [docs/opencode.md](docs/opencode.md).
 
 ## Use
 
-One command, and you don't need to know the others:
+One command:
 
 ```
-/rune:hello
+/rune:using-rune
 ```
 
-Say what you want in plain language — "start a new project", "fix the login bug", "where
-were we", "stop". It reads the state, works out where that goes, and takes you there.
+Then say what you want in plain language. It reads the project state and routes you.
 
-The direct commands still exist if you prefer them:
-
-| You want to | Run |
+| You say | What happens |
 |---|---|
-| Start on a repo for the first time | `/rune:init` |
-| Map out what you're building | `/rune:vision` |
-| Build a feature, fix a bug, refactor | `/rune:work` |
-| Stop work cleanly, or check if it's stopped | `/rune:pause` |
-| Move to a fresh session before context fills | `/rune:handoff` |
-| Pick up in a fresh session | `/rune:continue` |
+| "set this repo up" | finds and runs the command that proves the code works, maps the codebase |
+| "start a new project" | interviews you, records decisions, writes milestones |
+| "add X" / "fix Y" / "clean up Z" / "why is W slow" | triages against real code, cuts tasks, builds and verifies each one |
+| "stop" | finishes what is running, leaves the tree clean |
+| "where were we" | reconciles state left by a dead session and picks up |
+| "context is full" | writes a handoff block for a fresh session |
 
-The twenty-one `ai-*` skills load themselves when they're needed and stay out of your
-slash-command list.
-
-Typical first run on an existing project:
-
-```
-/rune:init        finds and runs the command that proves the code works, maps the codebase
-/rune:vision      looks around, asks you questions, notes what doesn't match, writes milestones
-/rune:work        breaks milestone 1 into tasks and starts building
-```
-
-New project, no code yet: `/rune:vision` first — init runs afterward, once there's a stack
-to look at.
-
-Before final task files or production implementation are written, work stops after
-independent draft cuts and shows you the proposed plan, its harmless implementation
-assumptions, and what it leaves out. Any behaviour or scope choice becomes a recorded
-decision and fresh planners receive that settled input. You can't turn the gate off.
+That is the whole interface. The other 27 skills are marked not user-invocable — the agent
+loads them itself when the situation calls for one, so they stay out of your command list
+and out of your context until they are needed.
 
 ## What Rune writes into your repo
-
-Everything worth keeping lives in `.rune/`:
 
 ```
 .rune/
@@ -96,223 +78,118 @@ Everything worth keeping lives in `.rune/`:
   vision.md              the vision document
   decisions.md           decisions made and still open — open ones block milestones
   milestones.md          the road to v1
-  ledger.md              versioned task state, attempts, blockers, and resume points; parent-written
-  drafts/M-nn/R-nnn/     selected protocol, planner cuts, and drift replacement map
-  tasks/T-nnn.md         immutable task specs; never edited, overwritten, or deleted
-  notes/T-nnn.md         handoff notes and long results
-  notes/{INV,RES}-nnn.md  promoted investigation and research answers
-  notes/open/             assigned investigation/research reports awaiting atomic promotion
-  drift/DRF-nnn.md       what the plan got wrong, and which tasks that invalidates
-  drift/open/             assigned drift reports awaiting atomic promotion
-  findings/FND-nnn.md    things noticed in passing, after a second agent checked them
-  findings/open/         unchecked claims, and verified records awaiting promotion
-  decisions/open/        per-task-attempt questions awaiting parent-assigned decision ids
+  ledger.md              task state, attempts, blockers, resume points
+  drafts/M-nn/R-nnn/     protocol, planner cuts, drift replacement map
+  tasks/T-nnn.md         immutable task specs; never edited or deleted
+  notes/                 handoff notes, promoted investigation and research answers
+  drift/                 what the plan got wrong, and which tasks that invalidates
+  findings/              things noticed in passing, after a second agent checked them
   sessions/              session handoffs for fresh-context recovery
-  worktrees/             disposable task checkouts; ignored by Git
+  worktrees/             disposable task checkouts; gitignore this one
 ```
 
-Rune also writes a short block into your `CLAUDE.md`, between `<!-- rune:begin -->` and
-`<!-- rune:end -->`, so an agent opening the project knows which command to reach for and
-how to talk to you. Everything outside those markers is left alone.
+**Commit it.** Vision, decisions, milestones, and ledger are project knowledge worth
+reviewing. Add `.rune/worktrees/` to `.gitignore`.
 
-**Commit it.** The vision, decisions, milestones, and ledger are project knowledge worth
-versioning and reviewing — they're written to be read by people, not just agents.
-Worktrees are the exception; add `.rune/worktrees/` to your `.gitignore`.
+Rune also writes a short playbook into your `CLAUDE.md` between `<!-- rune:begin -->` and
+`<!-- rune:end -->`. Everything outside those markers is left alone.
 
-Background that only agents need — how a subsystem works, where the sharp edges are — goes
-into Serena memories rather than `.rune/`, so the files people read stay readable.
-
-### Upgrading existing repositories
-
-Rune 0.11 changes the coordination-root storage format. Public commands migrate the old
-layout before reading state and fail closed if two roots or active legacy task worktrees
-make that unsafe. See [the migration guide](docs/migrating-from-agent.md) before upgrading
-a repository with work in flight.
+Upgrading a repo with work in flight? Read
+[the migration guide](docs/migrating-from-agent.md) first.
 
 ## How it works
 
-You invoke one skill; it loads the others.
+**Set up** — find and *run* the pass/fail command that proves the codebase works. If there
+isn't one, say so loudly and work in a reduced mode.
 
-Rune is 26 skills, but only seven can be called by name — `hello`, `init`, `vision`,
-`work`, `pause`, `handoff`, `continue` — and `hello` picks between those for you. The other
-twenty-one are marked as not user-invocable. The agent loads them itself when the situation
-calls for one: `/rune:work` triages a request as a bug and pulls in `ai-bug`; the agent it
-sends off to write the code pulls in `ai-taskfmt` and `ai-serena`.
+**Plan** — interview, then milestones. Every open choice becomes a written decision, and no
+milestone is generated while a decision it depends on is unanswered.
 
-The reason is the same one behind everything else here. Instructions for all 26 skills in
-one context window would crowd out your actual code, and most of them are irrelevant at any
-given moment. Loading them on demand means each agent carries only the rules for the job in
-front of it — and you only have to remember one command.
+**Build** — triage into bug / feature / refactor / investigation, cut the current milestone
+into tasks *only when it's time to build them*, send each to its own agent, then check each
+in a separate fresh context. Up to three run in parallel when their file lists don't
+overlap.
 
-Four phases:
-
-**1 · Set up** — `/rune:init` finds and *runs* the pass/fail command that proves the
-codebase works (`rune.yml` calls it the oracle). If there isn't one, it says so loudly and
-works in a reduced mode rather than pretending otherwise. It also maps modules,
-conventions, and risky areas.
-
-**2 · Plan** — `/rune:vision` asks you about the project to build the vision, then breaks
-it into milestones. Every open choice is written down as a decision, and **no milestone can
-be generated while a decision it depends on is unanswered** — which is what turns "suggest,
-never assume" into something you can check.
-
-**3 · Build** — `/rune:work` sorts the request into bug / feature / refactor /
-investigation (each has its own approach), breaks the current milestone into tasks — only
-when it's time to build them, against real code — sends each task to its own agent, then
-checks each one in a separate, fresh context. The selected bug, feature, or refactor
-protocol is written into each planning run before independent planners start, so their
-fresh contexts all apply the same type-specific rules. They write to distinct draft
-artifacts first; one fresh reconciler compares those complete cuts and is the only worker
-that creates final task files, so parallel planning cannot race on task ids or files.
-
-**4 · Resume** — `/rune:continue` reads disk, sorts out state left behind by a dead
-session, and puts you back into whichever phase you were in.
+**Resume** — read disk, sort out what a dead session left behind, carry on.
 
 ## Why it's built this way
 
-**Context is the budget.** The main session never reads source code — it holds the ledger
-and short reports, nothing else. One "just checking" file read would bring back the exact
-cost the design exists to avoid. Subagents return 200 tokens or less; anything longer goes
-to disk. Each one carries exactly one issue — one bug, one task, one question, never a
-batch — so three reported bugs get three agents, running at the same time if they can;
-that keeps evidence from one out of the reading of another, and keeps one agent from
-holding three working sets. And an agent in trouble writes a handoff note and exits rather
-than pausing, because resuming an agent keeps its context, which is the opposite of what
-you want here. A fresh one starts again from the task file — with Serena, about 10k to get
-back up to speed.
-
-**Interrupting it is safe.** Every task runs in its own git worktree. An unfinished task's
-`git diff` is the authoritative partial record; a finished task is committed, and that
-commit SHA is recorded on disk before an independent agent verifies it. Changes are always
-made *before* they're recorded, so the only thing that can go missing is a record — and
-that fixes itself, because the next agent finds the step already done. The other order
-would leave a record with no change behind it, and real work would get skipped. That
-ordering is also what makes a killed session recoverable rather than merely resettable:
-the diff can be matched against the task's steps to find where to resume. `/rune:pause`
-stops new work but lets what's running finish and land, so you're never left with a
-half-applied change, and the flag lives on disk so nothing clears it quietly.
-
-**Checkout identity is explicit.** Every worker receives the absolute orchestration
-checkout path. Task-bound workers also receive one absolute task-worktree path, allocated
-before their first source write and kept unchanged through diagnosis, retries, verification,
-recovery, and landing. A bug reserves its task id and creates that worktree before its
-reproduction test is written; planning then consumes the committed failing check.
-Coordination files are always read and written through the orchestration path, so an
-uncommitted task file cannot disappear merely because a worker started in another
-worktree. A verifier must inspect the executor's exact kept worktree; a clean anonymous
-checkout is rejected rather than mistaken for the artifact.
-
-**Work is checked, not claimed.** A task's test must be seen *failing* before the change is
-made, with the evidence recorded — a test written after the fix and never seen failing
-proves nothing, and a reviewer in a fresh context can't tell the two apart. For a bug,
-that happens during task-bound diagnosis before planning; the executor later reconfirms
-the same failure before implementing the fix. Each finished task is then committed and
-checked by a different agent that never saw the work. The SHA
-that agent approves is the only SHA the lander may merge. Tasks are self-contained
-— goal, files it may touch, what counts as done, its test — so any one can be run, retried,
-or reviewed without knowing about the others, and up to three run in parallel when their
-file lists don't overlap, merged one at a time with the checks re-run after each. A merge
-that breaks those checks is rolled straight back out, with the reason written down, so the
-main tree is never left broken while the records claim otherwise. Milestones
-are planned in full, but tasks only when it's time to build them: a task has to name real
-files, and for a milestone three steps out those files don't exist yet.
-
-**Task size is checked, not assumed.** A task is capped at five files and one outcome, but
-five files in one module and five files across three subsystems are not the same job, and
-the planner holding the whole milestone is the least able to tell them apart. So every new
-task is registered as *unsized* and read cold by a fresh agent, which answers one question:
-could one executor finish this — understanding, code, tests, handoff — with room left over?
-Only a pass makes it dispatchable. Too big comes back with the seam named and gets re-cut,
-and the replacements are sized too, because a second cut can also be wrong.
-
-**A guess is not a finding.** Agents notice things they weren't asked about — a bug two
-files over, a test passing for the wrong reason. Those arrive already phrased as facts,
-from an agent that glanced at the code for a few seconds while thinking about something
-else. So it writes the claim down, says plainly how little it actually looked, and carries
-on. A fresh agent that never saw the work then checks it and records confirmed, refuted, or
-inconclusive. Only confirmed ones reach you, and even those become work only if you say so.
-Refuted claims are kept on purpose, so the same wrong observation isn't raised again in
-three months.
-
-**A wrong plan stays legible.** Drift never patches or overwrites a task specification.
-The obsolete unfinished task becomes a terminal retired row, fresh replacement work gets
-new task ids and files, and the ledger records the immediate old-to-new relationship (or
-that no replacement is needed). Completed tasks remain completed history. A crash before
-the atomic ledger update leaves the old tasks blocked and the unregistered new ids burned,
-so recovery cannot mistake half a replan for live work.
-
-**You decide the things worth deciding.** Every run stops before final task reconciliation
-to show you the candidate plan, harmless implementation assumptions, and what it is
-deliberately leaving out — then asks what you'd like to add. There's no flag to skip it.
-An agent that hits a
-choice you'd want a say in writes down the question and its recommendation and stops rather
-than guessing, but only when the answer changes behaviour you'd notice and neither the task
-nor the surrounding code settles it. You get an update after each task, batch, milestone,
-and blocker: summary first, plain words.
+- **Context is the budget.** The main session never reads source code. Subagents return 200
+  tokens or less; anything longer goes to disk. One agent, one issue.
+- **Interrupting is safe.** Each task is a git worktree. Unfinished work is its `git diff`;
+  finished work is a commit, verified by SHA before it lands.
+- **Work is checked, not claimed.** A task's test must be seen *failing* before the fix,
+  with the evidence recorded. A different agent, which never saw the work, verifies it.
+- **Task size is checked, not assumed.** Every new task is read cold by a fresh agent that
+  answers one question: could one executor finish this with room left over?
+- **A guess is not a finding.** Things noticed in passing are written down as claims, then
+  checked by an agent that never saw the work. Only confirmed ones reach you.
+- **A wrong plan stays legible.** Drift never patches a task spec. The obsolete task is
+  retired, replacements get new ids, and the ledger records the relationship.
+- **You decide the things worth deciding.** Every run stops before final task files to show
+  you the plan, its assumptions, and what it leaves out. There's no flag to skip it.
 
 ## Layout
 
 ```
-.claude-plugin/
-  plugin.json        the manifest
-  marketplace.json   so the repo can be installed directly
+.claude-plugin/    plugin.json, marketplace.json
 
 skills/
-  hello                                 the one command that routes to the rest
-  init  vision  work                    or call these directly, as /rune:<name>
-  pause  handoff  continue
+  using-rune           the only command; routes to everything below
 
-  ai-root         coordination-root identity and legacy migration
-  ai-taskfmt      the file formats everything else depends on
-  ai-report       when to talk to the user, and how
-  ai-serena       reading code without spending much context
-  ai-recover      salvaging a task that stopped halfway
-  ai-oracle       finding and running the pass/fail check
-  ai-survey       looking around an unfamiliar codebase
-  ai-triage       is it a bug, a feature, a refactor, or a question
-  ai-decompose    milestone to tasks, and how big a task should be
-  ai-execute      doing one task: worktree, required evidence, publishing its commit
-  ai-bug          reproduce in a reserved task worktree before planning
-  ai-feature      thin end-to-end slices, open questions decided first
-  ai-refactor     cover behaviour with tests first, then leave them alone
-  ai-investigate  read-only, ends in an answer
-  ai-research     evidence from outside the repo, graded and cited
-  ai-drift        when the plan turns out to be wrong
-  ai-verify       an independent second check
-  ai-land         merging the exact verified commit, and backing it out if checks break
-  ai-ledger       state updates, and cleaning up after a crash
+  rune-root            coordination-root identity and legacy migration
+  rune-taskfmt         the file formats everything else depends on
+  rune-ledger          state updates, and cleaning up after a crash
+  rune-report          when to talk to the user, and how
+  rune-serena          reading code without spending much context
+  rune-oracle          finding and running the pass/fail check
+  rune-init            establishing the oracle and mapping the codebase
+  rune-survey          looking around an unfamiliar codebase
+  rune-vision          the interview, decisions, and the milestone graph
+  rune-work            the build loop: triage, decompose, dispatch, verify, land
+  rune-triage          bug, feature, refactor, or question
+  rune-decompose       milestone to tasks, and how big a task should be
+  rune-size            could one fresh executor actually finish this
+  rune-execute         doing one task: worktree, evidence, publishing its commit
+  rune-bug             reproduce in a reserved task worktree before planning
+  rune-feature         thin end-to-end slices, open questions decided first
+  rune-refactor        cover behaviour with tests first, then leave them alone
+  rune-investigate     read-only, ends in an answer
+  rune-research        evidence from outside the repo, graded and cited
+  rune-verify          an independent second check
+  rune-verify-finding  checking a claim nobody asked for
+  rune-land            merging the exact verified commit, backing it out if checks break
+  rune-drift           when the plan turns out to be wrong
+  rune-recover         salvaging a task that stopped halfway
+  rune-pause           stop cleanly, and check whether work is stopped
+  rune-handoff         moving to a fresh session before context fills
+  rune-continue        picking up in a fresh session
 ```
+
+The `rune-` prefix is what keeps a plain `npx skills install` from colliding with your own
+skills, or with Claude Code's bundled ones. Under the plugin the namespace does that job
+already, so the prefix is only ever visible to the agent.
 
 There is no `agents/` directory. Every worker is an ordinary subagent told which skill to
 follow, so a skill is the only thing Rune defines and the only thing a harness has to
-understand. Agent definitions bought two things — a tool allowlist and a model tier — and
-every harness spells both differently, while behaviour split across two files meant rules
-that lived in one and not the other. The trade is real: a verifier that *could not* edit is
-now a verifier that is told not to, so the skills that rely on that say it plainly rather
-than assuming a wall is there.
+understand.
 
 ## Versioning
 
-Tagged `vMAJOR.MINOR.PATCH`, matching `version` in `plugin.json`. Because that field is
-set, installed copies only update when it changes — so every release bumps it.
-
-Before 1.0, minor versions may break the `.rune/` file formats. `/rune:continue` will tell
-you if it finds a layout it doesn't recognise rather than guessing.
+Tagged `vMAJOR.MINOR.PATCH`, matching `version` in `plugin.json`. Installed copies only
+update when that field changes, so every release bumps it. Before 1.0, minor versions may
+break the `.rune/` file formats.
 
 ## Status
 
-**Not yet production-tested.** `v0.12.1` makes report publication collision-safe: the
-parent reserves every drift, investigation, and research id and output path before work
-starts, workers write distinct staging files, and complete reports are promoted atomically.
-Rune has not yet been run end to end on a real repository. Expect to adjust:
+**Not yet production-tested.** `v0.14.0` collapses the interface to one command and renames
+the 27 internal skills to `rune-*` so a non-plugin install cannot collide with anything. Rune has not been run end to end on a real
+repository. Expect to adjust the 200-token subagent return limit, Windows worktree paths,
+and whether the plan-approval stop lands at the right moments.
 
-- the 200-token limit on what subagents return (models go over it)
-- how worktrees behave on Windows paths
-- whether stopping for plan approval happens at the right times or just gets annoying
-
-Start with `/rune:init` on a low-stakes repo. It does not edit source code, but it writes
-`.rune/` coordination state, updates the worktree ignore entry, and may migrate recognized
-legacy Rune state before it looks for the test command for your stack.
+Start on a low-stakes repo. Rune does not edit source code before you approve a plan, but
+it does write `.rune/` state, update the worktree ignore entry, and may migrate recognized
+legacy state.
 
 ## License
 

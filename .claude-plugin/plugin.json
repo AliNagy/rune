@@ -1,7 +1,7 @@
 {
   "name": "rune",
   "description": "A context-budgeted development workflow. Maps a project's road to v1, then executes it as encapsulated tasks in isolated worktrees, keeping every unit of work under ~150k context by holding all state on disk.",
-  "version": "0.12.1",
+  "version": "0.14.0",
   "author": {
     "name": "Ali Nagy",
     "email": "alinagy50@gmail.com",
@@ -17,5 +17,35 @@
     "subagents",
     "serena",
     "tdd"
+  ],
+  "skills": [
+    "./skills/using-rune",
+    "./skills/rune-bug",
+    "./skills/rune-continue",
+    "./skills/rune-decompose",
+    "./skills/rune-drift",
+    "./skills/rune-execute",
+    "./skills/rune-feature",
+    "./skills/rune-handoff",
+    "./skills/rune-init",
+    "./skills/rune-investigate",
+    "./skills/rune-land",
+    "./skills/rune-ledger",
+    "./skills/rune-oracle",
+    "./skills/rune-pause",
+    "./skills/rune-recover",
+    "./skills/rune-refactor",
+    "./skills/rune-report",
+    "./skills/rune-research",
+    "./skills/rune-root",
+    "./skills/rune-serena",
+    "./skills/rune-size",
+    "./skills/rune-survey",
+    "./skills/rune-taskfmt",
+    "./skills/rune-triage",
+    "./skills/rune-verify",
+    "./skills/rune-verify-finding",
+    "./skills/rune-vision",
+    "./skills/rune-work"
   ]
 }
