@@ -1,5 +1,7 @@
 ---
 name: rune-verify
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Bash, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when confirming a completed task actually passed. Checks acceptance criteria, audits the task's declared verification evidence, and detects vacuous checks. Never used on work the same agent performed.
 ---

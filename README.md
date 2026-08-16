@@ -69,6 +69,21 @@ That is the whole interface. The other 27 skills are marked not user-invocable �
 loads them itself when the situation calls for one, so they stay out of your command list
 and out of your context until they are needed.
 
+### Optional: two lines in your CLAUDE.md
+
+Rune needs nothing in `CLAUDE.md` to work. If you want sessions to reach for it without
+being told, this is all that belongs there — it is loaded into every context, so keep it
+to what is true in all of them:
+
+```
+This project uses Rune. Start with the using-rune skill.
+Never hand-edit files under .rune/.
+```
+
+Do not copy Rune's rules into `CLAUDE.md`. They are role-specific — the coordinator must
+not edit source, its workers must — and a file loaded everywhere would hand both halves to
+every agent at once.
+
 ## What Rune writes into your repo
 
 ```
@@ -133,6 +148,7 @@ overlap.
 
 ```
 .claude-plugin/    plugin.json, marketplace.json
+hooks/             worktree-guard.py, wired from the skills that edit source
 
 skills/
   using-rune           the only command; routes to everything below

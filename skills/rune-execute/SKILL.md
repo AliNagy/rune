@@ -1,6 +1,14 @@
 ---
 name: rune-execute
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Edit, Bash, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
+hooks:
+  PreToolUse:
+    - matcher: Edit|Write|NotebookEdit|MultiEdit
+      hooks:
+        - type: command
+          command: "${CLAUDE_PLUGIN_ROOT}/hooks/worktree-guard.py"
 description: Use when executing one Rune task from an explicitly identified main checkout and task worktree. Covers worktree isolation, the change surface boundary, task-specific verification evidence, publishing a completed task as a commit, durable budget or blocker stops, and the return format. Never used by the dispatcher on its own behalf.
 ---
 
@@ -62,15 +70,15 @@ Both records can exist at once. They fail at different gates: the verify record 
 change did not meet its own acceptance, the landing record means it did and then broke the
 main tree on merge. Read both, and treat the later one as the live problem.
 
-## You are a subagent, and you have no special permissions
+## You are a subagent, and almost nothing here is enforced
 
-Nothing stops you from editing a file outside your change surface, verifying your own
-work, or answering the user directly. The boundaries below are not enforced by the harness
-and must hold because you keep them.
+Two boundaries are real. This skill declares `context: fork`, so you are running in your
+own context and cannot pollute the dispatcher's. And a `PreToolUse` hook rejects any edit
+to source outside a task worktree, so that one rule cannot be broken by accident.
 
-That is worth stating plainly rather than assuming: every rule here exists because
-breaking it is *easy* and the damage shows up somewhere else, in a context that cannot see
-what you did.
+Everything else below holds only because you keep it: staying inside your change surface,
+not verifying your own work, not answering the user directly. Those are still easy to
+break, and the damage shows up somewhere else, in a context that cannot see what you did.
 
 ## Bind the two checkout identities first
 

@@ -1,5 +1,7 @@
 ---
 name: rune-land
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Bash
 user-invocable: false
 description: Use when merging one verified task commit into the main tree. Binds the branch to the verifier's exact commit, merges it, re-runs the project oracle, reverts the merge if the oracle fails, and records why so the next attempt is not blind. Never used on unverified work, and never by the parent on its own behalf.
 ---

@@ -1,5 +1,7 @@
 ---
 name: rune-research
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, WebSearch, WebFetch
 user-invocable: false
 description: Use when a question needs evidence from outside this repository - prior art, library or vendor evaluation, spec and protocol detail, security advisories, benchmark claims, current best practice, or "how does everyone else solve this". Runs a systematic search, grades every source, and terminates in a cited written answer.
 ---

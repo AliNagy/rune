@@ -1,5 +1,7 @@
 ---
 name: rune-triage
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when classifying one Rune request as bug, feature, refactor, or investigation, using evidence from the codebase rather than the wording of the request. Read-only, tight budget, one request per dispatch.
 ---

@@ -1,5 +1,7 @@
 ---
 name: rune-recover
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Bash, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when a task was left mid-flight by a session that died and there is no handoff note explaining it. Reconstructs how far the work actually got from the worktree diff, decides whether it is salvageable, and names the exact resume point. Runs as a subagent.
 ---

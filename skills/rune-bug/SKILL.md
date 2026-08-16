@@ -1,6 +1,14 @@
 ---
 name: rune-bug
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Edit, Bash, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
+hooks:
+  PreToolUse:
+    - matcher: Edit|Write|NotebookEdit|MultiEdit
+      hooks:
+        - type: command
+          command: "${CLAUDE_PLUGIN_ROOT}/hooks/worktree-guard.py"
 description: Use when something that used to work no longer does, or a request is classified as a defect. Reproduces it inside a reserved task worktree before planning, finds root cause over symptom, and turns the reproduction into the regression test.
 ---
 

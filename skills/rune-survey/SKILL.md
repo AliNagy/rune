@@ -1,5 +1,7 @@
 ---
 name: rune-survey
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when mapping an unfamiliar or in-progress codebase - stack, modules, entry points, conventions, danger zones, and what is stubbed, orphaned, or half-built. Always runs as a subagent so the caller stays clean.
 ---

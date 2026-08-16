@@ -1,5 +1,7 @@
 ---
 name: rune-decompose
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Edit, Bash, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when turning a milestone or a triaged request into independent planner drafts and reconciled task files. Covers sizing limits, context contracts, forbidden lists, and dependency ordering. Runs just-in-time against real code, never ahead of time.
 ---

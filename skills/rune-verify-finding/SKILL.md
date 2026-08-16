@@ -1,5 +1,7 @@
 ---
 name: rune-verify-finding
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when a worker raised a claim about the codebase outside its own task and that claim needs checking before anyone treats it as true. Runs as a fresh subagent that never saw the work which produced it.
 ---

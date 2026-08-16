@@ -1,5 +1,7 @@
 ---
 name: rune-size
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use after a task file is written and before it can be executed, to judge whether one fresh executor could finish the whole task - understanding, implementation, tests, and handoff - with context to spare. Returns pass, split, or blocked.
 ---

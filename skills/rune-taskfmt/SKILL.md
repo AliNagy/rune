@@ -239,6 +239,20 @@ checkout is not the task checkout.
 which skill to follow. A dispatch names one job, one skill, stable checkout identities,
 and pointers — never file contents.
 
+**Dispatch is not a figure of speech.** Every worker skill in the table below declares
+`context: fork` in its frontmatter, so invoking one runs it in a separate context and
+returns only its result. Invoking a skill without `context: fork` — `rune-root`,
+`rune-report`, `rune-serena`, `rune-taskfmt`, `rune-ledger` — loads it into the caller's
+own context. That is the whole difference between the two verbs this system uses:
+
+- **Follow** `rune-x` — load it here, act on it yourself. Reference skills only.
+- **Dispatch** `rune-x` — invoke the skill; the fork happens because its frontmatter says
+  so. You get a short return, not the work.
+
+A parent that finds itself reading source, creating a worktree, or running a test suite
+has followed a worker skill that should have forked. Check its frontmatter before
+continuing; do not carry on doing the worker's job by hand.
+
 | Job | The worker follows |
 |---|---|
 | map an unfamiliar codebase | `rune-survey` |
@@ -252,6 +266,10 @@ and pointers — never file contents.
 | answer a question about the code | `rune-investigate` |
 | answer a question from outside the repo | `rune-research` |
 | reproduce a bug | `rune-bug` |
+
+`rune-oracle` and `rune-drift` are the two exceptions: both are dispatched by parents and
+followed inline by workers, so neither forks yet. Until that is split, a parent dispatching
+either one must confirm it is not doing the work in its own context.
 
 **Never specify a model.** A subagent runs on whatever the session is running on. Model
 selection is a separate concern that does not belong in these files.

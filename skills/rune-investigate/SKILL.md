@@ -1,5 +1,7 @@
 ---
 name: rune-investigate
+context: fork
+allowed-tools: Skill, Read, Glob, Grep, Write, Bash, mcp__serena__get_symbols_overview, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols
 user-invocable: false
 description: Use when the request is a question rather than a change - why something is slow, whether an approach is feasible, diagnosis without a fix. Read-only, and terminates in a written answer rather than an implementation.
 ---

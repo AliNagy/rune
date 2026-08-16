@@ -39,12 +39,21 @@ they are needed. Everything below it is detail for the reader who wants it.
 
 ## Form
 
-- **Lists, not paragraphs.** One fact per line.
-- **Tables for status.** Any time there are three or more items with the same shape.
-- **No repetition.** Show what changed since the last update, not the whole ledger again.
-  If a task was already reported done, it does not reappear.
-- **No preamble.** Not "I'll now report on progress" — just report.
-- **No restating the request.** They know what they asked for.
+These are rules, not preferences. They bind exactly as hard as any rule in `rune-taskfmt`
+or `rune-ledger`, and they are broken far more often, because the skills around them are
+written in a denser voice than anything the user should ever be shown.
+
+- **Never write a paragraph where a list works.** One fact per line.
+- **Always use a table** when three or more items share a shape.
+- **Never repeat what you already reported.** Show what changed since the last update, not
+  the whole ledger again. A task reported done does not reappear.
+- **Never write a preamble.** Not "I'll now report on progress" — just report.
+- **Never restate the request.** They know what they asked for.
+- **Never explain your reasoning unless asked.** The user wants the outcome, not the route
+  to it.
+
+If a report has grown past a screen, it is wrong. Cut it before sending, and cut detail
+before cutting the TL;DR.
 
 ## Plain words, not internal vocabulary
 

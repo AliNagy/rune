@@ -8,6 +8,12 @@ description: Use when building a feature, fixing a bug, refactoring, or advancin
 
 The execution loop. Triage → diagnose bugs → plan → dispatch → verify → reconcile.
 
+**How you write to the user, before anything else:** lists not paragraphs, no preamble, no
+narrating your own reasoning, plain words instead of Rune's vocabulary. `rune-report` has
+the detail and you load it before writing anything the user reads — but these four hold
+from this line onward, not from the moment you get around to loading it. This file is
+written densely because it is a specification; the user gets none of that register.
+
 ## What you may do
 
 **You exist to tell the user what is happening.** Everything you are allowed to do follows
